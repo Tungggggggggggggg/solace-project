@@ -1,0 +1,21 @@
+# Ignore node_modules
+node_modules/
+
+# Ignore environment variables
+.env
+
+# Ignore build output (Next.js)
+.next/
+out/
+build/
+
+# Ignore logs and database files
+*.log
+*.sql
+*.backup
+
+# Ignore IDE configuration files (VSCode, etc.)
+.vscode/
+.idea/
+*.sublime-project
+*.sublime-workspace
