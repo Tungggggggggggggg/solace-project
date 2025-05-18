@@ -1,12 +1,12 @@
-const express = require('express');
-const dotenv = require('dotenv');
+const express = require("express");
+const dotenv = require("dotenv");
 
 dotenv.config();
 const app = express();
 app.use(express.json());
 
-app.get('/', (req, res) => {
-  res.send('Solace API');
+app.get("/", (req, res) => {
+    res.send("Solace API");
 });
 
 const PORT = process.env.PORT || 5000;

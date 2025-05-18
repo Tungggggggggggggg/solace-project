@@ -1,103 +1,58 @@
-import Image from "next/image";
+"use client";
 
+// Import các component và hook cần thiết
+import { useState } from "react";
+import Header from "../components/Header";
+import Tabs from "../components/Tabs";
+import InputSection from "../components/InputSection";
+import Post from "../components/Post";
+import LeftSidebar from "../components/LeftSidebar";
+import RightSidebar from "../components/RightSidebar";
+import AuthModal from "../components/AuthModal";
+
+// Component Home hiển thị trang chính của ứng dụng
 export default function Home() {
-  return (
-    <div className="grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20 font-[family-name:var(--font-geist-sans)]">
-      <main className="flex flex-col gap-[32px] row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="list-inside list-decimal text-sm/6 text-center sm:text-left font-[family-name:var(--font-geist-mono)]">
-          <li className="mb-2 tracking-[-.01em]">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] px-1 py-0.5 rounded font-[family-name:var(--font-geist-mono)] font-semibold">
-              src/app/page.tsx
-            </code>
-            .
-          </li>
-          <li className="tracking-[-.01em]">
-            Save and see your changes instantly.
-          </li>
-        </ol>
+  // State để kiểm soát hiển thị modal đăng nhập/đăng ký
+  const [showAuth, setShowAuth] = useState(false);
+  // State để xác định tab mặc định của modal (login hoặc signup)
+  const [authTab, setAuthTab] = useState<'login' | 'signup'>('login');
 
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:w-auto"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 w-full sm:w-auto md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Read our docs
-          </a>
+  // Hàm mở modal với tab tương ứng
+  const handleOpenAuth = (tab: 'login' | 'signup') => {
+    setAuthTab(tab);
+    setShowAuth(true);
+  };
+
+  return (
+    // Container chính với gradient background
+    <div className="min-h-screen w-full bg-gradient-to-br from-[#E1ECF7] to-[#AECBEB]">
+      {/* Header với khả năng mở modal đăng nhập/đăng ký */}
+      <Header onOpenAuth={handleOpenAuth} />
+      {/* Modal xác thực (đăng nhập/đăng ký) */}
+      {showAuth && <AuthModal onClose={() => setShowAuth(false)} defaultTab={authTab} />}
+      {/* Layout chính với sidebar và nội dung */}
+      <div className="flex w-full mt-4 items-center">
+        {/* Sidebar trái hiển thị các icon điều hướng */}
+        <LeftSidebar />
+        {/* Nội dung chính */}
+        <div className="flex-1">
+          {/* Tabs để chuyển đổi giữa các loại bài đăng */}
+          <Tabs />
+          {/* Phần nhập liệu để tạo bài đăng mới */}
+          <InputSection />
+          {/* Component hiển thị một bài đăng mẫu */}
+          <Post
+            name="NAME"
+            date="09:37 PM +07, May 15, 2025"
+            content="Content Content Content Content Content Content Content Content Content Content Content Content Content Content Content Content Content Content"
+            likes={123}
+            comments={123}
+            shares={123}
+          />
         </div>
-      </main>
-      <footer className="row-start-3 flex gap-[24px] flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
-          />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
-      </footer>
+        {/* Sidebar phải hiển thị danh sách bạn bè */}
+        <RightSidebar />
+      </div>
     </div>
   );
 }
