@@ -2,7 +2,11 @@
 import { useRouter, usePathname } from "next/navigation";
 
 // Component LeftSidebar hiển thị thanh điều hướng bên trái
-const LeftSidebar = () => {
+interface LeftSidebarProps {
+  theme?: 'inspiring' | 'reflective';
+}
+
+const LeftSidebar = ({ theme = 'inspiring' }: LeftSidebarProps) => {
   // Khởi tạo router và pathname để điều hướng và xác định trang hiện tại
   const router = useRouter();
   const pathname = usePathname();
@@ -16,7 +20,7 @@ const LeftSidebar = () => {
 
   return (
     // Container cho sidebar trái
-    <div className="w-24 bg-[#AECBEB] rounded-r-[50px] flex flex-col items-center mt-8 shadow-lg py-8">
+    <div className={`w-24 rounded-r-[50px] flex flex-col items-center mt-8 shadow-lg py-8 ${theme === 'reflective' ? 'bg-[#D5BDAF]' : 'bg-[#AECBEB]'}`}>
       <div className="flex flex-col gap-8">
         {icons.map((icon, idx) => (
           // Nút điều hướng cho mỗi icon

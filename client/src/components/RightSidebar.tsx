@@ -1,11 +1,15 @@
 // Component RightSidebar hiển thị danh sách bạn bè
-const RightSidebar = () => {
+interface RightSidebarProps {
+  theme?: 'inspiring' | 'reflective';
+}
+
+const RightSidebar = ({ theme = 'inspiring' }: RightSidebarProps) => {
   // Danh sách bạn bè mẫu
   const friends = ["NAME", "NAME", "NAME", "NAME", "NAME"];
 
   return (
     // Container cho sidebar phải
-    <div className="w-56 p-6 bg-[#AECBEB] rounded-l-[50px] flex flex-col items-center">
+    <div className={`w-56 p-6 rounded-l-[50px] flex flex-col items-center ${theme === 'reflective' ? 'bg-[#D5BDAF]' : 'bg-[#AECBEB]'}`}>
       {/* Tiêu đề */}
       <div className="text-center mb-6">
         <h2 className="text-black font-bold text-xl font-[Inter] mb-2">Friend</h2>
