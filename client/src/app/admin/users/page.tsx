@@ -2,92 +2,21 @@
 
 import { useState } from 'react';
 import type { ReactElement } from 'react';
-import Image from 'next/image';
-import Link from 'next/link';
-import { FiSearch, FiChevronDown, FiEdit2, FiLock, FiUnlock, FiBell, FiUser,FiSettings,} from 'react-icons/fi';
-import { RiDashboardLine,} from 'react-icons/ri';
-import { HiOutlineUsers, HiOutlineDocumentText, HiOutlineExclamationCircle,} from 'react-icons/hi';
+import { FiSearch, FiChevronDown, FiEdit2, FiLock, FiUnlock } from 'react-icons/fi';
+import AdminLayout from '@/components/AdminLayout';
 
 export default function UserManagementPage(): ReactElement {
-  const [searchQuery, setSearchQuery] = useState('');
   const [selectedStatus, setSelectedStatus] = useState('Tất cả trạng thái');
   const [showDropdown, setShowDropdown] = useState(false);
 
+  // Thêm hàm onOpenAuth
+  const handleOpenAuth = (tab: 'login' | 'signup') => {
+    console.log(`Mở tab ${tab}`); // Thay bằng logic mở modal
+  };
 
   return (
-    <div className="flex min-h-screen bg-white">
-      {/* Sidebar */}
-      <aside className="w-80 bg-white border-r border-gray-200 p-4 flex flex-col justify-between">
-        <div className="space-y-4">
-          <div className="flex items-center gap-3">
-            <div className="w-12 h-12 bg-[#AECBEB] rounded-full"></div>
-            <h1 className="text-xl font-medium text-[#1C170D]">Solace Admin</h1>
-          </div>
-
-          <nav className="space-y-2">
-          <Link href="/admin/overview">
-                <div className="flex items-center gap-3 px-3 py-2 hover:bg-gray-100 rounded-lg text-gray-700 cursor-pointer">
-                    <RiDashboardLine className="w-5 h-5" />
-                    <span className="font-medium">Tổng quan</span>
-                </div>
-            </Link>
-            <Link href="/admin/users">
-              <div className="flex items-center gap-3 px-3 py-2 bg-[#AECBEB] rounded-lg text-black">
-                <HiOutlineUsers className="w-5 h-5" />
-                <span className="font-medium">Quản lý người dùng</span>
-              </div>
-            </Link>
-            <Link href="/admin/posts">
-              <div className="flex items-center gap-3 px-3 py-2 hover:bg-gray-100 rounded-lg text-gray-700 cursor-pointer">
-                <HiOutlineDocumentText className="w-5 h-5" />
-                <span className="font-medium">Quản lý bài đăng</span>
-              </div>
-            </Link>
-
-            <Link href="/admin/reports">
-              <div className="flex items-center gap-3 px-3 py-2 hover:bg-gray-100 rounded-lg text-gray-700 cursor-pointer">
-                <HiOutlineExclamationCircle className="w-5 h-5" />
-                <span className="font-medium">Quản lý báo cáo</span>
-              </div>
-            </Link>
-
-            <Link href="/admin/settings">
-              <div className="flex items-center gap-3 px-3 py-2 hover:bg-gray-100 rounded-lg text-gray-700 cursor-pointer">
-                <FiSettings className="w-5 h-5" />
-                <span className="font-medium">Quản lý cài đặt</span>
-              </div>
-            </Link>
-          </nav>
-        </div>
-      </aside>
-
-      {/* Main Content */}
+    <AdminLayout onOpenAuth={handleOpenAuth}>
       <main className="flex-1 bg-white">
-        {/* Header */}
-        <header className="h-16 bg-[#AECBEB] px-6 flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <Image src="/images/admin-logo.png" alt="Logo" width={100} height={100} className="rounded-full" />
-            <div className="relative">
-              <FiSearch className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500" />
-              <input
-                type="text"
-                placeholder="Search..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-10 pr-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:border-[#AECBEB]"
-              />
-            </div>
-          </div>
-          <div className="flex items-center gap-4">
-            <button className="p-2 hover:bg-gray-100 rounded-full">
-              <FiBell className="w-6 h-6 text-white" />
-            </button>
-            <button className="p-2 hover:bg-gray-100 rounded-full">
-              <FiUser className="w-6 h-6 text-white" />
-            </button>
-          </div>
-        </header>
-
         {/* Content: User Management */}
         <div className="p-6">
           {/* Header */}
@@ -209,6 +138,6 @@ export default function UserManagementPage(): ReactElement {
           </div>
         </div>
       </main>
-    </div>
+    </AdminLayout>
   );
 }
