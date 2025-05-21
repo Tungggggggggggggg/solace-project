@@ -1,20 +1,24 @@
 import React from 'react';
+import Image from 'next/image';
 
 const ProfileInfo: React.FC = () => {
   return (
     <div className="flex flex-col items-center -mt-24 px-4 relative z-10">
       <div className="relative mb-4">
-        <img
+        <Image
           src="https://img.tripi.vn/cdn-cgi/image/width=700,height=700/https://gcs.tripi.vn/public-tripi/tripi-feed/img/474072oeB/anh-dai-dien-buon-ngau_023706184.jpg"
           alt="Avatar"
+          width={160}
+          height={160}
           className="w-40 h-40 rounded-full object-cover border-4 border-white shadow-lg hover:scale-105 transition-transform"
+          unoptimized
         />
         <div className="absolute bottom-2 right-2 w-5 h-5 rounded-full bg-green-500 border-2 border-white" />
       </div>
       <h1 className="text-3xl font-bold font-playfair">Nguyễn Thị Mai</h1>
       <p className="text-gray-500 text-center max-w-xl mt-2">
         Nhà thiết kế đồ họa | Nhiếp ảnh gia nghiệp dư | Yêu động vật và du lịch<br />
-        "Sáng tạo không giới hạn"
+        &quot;Sáng tạo không giới hạn&quot;
       </p>
 
       <div className="flex flex-wrap gap-6 justify-center mt-6">

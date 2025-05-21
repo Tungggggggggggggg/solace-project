@@ -90,12 +90,12 @@ export default function SearchPage() {
           {/* Tiêu đề */}
           <div className="w-full max-w-3xl mb-6">
             <span className="font-bold text-2xl text-[#1E1E1E]">
-              Kết quả tìm kiếm cho: <span className="text-blue-600">"{query}"</span>
+              Kết quả tìm kiếm cho: <span className="text-blue-600">&quot;{query}&quot;</span>
             </span>
           </div>
           {/* Tabs với hiệu ứng underline trượt */}
           <div className="flex gap-6 mb-6 text-lg font-semibold relative">
-            {["all", "post", "friend"].map((t, idx) => (
+            {["all", "post", "friend"].map((t) => (
               <button
                 key={t}
                 className={
@@ -104,7 +104,7 @@ export default function SearchPage() {
                     : "text-gray-500 relative"
                 }
                 style={{ transition: 'color 0.2s' }}
-                onClick={() => setTab(t as any)}
+                onClick={() => setTab(t as "all" | "post" | "friend")}
               >
                 {t === "all" ? "Tất cả" : t === "post" ? "Bài viết" : "Bạn bè"}
                 {tab === t && (

@@ -1,9 +1,8 @@
-import { useRouter } from "next/navigation";
+import React from 'react';
 import { useState } from "react";
 
 // Định nghĩa interface cho props của Post
 interface PostProps {
-  id: string; // Thêm id để điều hướng
   name: string; /* Tên người đăng */
   date: string; /* Thời gian đăng */
   content: string; /* Nội dung bài đăng */
@@ -14,8 +13,7 @@ interface PostProps {
 }
 
 // Component Post hiển thị một bài đăng
-const Post = ({ id, name, date, content, likes, comments, shares, onOpenDetail }: PostProps) => {
-  const router = useRouter();
+const Post = ({ name, date, content, likes, comments, shares, onOpenDetail }: PostProps) => {
   const [clicked, setClicked] = useState(false);
   // Hàm chuyển sang trang chi tiết
   const handleOpenDetail = (e?: React.MouseEvent) => {
@@ -72,26 +70,3 @@ const Post = ({ id, name, date, content, likes, comments, shares, onOpenDetail }
 };
 
 export default Post;
-
-// Thêm style động cho hiệu ứng
-<style jsx global>{`
-  @keyframes fadein {
-    from { opacity: 0; transform: translateY(20px); }
-    to { opacity: 1; transform: none; }
-  }
-  .animate-fadein {
-    animation: fadein 0.5s cubic-bezier(.4,2,.6,1);
-  }
-  .post-card {
-    transition: transform 0.2s cubic-bezier(.4,2,.6,1), box-shadow 0.2s;
-  }
-  .post-card:hover {
-    transform: scale(1.03) translateY(-2px);
-    box-shadow: 0 8px 32px 0 rgba(8,90,180,0.10), 0 1.5px 6px 0 rgba(0,0,0,0.08);
-    z-index: 10;
-  }
-  .post-card.clicked {
-    transform: scale(0.96);
-    box-shadow: 0 2px 8px 0 rgba(8,90,180,0.10), 0 1.5px 6px 0 rgba(0,0,0,0.08);
-  }
-`}</style>

@@ -1,5 +1,6 @@
-import { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { MaterialIcon } from './MaterialIcon';
+import Image from 'next/image';
 
 type User = {
   name: string;
@@ -18,6 +19,9 @@ type Notification = {
 };
 
 const NotificationsPage = () => {
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => { setMounted(true); }, []);
+
   const [activeTab, setActiveTab] = useState<'all' | 'unread' | 'system'>('all');
   const [notifications, setNotifications] = useState<Notification[]>([
     {
@@ -81,6 +85,7 @@ const NotificationsPage = () => {
     return true;
   });
 
+  if (!mounted) return null;
   return (
     <div className="min-h-screen bg-gray-50 text-gray-800">
       <div className="max-w-3xl mx-auto p-5">
@@ -160,12 +165,12 @@ const NotificationsPage = () => {
                   </>
                 ) : (
                   <>
-                    <img src={noti.user?.avatar} className="w-12 h-12 rounded-full mr-4" alt={noti.user?.name} />
+                    <Image src={noti.user?.avatar || '/logo.png'} width={48} height={48} className="w-12 h-12 rounded-full mr-4 object-cover" alt={noti.user?.name || 'avatar'} unoptimized />
                     <div className="flex-1">
                       <div className="mb-1">
                         <strong className="text-purple-600">{noti.user?.name}</strong> {noti.content}
                         {noti.type === 'comment' && (
-                          <div className="mt-1 text-gray-600 italic">"{noti.comment}"</div>
+                          <div className="mt-1 text-gray-600 italic">&quot;{noti.comment}&quot;</div>
                         )}
                       </div>
                       <div className="text-sm text-gray-500">{noti.time}</div>

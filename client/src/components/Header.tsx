@@ -28,7 +28,7 @@ const mockSuggestions = [
 ];
 
 // Component Header hiển thị logo, thanh tìm kiếm và nút đăng nhập/đăng ký
-const Header = ({ onOpenAuth, theme = 'inspiring', searchValue, onSearchChange, onSearch, onSearchKeyDown, ...props }: HeaderProps) => {
+const Header = ({ onOpenAuth, theme = 'inspiring', searchValue, onSearchChange, onSearch, onSearchKeyDown }: HeaderProps) => {
   const router = useRouter();
   const [search, setSearch] = useState("");
   const [showSuggestions, setShowSuggestions] = useState(false);
@@ -77,7 +77,7 @@ const Header = ({ onOpenAuth, theme = 'inspiring', searchValue, onSearchChange, 
   }, []);
 
   const handleSuggestionClick = (suggestion: string) => {
-    if (onSearchChange) onSearchChange({ target: { value: suggestion } } as any);
+    if (onSearchChange) onSearchChange({ target: { value: suggestion } } as React.ChangeEvent<HTMLInputElement>);
     else setSearch(suggestion);
     setShowSuggestions(false);
     if (onSearch) onSearch();
