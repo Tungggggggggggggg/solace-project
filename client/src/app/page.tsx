@@ -2,17 +2,19 @@
 
 // Import các component và hook cần thiết
 import { useState } from "react";
-import Header from "../components/Header";
-import Tabs from "../components/Tabs";
-import InputSection from "../components/InputSection";
-import Post from "../components/Post";
-import LeftSidebar from "../components/LeftSidebar";
-import RightSidebar from "../components/RightSidebar";
-import AuthModal from "../components/AuthModal";
-import PostDetailPopup from "../components/PostDetailPopup";
+import Header from "@/components/Header";
+import Tabs from "@/components/Tabs";
+import InputSection from "@/components/InputSection";
+import Post from "@/components/Post";
+import LeftSidebar from "@/components/LeftSidebar";
+import RightSidebar from "@/components/RightSidebar";
+import AuthModal from "@/components/AuthModal";
+import PostDetailPopup from "@/components/PostDetailPopup";
+import { useUser } from "@/contexts/UserContext";
 
 // Component Home hiển thị trang chính của ứng dụng
 export default function Home() {
+  const { user } = useUser();
   // State để kiểm soát hiển thị modal đăng nhập/đăng ký
   const [showAuth, setShowAuth] = useState(false);
   // State để xác định tab mặc định của modal (login hoặc signup)
@@ -32,8 +34,10 @@ export default function Home() {
 
   // Hàm mở modal với tab tương ứng
   const handleOpenAuth = (tab: 'login' | 'signup') => {
-    setAuthTab(tab);
-    setShowAuth(true);
+    if (!user) { // Chỉ mở modal nếu chưa đăng nhập
+      setAuthTab(tab);
+      setShowAuth(true);
+    }
   };
 
   // Xác định theme dựa trên tab
@@ -50,8 +54,8 @@ export default function Home() {
     <div className={`min-h-screen w-full ${bgClass}`}>
       {/* Header với khả năng mở modal đăng nhập/đăng ký */}
       <Header onOpenAuth={handleOpenAuth} theme={theme} />
-      {/* Modal xác thực (đăng nhập/đăng ký) */}
-      {showAuth && <AuthModal onClose={() => setShowAuth(false)} defaultTab={authTab} />}
+      {/* Modal xác thực (đăng nhập/đăng ký) chỉ hiển thị khi chưa đăng nhập */}
+      {showAuth && !user && <AuthModal onClose={() => setShowAuth(false)} defaultTab={authTab} />}
       {/* Layout chính với sidebar và nội dung */}
       <div className="flex w-full mt-4 items-center">
         {/* Sidebar trái hiển thị các icon điều hướng */}

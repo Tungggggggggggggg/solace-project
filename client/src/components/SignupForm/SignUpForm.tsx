@@ -1,10 +1,12 @@
-// Import hook và icon cần thiết
+// Import hook cần thiết
 import { useState } from "react";
-import { FaFacebookF } from "react-icons/fa";
-import { FcGoogle } from "react-icons/fc";
+
+interface SignUpFormProps {
+  onSuccess?: () => void;
+}
 
 // Component SignUpForm xử lý form đăng ký
-const SignUpForm = () => {
+const SignUpForm = ({ onSuccess }: SignUpFormProps) => {
   // State để quản lý dữ liệu form
   const [form, setForm] = useState({
     firstName: "",
@@ -21,7 +23,7 @@ const SignUpForm = () => {
   };
 
   // Hàm xử lý submit form
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     // Kiểm tra dữ liệu đầu vào
     if (!form.firstName || !form.lastName || !form.email || !form.password) {
@@ -30,6 +32,7 @@ const SignUpForm = () => {
     }
     setError("");
     alert("Đăng ký thành công!");
+    onSuccess?.();
   };
 
   return (
@@ -100,28 +103,6 @@ const SignUpForm = () => {
         className="w-full py-3 mt-2 bg-black text-white font-bold rounded-full hover:bg-blue-700 transition-all text-lg shadow"
       >
         Sign up
-      </button>
-      {/* Phân cách cho các tùy chọn đăng ký khác */}
-      <div className="flex items-center gap-2 my-2">
-        <div className="flex-1 h-px bg-gray-300" />
-        <span className="text-gray-500 text-base font-semibold">OR</span>
-        <div className="flex-1 h-px bg-gray-300" />
-      </div>
-      {/* Nút đăng ký bằng Facebook */}
-      <button
-        type="button"
-        className="w-full flex items-center gap-3 border border-gray-300 rounded-full py-3 text-base mb-2 hover:bg-gray-100 transition justify-center"
-      >
-        <span className="text-blue-600 text-2xl"><FaFacebookF /></span>
-        <span className="text-black">Sign up with Facebook</span>
-      </button>
-      {/* Nút đăng ký bằng Google */}
-      <button
-        type="button"
-        className="w-full flex items-center gap-3 border border-gray-300 rounded-full py-3 text-base hover:bg-gray-100 transition justify-center"
-      >
-        <span className="text-xl"><FcGoogle /></span>
-        <span className="text-black">Sign up with Google</span>
       </button>
     </form>
   );

@@ -2,6 +2,7 @@
 import type { Metadata } from "next";
 import { Be_Vietnam_Pro } from "next/font/google";
 import "./globals.css";
+import { UserContextProvider } from "@/contexts/UserContext";
 
 // Cấu hình font Be Vietnam Pro với các trọng lượng và hỗ trợ tiếng Việt
 const beVietnamPro = Be_Vietnam_Pro({
@@ -29,13 +30,16 @@ export default function RootLayout({
       <head>
         {/* Thêm Google Material Symbols để sử dụng icon */}
         <link
-          href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200"
+          href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200&display=optional"
           rel="stylesheet"
         />
       </head>
       {/* Body áp dụng font và tối ưu chống răng cưa */}
-      <body className={`${beVietnamPro.variable} font-be-vietnam antialiased`}>
-        {children}
+      <body
+        className={`${beVietnamPro.variable} font-be-vietnam antialiased`}
+        suppressHydrationWarning
+      >
+        <UserContextProvider>{children}</UserContextProvider>
       </body>
     </html>
   );

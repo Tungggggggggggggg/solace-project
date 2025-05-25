@@ -3,6 +3,7 @@ import { useState } from "react";
 
 // Định nghĩa interface cho props của Post
 interface PostProps {
+  id: string; /* ID của bài đăng */
   name: string; /* Tên người đăng */
   date: string; /* Thời gian đăng */
   content: string; /* Nội dung bài đăng */
@@ -13,20 +14,24 @@ interface PostProps {
 }
 
 // Component Post hiển thị một bài đăng
-const Post = ({ name, date, content, likes, comments, shares, onOpenDetail }: PostProps) => {
+const Post = ({ id, name, date, content, likes, comments, shares, onOpenDetail }: PostProps) => {
   const [clicked, setClicked] = useState(false);
+
   // Hàm chuyển sang trang chi tiết
   const handleOpenDetail = (e?: React.MouseEvent) => {
     if (e) e.stopPropagation();
     setClicked(true);
     setTimeout(() => {
+      onOpenDetail?.();
       setClicked(false);
-      if (onOpenDetail) onOpenDetail();
-    }, 120); // 120ms cho hiệu ứng
+    }, 300);
   };
   return (
     // Container cho bài đăng
-    <div className={`bg-[#E1ECF7] rounded-[40px] shadow max-w-xl mx-auto my-6 px-8 py-6 post-card animate-fadein ${clicked ? 'clicked' : ''}`}>
+    <div 
+      id={`post-${id}`}
+      className={`bg-[#E1ECF7] rounded-[40px] shadow max-w-xl mx-auto my-6 px-8 py-6 post-card animate-fadein ${clicked ? 'clicked' : ''}`}
+    >
       {/* Thông tin người đăng */}
       <div className="flex items-center mb-3">
         {/* Avatar placeholder */}
