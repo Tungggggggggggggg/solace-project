@@ -1,69 +1,93 @@
 "use client";
 
-import React from 'react';
+import React, { useRef, useEffect, useState } from 'react';
+import { gsap } from 'gsap';
 
+// Định nghĩa kiểu props cho Toast
 interface ToastProps {
   message: string;
   type: 'success' | 'error' | 'info' | 'warning';
   onClose: () => void;
 }
 
+// Component Toast: Hiển thị thông báo trạng thái với hiệu ứng động và màu sắc theo loại thông báo
 const Toast: React.FC<ToastProps> = ({ message, type, onClose }) => {
-  const [isClosing, setIsClosing] = React.useState(false);
+  const [isClosing, setIsClosing] = useState(false);
+  const toastRef = useRef<HTMLDivElement>(null);
+  const closeTimeout = useRef<NodeJS.Timeout | null>(null);
 
-  React.useEffect(() => {
-    const timer = setTimeout(() => {
-      setIsClosing(true);
-      setTimeout(onClose, 300);
-    }, 3000);
+  // Hiệu ứng xuất hiện khi Toast được mount
+  useEffect(() => {
+    if (toastRef.current) {
+      gsap.fromTo(
+        toastRef.current,
+        { opacity: 0, y: 30, scale: 0.95 },
+        { opacity: 1, y: 0, scale: 1, duration: 0.5, ease: 'power3.out' }
+      );
+    }
+    // Tự động đóng Toast sau 3 giây
+    closeTimeout.current = setTimeout(() => setIsClosing(true), 3000);
+    return () => {
+      if (closeTimeout.current) clearTimeout(closeTimeout.current);
+    };
+  }, []);
 
-    return () => clearTimeout(timer);
-  }, [onClose]);
+  // Hiệu ứng biến mất khi Toast đóng
+  useEffect(() => {
+    if (isClosing && toastRef.current) {
+      gsap.to(toastRef.current, {
+        opacity: 0,
+        y: -24,
+        scale: 0.92,
+        duration: 0.35,
+        ease: 'power2.in',
+        onComplete: onClose,
+      });
+    }
+  }, [isClosing, onClose]);
 
+  // Cấu hình màu sắc, icon, border cho từng loại Toast
   const toastConfig = {
     success: {
-      bgColor: 'bg-green-400',
+      bgColor: 'bg-green-100',
       icon: 'check_circle',
-      ringColor: 'ring-green-300',
-      textColor: 'text-green-900'
+      borderColor: 'border-green-400',
+      textColor: 'text-green-800'
     },
     error: {
-      bgColor: 'bg-red-400',
+      bgColor: 'bg-red-100',
       icon: 'error',
-      ringColor: 'ring-red-300',
-      textColor: 'text-red-900'
+      borderColor: 'border-red-400',
+      textColor: 'text-red-800'
     },
     warning: {
-      bgColor: 'bg-yellow-400',
+      bgColor: 'bg-yellow-100',
       icon: 'warning',
-      ringColor: 'ring-yellow-300',
-      textColor: 'text-yellow-900'
+      borderColor: 'border-yellow-400',
+      textColor: 'text-yellow-800'
     },
     info: {
-      bgColor: 'bg-blue-400',
+      bgColor: 'bg-blue-100',
       icon: 'info',
-      ringColor: 'ring-blue-300',
-      textColor: 'text-blue-900'
+      borderColor: 'border-blue-400',
+      textColor: 'text-blue-800'
     }
   };
 
   const config = toastConfig[type];
 
   return (
-    <div 
-      className={`fixed top-4 left-1/2 -translate-x-1/2 z-50 min-w-[320px] max-w-[90vw] transition-all duration-300 ${
-        isClosing 
-          ? 'opacity-0 -translate-y-4' 
-          : 'opacity-100 translate-y-0'
-      }`}
+    <div
+      ref={toastRef}
+      className={`fixed top-4 left-1/2 -translate-x-1/2 z-[9999] min-w-[320px] max-w-[90vw]`}
       role="alert"
       aria-live="assertive"
     >
-      <div 
+      <div
         className={`
-          flex items-center gap-3 px-6 py-4 rounded-lg shadow-lg 
-          ${config.bgColor} 
-          ring-4 ${config.ringColor}
+          flex items-center gap-3 px-6 py-4 rounded-lg shadow-lg
+          ${config.bgColor}
+          border ${config.borderColor}
           backdrop-blur-sm bg-opacity-90
         `}
       >
@@ -71,8 +95,8 @@ const Toast: React.FC<ToastProps> = ({ message, type, onClose }) => {
           {config.icon}
         </span>
         <p className={`font-medium text-base ${config.textColor}`}>{message}</p>
-        <button 
-          onClick={() => setIsClosing(true)} 
+        <button
+          onClick={() => setIsClosing(true)}
           className="ml-auto text-black/60 hover:text-black transition-colors"
           aria-label="Đóng thông báo"
         >
