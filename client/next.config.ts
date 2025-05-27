@@ -8,6 +8,14 @@ const nextConfig: NextConfig = {
       'graph.facebook.com' // Facebook user avatars (alternate domain)
     ],
   },
+  async rewrites() {
+    return [
+      {
+        source: '/api/:path*',
+        destination: 'http://localhost:5000/api/:path*'
+      }
+    ];
+  }
 };
 
 export default nextConfig;

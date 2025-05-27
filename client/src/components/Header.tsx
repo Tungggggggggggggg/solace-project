@@ -1,6 +1,6 @@
 "use client";
 
-import React, { FC, useEffect, useRef } from "react";
+import React, { FC, useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { useUser } from "@/contexts/UserContext";
@@ -18,9 +18,6 @@ interface HeaderProps {
   onSearchKeyDown?: (e: React.KeyboardEvent<HTMLInputElement>) => void;
 }
 
-// Danh sách gợi ý tìm kiếm mẫu
-const mockSuggestions = ["ReactJS", "NextJS", "NodeJS", "Solace", "Figma", "Design System", "UI/UX", "TypeScript", "JavaScript"];
-
 // Component Header: Thanh điều hướng trên cùng của ứng dụng
 const Header: FC<HeaderProps> = ({
   onOpenAuth,
@@ -37,7 +34,7 @@ const Header: FC<HeaderProps> = ({
   // State hiển thị danh sách gợi ý
   const [showSuggestions, setShowSuggestions] = React.useState(false);
   // State lưu danh sách gợi ý đã lọc
-  const [filteredSuggestions, setFilteredSuggestions] = React.useState<string[]>([]);
+  const [suggestions, setSuggestions] = useState<any[]>([]);
   // State hiển thị menu người dùng
   const [showUserMenu, setShowUserMenu] = React.useState(false);
   // State hiển thị Toast thông báo
@@ -50,9 +47,10 @@ const Header: FC<HeaderProps> = ({
   const signupBtnRef = useRef<HTMLButtonElement>(null);
 
   // Xác định giá trị hiện tại của ô tìm kiếm
-  const value = searchValue !== undefined ? searchValue : search;
+  const isControlled = typeof searchValue === 'string' && typeof onSearchChange === 'function';
+  const value = isControlled ? searchValue : search;
   // Hàm xử lý thay đổi giá trị ô tìm kiếm
-  const handleChange = onSearchChange || ((e) => setSearch(e.target.value));
+  const handleChange = isControlled ? onSearchChange : ((e: React.ChangeEvent<HTMLInputElement>) => setSearch(e.target.value));
   // Hàm xử lý sự kiện nhấn phím trong ô tìm kiếm
   const handleKeyDown = onSearchKeyDown || ((e) => {
     if (e.key === "Enter") {
@@ -67,13 +65,18 @@ const Header: FC<HeaderProps> = ({
     setShowSuggestions(false);
   });
 
-  // Lọc gợi ý tìm kiếm khi giá trị thay đổi
+  // Lấy gợi ý tìm kiếm từ API khi giá trị thay đổi
   useEffect(() => {
-    const keyword = value.trim().toLowerCase();
+    const keyword = value.trim();
     if (keyword) {
-      setFilteredSuggestions(mockSuggestions.filter((s) => s.toLowerCase().includes(keyword)));
-      setShowSuggestions(true);
+      fetch(`/api/search-suggestions?query=${encodeURIComponent(keyword)}`)
+        .then(res => res.json())
+        .then(data => {
+          setSuggestions(Array.isArray(data) ? data : []);
+          setShowSuggestions(true);
+        });
     } else {
+      setSuggestions([]);
       setShowSuggestions(false);
     }
   }, [value]);
@@ -97,12 +100,12 @@ const Header: FC<HeaderProps> = ({
   }, []);
 
   // Xử lý chọn gợi ý tìm kiếm
-  const handleSuggestionClick = (suggestion: string) => {
-    if (onSearchChange) onSearchChange({ target: { value: suggestion } } as React.ChangeEvent<HTMLInputElement>);
-    else setSearch(suggestion);
+  const handleSuggestionClick = (suggestion: any) => {
+    if (onSearchChange) onSearchChange({ target: { value: suggestion.name } } as React.ChangeEvent<HTMLInputElement>);
+    else setSearch(suggestion.name);
     setShowSuggestions(false);
     if (onSearch) onSearch();
-    else router.push(`/search?query=${encodeURIComponent(suggestion)}`);
+    else router.push(`/search?query=${encodeURIComponent(suggestion.name)}`);
   };
 
   // Hiển thị Toast thông báo
@@ -188,11 +191,13 @@ const Header: FC<HeaderProps> = ({
               </svg>
             </div>
           </div>
-          {showSuggestions && filteredSuggestions.length > 0 && (
+          {showSuggestions && suggestions.length > 0 && (
             <div className="absolute left-0 right-0 top-full z-50 bg-white border border-black/10 rounded-b-xl shadow-lg max-h-60 overflow-y-auto">
-              {filteredSuggestions.map((s, idx) => (
-                <div key={s + idx} className="px-5 py-3 cursor-pointer hover:bg-[#E1ECF7] text-black text-base" onClick={() => handleSuggestionClick(s)}>
-                  {s}
+              {suggestions.map((s, idx) => (
+                <div key={s.id + s.type + idx} className="flex items-center gap-3 px-5 py-3 cursor-pointer hover:bg-[#E1ECF7] text-black text-base" onClick={() => handleSuggestionClick(s)}>
+                  {s.avatar && <Image src={s.avatar} alt={s.name} width={32} height={32} className="rounded-full" />}
+                  <span className="font-medium">{s.name}</span>
+                  <span className="ml-auto text-xs px-2 py-1 rounded bg-gray-100 text-gray-500 border border-gray-200">{s.type === 'user' ? 'User' : 'Post'}</span>
                 </div>
               ))}
             </div>

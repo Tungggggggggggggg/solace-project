@@ -1,7 +1,10 @@
 'use client';
 
-import { useState, useRef, ChangeEvent } from 'react';
+import { useState, useRef, ChangeEvent, useLayoutEffect } from 'react';
 import { MaterialIcon } from './MaterialIcon';
+import axios from 'axios';
+import { useUser } from '../contexts/UserContext';
+import gsap from 'gsap';
 
 type PrivacyOption = 'public' | 'friends' | 'onlyme';
 
@@ -11,21 +14,81 @@ const privacyOptions: Record<PrivacyOption, { icon: string; text: string; desc: 
   onlyme: { icon: 'lock', text: 'Chỉ mình tôi', desc: 'Chỉ bạn có thể xem' },
 };
 
-export default function CreatePostModal() {
+const FEELINGS = [
+  { icon: '😊', label: 'Vui vẻ' },
+  { icon: '😢', label: 'Buồn' },
+  { icon: '😡', label: 'Tức giận' },
+  { icon: '🥰', label: 'Yêu đời' },
+  { icon: '😱', label: 'Bất ngờ' },
+  { icon: '😴', label: 'Mệt mỏi' },
+  { icon: '🤩', label: 'Hào hứng' },
+  { icon: '😭', label: 'Tổn thương' },
+  { icon: '😇', label: 'Bình yên' },
+];
+
+const POPULAR_LOCATIONS = [
+  'Hà Nội',
+  'TP. Hồ Chí Minh',
+  'Đà Nẵng',
+  'Hải Phòng',
+  'Cần Thơ',
+  'Nha Trang',
+  'Huế',
+  'Vũng Tàu',
+  'Biên Hòa',
+  'Buôn Ma Thuột',
+  'Quy Nhơn',
+  'Phan Thiết',
+  'Hạ Long',
+  'Thanh Hóa',
+  'Nam Định',
+  'Vinh',
+  'Long Xuyên',
+  'Rạch Giá',
+  'Thái Nguyên',
+  'Bắc Ninh',
+];
+
+export default function CreatePostModal({ onClose, onPostCreated, theme }: { onClose?: () => void, onPostCreated?: (post: any) => void, theme?: string }) {
   const [content, setContent] = useState('');
   const [images, setImages] = useState<string[]>([]);
   const [privacy, setPrivacy] = useState<PrivacyOption>('public');
   const [showPrivacyModal, setShowPrivacyModal] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
+  const [uploading, setUploading] = useState(false);
+  const { user } = useUser();
+  const [selectedFeeling, setSelectedFeeling] = useState<{icon: string, label: string} | null>(null);
+  const [showFeelingModal, setShowFeelingModal] = useState(false);
+  const [selectedLocation, setSelectedLocation] = useState<string | null>(null);
+  const [showLocationModal, setShowLocationModal] = useState(false);
+  const [locationInput, setLocationInput] = useState('');
+  const [isGettingLocation, setIsGettingLocation] = useState(false);
+  const feelingModalRef = useRef<HTMLDivElement>(null);
+  const locationModalRef = useRef<HTMLDivElement>(null);
+  const statusRef = useRef<HTMLDivElement>(null);
 
-  const handleAddImage = (e: ChangeEvent<HTMLInputElement>) => {
+  const handleAddImage = async (e: ChangeEvent<HTMLInputElement>) => {
     if (!e.target.files) return;
     if (images.length + e.target.files.length > 9) {
       alert('Bạn chỉ có thể tải lên tối đa 9 ảnh');
       return;
     }
-    const files = Array.from(e.target.files).map(file => URL.createObjectURL(file));
-    setImages(prev => [...prev, ...files]);
+    setUploading(true);
+    const formData = new FormData();
+    Array.from(e.target.files).forEach(file => formData.append('media', file));
+    formData.append('user_id', user?.uid || '');
+    formData.append('content', content);
+    formData.append('privacy', privacy);
+    try {
+      const res = await axios.post('/api/posts/upload-media', formData, {
+        baseURL: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000',
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+      setImages(prev => [...prev, ...res.data.images]);
+    } catch (err) {
+      alert('Upload ảnh thất bại');
+    }
+    setUploading(false);
   };
 
   const removeImage = (index: number) => {
@@ -36,21 +99,85 @@ export default function CreatePostModal() {
 
   const isValid = content.trim() !== '' || images.length > 0;
 
-  const handlePost = () => {
-    console.log({ content, images, privacy });
-    alert('Bài viết đã được đăng!');
-    setContent('');
-    setImages([]);
+  const handlePost = async () => {
+    if (uploading) return;
+    if (!user?.uid) {
+      alert('Bạn cần đăng nhập để đăng bài!');
+      return;
+    }
+    if (!content.trim() && images.length === 0) {
+      alert('Nội dung bài viết không được để trống!');
+      return;
+    }
+    setUploading(true);
+    try {
+      const res = await axios.post('/api/posts', {
+        user_id: user?.uid || '',
+        content,
+        privacy,
+        images,
+        feeling: selectedFeeling ? { icon: selectedFeeling.icon, label: selectedFeeling.label } : null,
+        location: selectedLocation || null,
+      }, {
+        baseURL: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000',
+      });
+      alert('Bài viết đã được đăng!');
+      setContent('');
+      setImages([]);
+      setSelectedFeeling(null);
+      setSelectedLocation(null);
+      if (onClose) onClose();
+      if (onPostCreated) onPostCreated(res.data);
+    } catch (err) {
+      alert('Đăng bài thất bại');
+    }
+    setUploading(false);
   };
 
+  useLayoutEffect(() => {
+    if (showFeelingModal && feelingModalRef.current) {
+      gsap.fromTo(
+        feelingModalRef.current,
+        { scale: 0.8, opacity: 0, y: 40 },
+        { scale: 1, opacity: 1, y: 0, duration: 0.4, ease: 'power3.out' }
+      );
+    }
+  }, [showFeelingModal]);
+
+  useLayoutEffect(() => {
+    if (showLocationModal && locationModalRef.current) {
+      gsap.fromTo(
+        locationModalRef.current,
+        { scale: 0.8, opacity: 0, y: 40 },
+        { scale: 1, opacity: 1, y: 0, duration: 0.4, ease: 'power3.out' }
+      );
+    }
+  }, [showLocationModal]);
+
+  useLayoutEffect(() => {
+    if ((selectedFeeling || selectedLocation) && statusRef.current) {
+      gsap.fromTo(
+        statusRef.current,
+        { opacity: 0, y: -10 },
+        { opacity: 1, y: 0, duration: 0.5, ease: 'power2.out' }
+      );
+    }
+  }, [selectedFeeling, selectedLocation]);
+
   return (
-    <div className="fixed inset-0 bg-black/40 flex items-center justify-center px-4 z-50 font-inter text-[#1c1e21]">
-      <div className="bg-white w-full max-w-xl rounded-[20px] overflow-hidden shadow-lg animate-[modalFadeIn_0.4s_ease-out]">
+    <div
+      className="fixed inset-0 bg-black/40 flex items-center justify-center px-4 z-50 font-inter text-[#1c1e21]"
+      onClick={onClose}
+    >
+      <div
+        className="bg-white w-full max-w-xl rounded-[20px] overflow-hidden shadow-lg animate-[modalFadeIn_0.4s_ease-out]"
+        onClick={e => e.stopPropagation()}
+      >
         <div className="flex justify-between items-center px-8 py-6 border-b bg-gradient-to-r from-white to-[#f8f9fd]">
           <h3 className="text-[22px] font-bold text-[#1c1e21] tracking-tight">Tạo bài viết</h3>
           <button
             className="text-[#606770] text-2xl hover:text-[--primary] hover:scale-110 hover:rotate-90 transition"
-            onClick={() => alert('Modal sẽ đóng trong ứng dụng thực tế')}
+            onClick={onClose ? onClose : () => alert('Modal sẽ đóng trong ứng dụng thực tế')}
           >
             ×
           </button>
@@ -59,12 +186,12 @@ export default function CreatePostModal() {
         <div className="px-8 py-8 bg-white">
           <div className="flex items-center mb-6">
             <img
-              src="https://img.tripi.vn/cdn-cgi/image/width=700,height=700/https://gcs.tripi.vn/public-tripi/tripi-feed/img/474072oeB/anh-dai-dien-buon-ngau_023706184.jpg"
+              src={user?.photoURL || '/images/default-avatar.png'}
               className="w-12 h-12 rounded-full border-2 border-[--primary-light] object-cover mr-4"
               alt="avatar"
             />
             <div>
-              <div className="font-semibold">Nguyễn Thị Mai</div>
+              <div className="font-semibold">{user?.displayName || 'Ẩn danh'}</div>
               <div
                 onClick={() => setShowPrivacyModal(true)}
                 className="flex items-center bg-[--primary-light] px-3 py-1 rounded-full text-sm cursor-pointer hover:bg-purple-100 transition mt-1"
@@ -75,6 +202,27 @@ export default function CreatePostModal() {
               </div>
             </div>
           </div>
+
+          {/* Hiển thị cảm xúc và vị trí đã chọn */}
+          {((selectedFeeling && selectedLocation) || (!selectedFeeling && selectedLocation)) && (
+            <div ref={statusRef} className="mb-3 flex flex-wrap items-center gap-2 text-lg font-medium">
+              <span className="font-semibold">{user?.displayName || 'Bạn'}</span>
+              {selectedFeeling && <><span>đang cảm thấy</span><span className="text-2xl">{selectedFeeling.icon}</span><span className="font-semibold text-[#6c5ce7]">{selectedFeeling.label}</span></>}
+              <span>tại</span>
+              <span className="font-semibold text-[#6c5ce7]">{selectedLocation}</span>
+              {selectedFeeling && <button className="ml-2 text-gray-400 hover:text-red-500 text-xl" onClick={() => setSelectedFeeling(null)} title="Xóa cảm xúc">×</button>}
+              {selectedLocation && <button className="ml-2 text-gray-400 hover:text-red-500 text-xl" onClick={() => setSelectedLocation(null)} title="Xóa vị trí">×</button>}
+            </div>
+          )}
+          {selectedFeeling && !selectedLocation && (
+            <div ref={statusRef} className="mb-3 flex flex-wrap items-center gap-2 text-lg font-medium">
+              <span className="font-semibold">{user?.displayName || 'Bạn'}</span>
+              <span>đang cảm thấy</span>
+              <span className="text-2xl">{selectedFeeling.icon}</span>
+              <span className="font-semibold text-[#6c5ce7]">{selectedFeeling.label}</span>
+              <button className="ml-2 text-gray-400 hover:text-red-500 text-xl" onClick={() => setSelectedFeeling(null)} title="Xóa cảm xúc">×</button>
+            </div>
+          )}
 
           <textarea
             placeholder="Bạn đang nghĩ gì?"
@@ -96,10 +244,19 @@ export default function CreatePostModal() {
                   </button>
                 </div>
               ))}
+              {images.length < 9 && (
+                <div
+                  className="flex flex-col items-center justify-center border-2 border-dashed border-black/20 rounded-xl aspect-square cursor-pointer hover:border-[--primary] hover:bg-[--primary-light] transition"
+                  onClick={() => fileRef.current?.click()}
+                >
+                  <MaterialIcon icon="add_a_photo" className="text-[--primary] text-3xl mb-1" />
+                  <span className="text-sm font-medium">Thêm ảnh</span>
+                </div>
+              )}
             </div>
           )}
 
-          <input type="file" hidden ref={fileRef} accept="image/*" multiple onChange={handleAddImage} />
+          <input type="file" hidden ref={fileRef} accept="image/*,video/*" multiple onChange={handleAddImage} />
           {images.length < 1 && (
             <div
               className="text-center py-8 px-6 bg-[#f0f2f5] border-2 border-dashed border-black/10 rounded-xl cursor-pointer hover:border-[--primary] hover:bg-[--primary-light] transition mb-6"
@@ -117,33 +274,54 @@ export default function CreatePostModal() {
               <span>Thêm vào bài viết</span>
             </div>
             <div className="flex flex-wrap gap-3">
-              {[
-                ['mood', 'Cảm xúc'],
-                ['person', 'Gắn thẻ'],
-                ['location_on', 'Vị trí'],
-                ['poll', 'Bình chọn'],
-              ].map(([icon, label]) => (
-                <button
-                  key={label}
-                  className="flex items-center bg-[#f0f2f5] px-4 py-2 rounded-full text-sm font-medium hover:bg-[--primary-light] transition"
-                >
-                  <MaterialIcon icon={icon} className="text-[--primary] mr-1" />
-                  {label}
-                </button>
-              ))}
+              <button
+                type="button"
+                className="flex items-center gap-2 px-5 py-3 rounded-full text-base font-semibold shadow bg-gradient-to-r from-[#f0f2f5] to-[#e0e7ff] hover:from-[#e0e7ff] hover:to-[#f0f2f5] hover:scale-105 transition-all border border-[#e0e7ff] focus:ring-2 focus:ring-[#6c5ce7]"
+                onClick={() => setShowFeelingModal(true)}
+              >
+                <MaterialIcon icon="mood" className="text-yellow-500 text-2xl" />
+                Cảm xúc
+              </button>
+              <button
+                type="button"
+                className="flex items-center gap-2 px-5 py-3 rounded-full text-base font-semibold shadow bg-gradient-to-r from-[#f0f2f5] to-[#e0e7ff] hover:from-[#e0e7ff] hover:to-[#f0f2f5] hover:scale-105 transition-all border border-[#e0e7ff] focus:ring-2 focus:ring-[#6c5ce7]"
+                onClick={() => setShowLocationModal(true)}
+              >
+                <MaterialIcon icon="location_on" className="text-pink-500 text-2xl" />
+                Vị trí
+              </button>
+              <button
+                type="button"
+                className="flex items-center gap-2 px-5 py-3 rounded-full text-base font-semibold shadow bg-gradient-to-r from-[#f0f2f5] to-[#e0e7ff] hover:from-[#e0e7ff] hover:to-[#f0f2f5] hover:scale-105 transition-all border border-[#e0e7ff] focus:ring-2 focus:ring-[#6c5ce7]"
+              >
+                <MaterialIcon icon="person" className="text-blue-500 text-2xl" />
+                Gắn thẻ
+              </button>
+              <button
+                type="button"
+                className="flex items-center gap-2 px-5 py-3 rounded-full text-base font-semibold shadow bg-gradient-to-r from-[#f0f2f5] to-[#e0e7ff] hover:from-[#e0e7ff] hover:to-[#f0f2f5] hover:scale-105 transition-all border border-[#e0e7ff] focus:ring-2 focus:ring-[#6c5ce7]"
+              >
+                <MaterialIcon icon="poll" className="text-green-500 text-2xl" />
+                Bình chọn
+              </button>
             </div>
           </div>
         </div>
 
         <div className="flex justify-end px-8 py-5 border-t bg-gradient-to-r from-[#f8f9fd] to-white">
           <button
-            disabled={!isValid}
+            disabled={!isValid || uploading}
             onClick={handlePost}
-            className={`px-8 py-3 rounded-full font-semibold text-white transition ${
-              isValid ? 'bg-[--primary] hover:bg-[#5b4cd6] hover:-translate-y-0.5 shadow-lg' : 'bg-[#ccd0d5] cursor-not-allowed'
+            style={theme === 'reflective' ? { background: '#E3D5CA', color: '#222' } : {}}
+            className={`px-8 py-3 rounded-full font-semibold transition ${
+              isValid && !uploading
+                ? (theme === 'reflective'
+                    ? 'hover:brightness-95 shadow-lg'
+                    : 'bg-[--primary] hover:bg-[#5b4cd6] hover:-translate-y-0.5 shadow-lg text-white')
+                : 'bg-[#ccd0d5] cursor-not-allowed text-white'
             }`}
           >
-            Đăng
+            {uploading ? 'Đang đăng...' : 'Đăng'}
           </button>
         </div>
       </div>
@@ -177,6 +355,84 @@ export default function CreatePostModal() {
                 {privacy === opt && <MaterialIcon icon="check" className="text-[--primary]" />}
               </div>
             ))}
+          </div>
+        </div>
+      )}
+
+      {showFeelingModal && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50" onClick={() => setShowFeelingModal(false)}>
+          <div ref={feelingModalRef} className="bg-white rounded-2xl p-6 w-full max-w-md shadow-xl relative animate-[modalFadeIn_0.3s_ease-out]" onClick={e => e.stopPropagation()}>
+            <div className="flex justify-between items-center mb-4">
+              <h4 className="text-lg font-bold">Chọn cảm xúc</h4>
+              <button className="text-2xl text-gray-400 hover:text-red-500" onClick={() => setShowFeelingModal(false)}>×</button>
+            </div>
+            <div className="grid grid-cols-3 gap-4">
+              {FEELINGS.map(feel => (
+                <button
+                  key={feel.label}
+                  className="flex flex-col items-center justify-center p-3 rounded-xl hover:bg-[#f0f2f5] transition"
+                  onClick={() => { setSelectedFeeling(feel); setShowFeelingModal(false); }}
+                >
+                  <span className="text-3xl mb-1">{feel.icon}</span>
+                  <span className="font-medium">{feel.label}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showLocationModal && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50" onClick={() => setShowLocationModal(false)}>
+          <div ref={locationModalRef} className="bg-white rounded-2xl p-6 w-full max-w-md shadow-xl relative animate-[modalFadeIn_0.3s_ease-out]" onClick={e => e.stopPropagation()}>
+            <div className="flex justify-between items-center mb-4">
+              <h4 className="text-lg font-bold">Chọn vị trí</h4>
+              <button className="text-2xl text-gray-400 hover:text-red-500" onClick={() => setShowLocationModal(false)}>×</button>
+            </div>
+            <button
+              className="w-full mb-4 flex items-center justify-center gap-2 py-2 px-4 rounded-lg bg-[#f0f2f5] hover:bg-[--primary-light] transition font-medium"
+              disabled={isGettingLocation}
+              onClick={async () => {
+                if (!navigator.geolocation) {
+                  alert('Trình duyệt không hỗ trợ định vị!');
+                  return;
+                }
+                setIsGettingLocation(true);
+                navigator.geolocation.getCurrentPosition(async (pos) => {
+                  try {
+                    const latitude = pos.coords.latitude;
+                    const longitude = pos.coords.longitude;
+                    // Gọi API reverse geocode (dùng OpenStreetMap miễn phí)
+                    const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}`);
+                    const data = await res.json();
+                    setSelectedLocation(data.display_name || `${latitude},${longitude}`);
+                    setShowLocationModal(false);
+                  } catch {
+                    setSelectedLocation(`${pos.coords.latitude},${pos.coords.longitude}`);
+                    setShowLocationModal(false);
+                  }
+                  setIsGettingLocation(false);
+                }, (err) => {
+                  alert('Không lấy được vị trí!');
+                  setIsGettingLocation(false);
+                });
+              }}
+            >
+              <MaterialIcon icon="my_location" className="text-[--primary] text-xl" />
+              {isGettingLocation ? 'Đang lấy vị trí...' : 'Lấy vị trí hiện tại'}
+            </button>
+            <div className="mb-2 text-gray-700 font-semibold">Hoặc chọn vị trí phổ biến:</div>
+            <div className="grid grid-cols-2 gap-2 mb-4">
+              {POPULAR_LOCATIONS.map(loc => (
+                <button
+                  key={loc}
+                  className="py-2 px-3 rounded-lg bg-[#f0f2f5] hover:bg-[--primary-light] transition font-medium text-sm"
+                  onClick={() => { setSelectedLocation(loc); setShowLocationModal(false); }}
+                >
+                  {loc}
+                </button>
+              ))}
+            </div>
           </div>
         </div>
       )}

@@ -1,7 +1,9 @@
 import React from 'react';
+import { useUser } from '../contexts/UserContext';
 
 // Component để tạo bài viết mới
-const CreatePost: React.FC = () => {
+const CreatePost: React.FC<{ onOpenModal: () => void }> = ({ onOpenModal }) => {
+  const { user } = useUser();
   return (
     // Container chính của phần tạo bài viết
     <div className="bg-white dark:bg-gray-800 p-6 rounded-2xl shadow">
@@ -9,15 +11,17 @@ const CreatePost: React.FC = () => {
       <div className="flex items-center mb-4">
         {/* Avatar người dùng */}
         <img
-          src="https://img.tripi.vn/cdn-cgi/image/width=700,height=700/https://gcs.tripi.vn/public-tripi/tripi-feed/img/474072oeB/anh-dai-dien-buon-ngau_023706184.jpg"
+          src={user?.photoURL || '/images/default-avatar.png'}
           alt="User"
           className="w-12 h-12 rounded-full object-cover mr-4 border-2 border-violet-500 hover:scale-105 transition-transform"
         />
         {/* Input nhập nội dung bài viết */}
         <input
           type="text"
-          placeholder="Bạn đang nghĩ gì, Mai?"
+          placeholder={`Bạn đang nghĩ gì, ${user?.displayName || 'bạn'}?`}
           className="flex-1 px-4 py-3 rounded-full bg-gray-100 dark:bg-gray-700 border-none focus:ring-2 focus:ring-violet-300 focus:outline-none"
+          readOnly
+          onClick={onOpenModal}
         />
       </div>
       {/* Phần footer với các tùy chọn thêm vào bài viết */}

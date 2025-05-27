@@ -4,40 +4,7 @@ import Image from "next/image";
 import Header from "@/components/Header";
 import Sidebar from "@/components/LeftSidebar";
 import RightSidebar from "@/components/RightSidebar";
-import { useState, KeyboardEvent, ChangeEvent } from "react";
-
-const mockResults = [
-  {
-    id: 1,
-    type: "friend",
-    name: "Nguyễn Văn A",
-    desc: "Bạn bè",
-    avatar: "/avatar1.png",
-  },
-  {
-    id: 2,
-    type: "group",
-    name: "Nhóm Lập Trình",
-    desc: "Nhóm",
-    avatar: "/group.svg",
-  },
-  {
-    id: 3,
-    type: "post",
-    name: "Bài viết về React",
-    desc: "Bài viết",
-    avatar: "/post.svg",
-  },
-];
-
-function removeVietnameseTones(str: string) {
-  return str
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .replace(/đ/g, "d")
-    .replace(/Đ/g, "D")
-    .toLowerCase();
-}
+import { useState, KeyboardEvent, ChangeEvent, useEffect } from "react";
 
 export default function SearchPage() {
   const router = useRouter();
@@ -45,6 +12,21 @@ export default function SearchPage() {
   const query = searchParams.get("query") || "";
   const [search, setSearch] = useState(query);
   const [tab, setTab] = useState<"all" | "post" | "friend">("all");
+  const [results, setResults] = useState<any[]>([]);
+  const [loading, setLoading] = useState(false);
+
+  // Gọi API lấy kết quả tìm kiếm
+  useEffect(() => {
+    if (!query) {
+      setResults([]);
+      return;
+    }
+    setLoading(true);
+    fetch(`/api/search-suggestions?query=${encodeURIComponent(query)}`)
+      .then(res => res.json())
+      .then(data => setResults(Array.isArray(data) ? data : []))
+      .finally(() => setLoading(false));
+  }, [query]);
 
   // Khi tìm kiếm mới
   const handleSearch = () => {
@@ -57,13 +39,8 @@ export default function SearchPage() {
   };
 
   // Lọc kết quả liên quan
-  const filtered = mockResults.filter(
-    (item) =>
-      removeVietnameseTones(item.name).includes(removeVietnameseTones(query)) ||
-      removeVietnameseTones(item.desc).includes(removeVietnameseTones(query))
-  );
-  const posts = filtered.filter(item => item.type === "post");
-  const friends = filtered.filter(item => item.type === "friend");
+  const posts = results.filter(item => item.type === "post");
+  const users = results.filter(item => item.type === "user");
 
   return (
     <div className="min-h-screen flex flex-col" style={{ fontFamily: "Inter, sans-serif" }}>
@@ -95,19 +72,23 @@ export default function SearchPage() {
           </div>
           {/* Tabs với hiệu ứng underline trượt */}
           <div className="flex gap-6 mb-6 text-lg font-semibold relative">
-            {["all", "post", "friend"].map((t) => (
+            {[
+              { key: "all", label: "Tất cả" },
+              { key: "post", label: "Bài viết" },
+              { key: "user", label: "Người dùng" },
+            ].map((t) => (
               <button
-                key={t}
+                key={t.key}
                 className={
-                  tab === t
+                  tab === t.key
                     ? "text-blue-700 relative"
                     : "text-gray-500 relative"
                 }
                 style={{ transition: 'color 0.2s' }}
-                onClick={() => setTab(t as "all" | "post" | "friend")}
+                onClick={() => setTab(t.key as any)}
               >
-                {t === "all" ? "Tất cả" : t === "post" ? "Bài viết" : "Bạn bè"}
-                {tab === t && (
+                {t.label}
+                {tab === t.key && (
                   <span className="absolute left-0 right-0 -bottom-1 h-1 bg-blue-700 rounded-full animate-slidein" style={{ transition: 'all 0.3s cubic-bezier(.4,2,.6,1)' }} />
                 )}
               </button>
@@ -115,7 +96,9 @@ export default function SearchPage() {
           </div>
           {/* Nội dung theo tab với hiệu ứng fade-in */}
           <div className="w-full max-w-3xl flex flex-col gap-6 animate-fadein">
-            {tab === "all" && (
+            {loading ? (
+              <div className="text-gray-400 text-lg py-8 bg-white rounded-[32px] shadow border-2 border-[#E3E3E3] text-center">Đang tìm kiếm...</div>
+            ) : tab === "all" ? (
               <>
                 <div className="font-bold text-blue-700 mb-2">Bài viết</div>
                 {posts.length === 0 ? (
@@ -127,41 +110,33 @@ export default function SearchPage() {
                       className="flex items-center gap-5 bg-white rounded-[32px] shadow px-8 py-6 border-2 border-[#E3E3E3] search-card"
                     >
                       <div className="w-16 h-16 rounded-full bg-[#F5F5F5] flex items-center justify-center border">
-                        <Image src={item.avatar} alt={item.name} width={48} height={48} className="rounded-full" />
+                        {item.avatar && <Image src={item.avatar} alt={item.name} width={48} height={48} className="rounded-full" />}
                       </div>
                       <div className="flex flex-col flex-1">
                         <span className="font-semibold text-xl">{item.name}</span>
-                        <span className="text-base text-gray-500">{item.desc}</span>
-                      </div>
-                      {/* Icon actions demo */}
-                      <div className="flex gap-6 ml-auto">
-                        <div className="flex items-center gap-1 text-gray-500"><span role="img" aria-label="like">😊</span> Likes</div>
-                        <div className="flex items-center gap-1 text-gray-500"><span role="img" aria-label="comment">💬</span> Comments</div>
-                        <div className="flex items-center gap-1 text-gray-500"><span role="img" aria-label="share">🔗</span> Share</div>
+                        {item.type === 'post' && <span className="text-base text-gray-500">Bài viết</span>}
                       </div>
                     </div>
                   ))
                 )}
-                <div className="font-bold text-blue-700 mt-6 mb-2">Bạn Bè</div>
-                {friends.length === 0 ? (
-                  <div className="text-gray-400 text-lg py-8 bg-white rounded-[32px] shadow border-2 border-[#E3E3E3] text-center">Không có bạn bè phù hợp.</div>
+                <div className="font-bold text-blue-700 mt-6 mb-2">Người dùng</div>
+                {users.length === 0 ? (
+                  <div className="text-gray-400 text-lg py-8 bg-white rounded-[32px] shadow border-2 border-[#E3E3E3] text-center">Không có người dùng phù hợp.</div>
                 ) : (
-                  friends.map((item) => (
+                  users.map((item) => (
                     <div
                       key={item.id}
                       className="flex items-center gap-5 bg-white rounded-[32px] shadow px-8 py-4 border-2 border-[#E3E3E3] search-card"
                     >
                       <div className="w-14 h-14 rounded-full bg-[#F5F5F5] flex items-center justify-center border">
-                        <Image src={item.avatar} alt={item.name} width={40} height={40} className="rounded-full" />
+                        {item.avatar && <Image src={item.avatar} alt={item.name} width={40} height={40} className="rounded-full" />}
                       </div>
                       <span className="font-semibold text-lg flex-1">{item.name}</span>
-                      <button className="bg-blue-500 text-white rounded-full px-4 py-2 font-semibold hover:bg-blue-600 transition">Add friend</button>
                     </div>
                   ))
                 )}
               </>
-            )}
-            {tab === "post" && (
+            ) : tab === "post" ? (
               <>
                 <div className="font-bold text-blue-700 mb-2">Bài viết</div>
                 {posts.length === 0 ? (
@@ -173,38 +148,31 @@ export default function SearchPage() {
                       className="flex items-center gap-5 bg-white rounded-[32px] shadow px-8 py-6 border-2 border-[#E3E3E3] search-card"
                     >
                       <div className="w-16 h-16 rounded-full bg-[#F5F5F5] flex items-center justify-center border">
-                        <Image src={item.avatar} alt={item.name} width={48} height={48} className="rounded-full" />
+                        {item.avatar && <Image src={item.avatar} alt={item.name} width={48} height={48} className="rounded-full" />}
                       </div>
                       <div className="flex flex-col flex-1">
                         <span className="font-semibold text-xl">{item.name}</span>
-                        <span className="text-base text-gray-500">{item.desc}</span>
-                      </div>
-                      <div className="flex gap-6 ml-auto">
-                        <div className="flex items-center gap-1 text-gray-500"><span role="img" aria-label="like">😊</span> Likes</div>
-                        <div className="flex items-center gap-1 text-gray-500"><span role="img" aria-label="comment">💬</span> Comments</div>
-                        <div className="flex items-center gap-1 text-gray-500"><span role="img" aria-label="share">🔗</span> Share</div>
+                        {item.type === 'post' && <span className="text-base text-gray-500">Bài viết</span>}
                       </div>
                     </div>
                   ))
                 )}
               </>
-            )}
-            {tab === "friend" && (
+            ) : (
               <>
-                <div className="font-bold text-blue-700 mb-2">Bạn Bè</div>
-                {friends.length === 0 ? (
-                  <div className="text-gray-400 text-lg py-8 bg-white rounded-[32px] shadow border-2 border-[#E3E3E3] text-center">Không có bạn bè phù hợp.</div>
+                <div className="font-bold text-blue-700 mb-2">Người dùng</div>
+                {users.length === 0 ? (
+                  <div className="text-gray-400 text-lg py-8 bg-white rounded-[32px] shadow border-2 border-[#E3E3E3] text-center">Không có người dùng phù hợp.</div>
                 ) : (
-                  friends.map((item) => (
+                  users.map((item) => (
                     <div
                       key={item.id}
                       className="flex items-center gap-5 bg-white rounded-[32px] shadow px-8 py-4 border-2 border-[#E3E3E3] search-card"
                     >
                       <div className="w-14 h-14 rounded-full bg-[#F5F5F5] flex items-center justify-center border">
-                        <Image src={item.avatar} alt={item.name} width={40} height={40} className="rounded-full" />
+                        {item.avatar && <Image src={item.avatar} alt={item.name} width={40} height={40} className="rounded-full" />}
                       </div>
                       <span className="font-semibold text-lg flex-1">{item.name}</span>
-                      <button className="bg-blue-500 text-white rounded-full px-4 py-2 font-semibold hover:bg-blue-600 transition">Add friend</button>
                     </div>
                   ))
                 )}

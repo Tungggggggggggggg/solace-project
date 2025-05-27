@@ -35,7 +35,7 @@ export default function UserManagementPage(): ReactElement {
       const params = new URLSearchParams();
       if (selectedStatus !== 'Tất cả trạng thái') params.set('status', selectedStatus);
       if (searchText.trim()) params.set('search', searchText);
-      const res = await fetch(`http://localhost:5000/api/users?${params.toString()}`);
+      const res = await fetch(`/api/users?${params.toString()}`);
       const data = await res.json();
       setUsers(data);
     } catch (error) {
@@ -53,7 +53,7 @@ export default function UserManagementPage(): ReactElement {
 
   const toggleUserStatus = async (userId: string, currentStatus: boolean) => {
     try {
-      await fetch(`http://localhost:5000/api/users/${userId}/status`, {
+      await fetch(`/api/users/${userId}/status`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ is_active: !currentStatus })
@@ -245,7 +245,7 @@ export default function UserManagementPage(): ReactElement {
               <button
                 className="px-4 py-2 bg-blue-500 text-white rounded-xl"
                 onClick={async () => {
-                  await fetch(`http://localhost:5000/api/users/${editingUser.id}`, {
+                  await fetch(`/api/users/${editingUser.id}`, {
                     method: 'PUT',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({

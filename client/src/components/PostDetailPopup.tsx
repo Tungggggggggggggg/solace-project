@@ -9,6 +9,7 @@ interface PostDetailPopupProps {
     likes: number;
     comments: number;
     shares: number;
+    images?: string[];
   };
   onClose: () => void;
 }
@@ -18,6 +19,7 @@ const PostDetailPopup = ({ post, onClose }: PostDetailPopupProps) => {
     { user: post.name, text: "0 no flop r" },
   ]);
   const [input, setInput] = useState("");
+  const [selectedImg, setSelectedImg] = useState(0);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => setInput(e.target.value);
   const handleInputKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
@@ -51,13 +53,29 @@ const PostDetailPopup = ({ post, onClose }: PostDetailPopupProps) => {
           </div>
         </div>
         {/* Nội dung & ảnh */}
-        <div className="flex gap-4 mb-4">
-          {[1,2,3].map((_, idx) => (
-            <div key={idx} className="flex-1 flex items-center justify-center">
-              <span className="material-symbols-outlined text-blue-500 text-4xl">image</span>
-            </div>
-          ))}
-        </div>
+        {(post.images && post.images.length > 0 ? post.images : []).length > 0 && (
+          <div className="flex flex-col items-center mb-4">
+            <img
+              src={(post.images && post.images[selectedImg]) || ''}
+              alt="post-large"
+              className="max-h-[400px] max-w-full rounded-2xl mb-2 object-contain cursor-pointer"
+              onClick={() => post.images && window.open(post.images[selectedImg], '_blank')}
+            />
+            {post.images && post.images.length > 1 && (
+              <div className="flex gap-2 mt-2">
+                {post.images.map((img, idx) => (
+                  <img
+                    key={idx}
+                    src={img}
+                    alt={`thumb-${idx}`}
+                    className={`w-16 h-16 object-cover rounded-lg border-2 cursor-pointer ${selectedImg === idx ? 'border-blue-500' : 'border-transparent'}`}
+                    onClick={() => setSelectedImg(idx)}
+                  />
+                ))}
+              </div>
+            )}
+          </div>
+        )}
         <div className="mb-4">
           <p className="text-black text-base font-medium font-[Inter]">{post.content}</p>
         </div>

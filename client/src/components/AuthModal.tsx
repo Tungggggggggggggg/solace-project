@@ -9,6 +9,7 @@ import { signInWithGoogle, signInWithFacebook } from "../lib/firebaseAuth";
 import { FcGoogle } from "react-icons/fc";
 import { FaFacebookF } from "react-icons/fa";
 import { gsap } from 'gsap';
+import axios from "axios";
 
 // Định nghĩa kiểu props cho AuthModal: quản lý đóng modal, tab mặc định và callback thành công
 interface AuthModalProps {
@@ -69,6 +70,16 @@ const AuthModal = ({ onClose, defaultTab = 'signup', onSuccess }: AuthModalProps
     try {
       const userCredential = await signInWithGoogle();
       if (userCredential.user) {
+        // Gửi thông tin user lên backend
+        await axios.post('/api/auth/google', {
+          id: userCredential.user.uid,
+          email: userCredential.user.email,
+          first_name: userCredential.user.displayName?.split(' ')[0] || '',
+          last_name: userCredential.user.displayName?.split(' ').slice(1).join(' ') || '',
+          avatar: userCredential.user.photoURL,
+        }, {
+          baseURL: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000',
+        });
         setToast({ message: `Đăng nhập thành công! Chào mừng, ${userCredential.user.displayName || 'người dùng'}!`, type: "success" });
         onSuccess?.();
       } else {

@@ -42,7 +42,7 @@ const Tabs = ({ onTabChange }: TabsProps) => {
           className={clsx(
             "px-8 py-2 text-lg font-bold font-[Inter] rounded-[16px] transition-all duration-150",
             active === 1
-              ? "bg-[#B7CCEC] text-black shadow"
+              ? "bg-[#E3D5CA] text-black shadow"
               : "bg-transparent text-black hover:bg-[#e1ecf7] hover:font-extrabold"
           )}
         >
