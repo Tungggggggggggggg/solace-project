@@ -1,5 +1,8 @@
 import React from 'react';
 import { useState } from "react";
+import ReportPostModal from './ReportPostModal';
+import { useUser } from '../contexts/UserContext';
+
 
 // Định nghĩa interface cho props của Post
 interface PostProps {
@@ -30,7 +33,10 @@ function getOptimizedCloudinaryUrl(url: string, width = 1000) {
 // Component Post hiển thị một bài đăng
 const Post = ({ id, name, date, content, likes, comments, shares, images, avatar, feeling, location, onOpenDetail, theme }: PostProps) => {
   const [clicked, setClicked] = useState(false);
+  const [showReport, setShowReport] = useState(false);
   const bgColor = theme === 'reflective' ? '#E3D5CA' : '#E1ECF7';
+  const { user } = useUser();
+  const reporterId = user?.uid || '';
 
   // Hàm chuyển sang trang chi tiết
   const handleOpenDetail = (e?: React.MouseEvent) => {
@@ -46,8 +52,23 @@ const Post = ({ id, name, date, content, likes, comments, shares, images, avatar
     <div 
       id={`post-${id}`}
       style={{ background: bgColor }}
-      className={`rounded-[40px] shadow max-w-xl mx-auto my-6 px-8 py-6 post-card animate-fadein ${clicked ? 'clicked' : ''}`}
+      className={`relative rounded-[40px] shadow max-w-xl mx-auto my-6 px-8 py-6 post-card animate-fadein ${clicked ? 'clicked' : ''}`}
     >
+      {/* Nút 3 chấm báo cáo */}
+      <button
+        className="absolute top-4 right-6 text-gray-500 hover:bg-gray-200 rounded-full p-2 z-10"
+        onClick={() => setShowReport(true)}
+        title="Báo cáo bài viết"
+      >
+        <span className="material-symbols-outlined text-2xl">more_horiz</span>
+      </button>
+      {showReport && (
+        <ReportPostModal
+          postId={id}
+          reporterId={reporterId}
+          onClose={() => setShowReport(false)}
+        />
+      )}
       {/* Thông tin người đăng */}
       <div className="flex items-center mb-3">
         {/* Avatar người đăng */}
