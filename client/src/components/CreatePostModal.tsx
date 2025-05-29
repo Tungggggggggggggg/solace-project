@@ -76,7 +76,7 @@ export default function CreatePostModal({ onClose, onPostCreated, theme }: { onC
     setUploading(true);
     const formData = new FormData();
     Array.from(e.target.files).forEach(file => formData.append('media', file));
-    formData.append('user_id', user?.uid || '');
+    formData.append('user_id', user?.id || '');
     formData.append('content', content);
     formData.append('privacy', privacy);
     try {
@@ -101,7 +101,7 @@ export default function CreatePostModal({ onClose, onPostCreated, theme }: { onC
 
   const handlePost = async () => {
     if (uploading) return;
-    if (!user?.uid) {
+    if (!user?.id) {
       alert('Bạn cần đăng nhập để đăng bài!');
       return;
     }
@@ -112,7 +112,7 @@ export default function CreatePostModal({ onClose, onPostCreated, theme }: { onC
     setUploading(true);
     try {
       const res = await axios.post('/api/posts', {
-        user_id: user?.uid || '',
+        user_id: user?.id || '',
         content,
         privacy,
         images,
@@ -186,12 +186,17 @@ export default function CreatePostModal({ onClose, onPostCreated, theme }: { onC
         <div className="px-8 py-8 bg-white">
           <div className="flex items-center mb-6">
             <img
-              src={user?.photoURL || '/images/default-avatar.png'}
+              src={user?.avatar_url || '/images/default-avatar.png'}
               className="w-12 h-12 rounded-full border-2 border-[--primary-light] object-cover mr-4"
               alt="avatar"
             />
             <div>
-              <div className="font-semibold">{user?.displayName || 'Ẩn danh'}</div>
+              <div className="font-semibold">
+                {user?.first_name && user?.last_name
+                  ? `${user.first_name} ${user.last_name}`
+                  : 'Ẩn danh'}
+              </div>
+
               <div
                 onClick={() => setShowPrivacyModal(true)}
                 className="flex items-center bg-[--primary-light] px-3 py-1 rounded-full text-sm cursor-pointer hover:bg-purple-100 transition mt-1"
@@ -206,7 +211,9 @@ export default function CreatePostModal({ onClose, onPostCreated, theme }: { onC
           {/* Hiển thị cảm xúc và vị trí đã chọn */}
           {((selectedFeeling && selectedLocation) || (!selectedFeeling && selectedLocation)) && (
             <div ref={statusRef} className="mb-3 flex flex-wrap items-center gap-2 text-lg font-medium">
-              <span className="font-semibold">{user?.displayName || 'Bạn'}</span>
+              <span className="font-semibold">{user?.first_name && user?.last_name
+                  ? `${user.first_name} ${user.last_name}`
+                  : 'Bạn'}</span>
               {selectedFeeling && <><span>đang cảm thấy</span><span className="text-2xl">{selectedFeeling.icon}</span><span className="font-semibold text-[#6c5ce7]">{selectedFeeling.label}</span></>}
               <span>tại</span>
               <span className="font-semibold text-[#6c5ce7]">{selectedLocation}</span>
@@ -216,7 +223,9 @@ export default function CreatePostModal({ onClose, onPostCreated, theme }: { onC
           )}
           {selectedFeeling && !selectedLocation && (
             <div ref={statusRef} className="mb-3 flex flex-wrap items-center gap-2 text-lg font-medium">
-              <span className="font-semibold">{user?.displayName || 'Bạn'}</span>
+              <span className="font-semibold">{user?.first_name && user?.last_name
+                  ? `${user.first_name} ${user.last_name}`
+                  : 'Bạn'}</span>
               <span>đang cảm thấy</span>
               <span className="text-2xl">{selectedFeeling.icon}</span>
               <span className="font-semibold text-[#6c5ce7]">{selectedFeeling.label}</span>

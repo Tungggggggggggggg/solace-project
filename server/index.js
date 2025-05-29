@@ -1,10 +1,15 @@
-require('dotenv').config();
-const express = require('express');
-const cors = require('cors');
+const express = require("express");
+const dotenv = require("dotenv");
+const cors = require("cors");
+const userRoutes = require("./routes/user.routes"); 
+const authRoutes = require('./routes/auth.routes');
 const postRoutes = require('./routes/posts');
-const authRouter = require('./routes/auth');
 const searchRoutes = require('./routes/search');
 const reportRoutes = require('./routes/reports');
+const cookieParser = require("cookie-parser");
+const pool = require('./db');
+
+dotenv.config();
 
 const app = express();
 
@@ -16,13 +21,22 @@ app.use(cors({
   credentials: true
 }));
 app.use(express.json());
+app.use(cookieParser(process.env.COOKIE_SECRET));
+
+const JWT_SECRET = process.env.JWT_SECRET;
+if (!JWT_SECRET) {
+    console.error("LỖI: JWT_SECRET chưa được định nghĩa trong file .env. Vui lòng kiểm tra lại.");
+    process.exit(1);
+}
 
 app.get('/', (req, res) => {
   res.send('Solace API');
 });
 
+// Gắn API xác thực
+app.use("/api/auth", authRoutes);
+
 app.use('/api/posts', postRoutes);
-app.use('/api/auth', authRouter);
 app.use('/api', searchRoutes);
 app.use('/api/reports', reportRoutes);
 

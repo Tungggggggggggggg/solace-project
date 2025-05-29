@@ -1,7 +1,8 @@
 // Import các hook và component cần thiết cho form đăng nhập
 import { useState, useEffect } from "react";
-import { signInWithEmail } from "@/lib/firebaseAuth";
+import React from "react";
 import Toast from "../Toast";
+import { useUser } from "@/contexts/UserContext";
 
 // Định nghĩa kiểu props cho LoginForm: cho phép truyền callback khi đăng nhập thành công
 interface LoginFormProps {
@@ -10,12 +11,17 @@ interface LoginFormProps {
 
 // Component LoginForm: Xử lý logic và giao diện form đăng nhập người dùng
 const LoginForm = ({ onSuccess }: LoginFormProps) => {
+  // Sử dụng hook để lấy hàm setUserData từ context UserContext
+  // Hàm này sẽ được gọi để lưu thông tin người dùng sau khi đăng nhập thành công
+  const { setUserData } = useUser();
   // State lưu trữ giá trị các trường nhập liệu của form
   const [form, setForm] = useState({
     email: "",
     password: "",
   });
   
+  const [loadingSubmit, setLoadingSubmit] = useState(false);
+
   // State quản lý trạng thái và nội dung của Toast thông báo
   const [toast, setToast] = useState<{
     show: boolean;
@@ -48,26 +54,69 @@ const LoginForm = ({ onSuccess }: LoginFormProps) => {
   // Xử lý submit form đăng nhập
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    // Kiểm tra dữ liệu đầu vào hợp lệ
+    
+    // Kiểm tra dữ liệu đầu vào
     if (!form.email || !form.password) {
       showToast("Vui lòng điền đầy đủ thông tin", "warning");
       return;
     }
+
+    // Validate email format
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(form.email)) {
+      showToast("Email không hợp lệ", "warning");
+      return;
+    }
+
+    setLoadingSubmit(true);
     try {
-      // Gọi hàm đăng nhập bằng email và password
-      await signInWithEmail(form.email, form.password);
-      // Hiển thị thông báo thành công
+      // Gọi API login
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/auth/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: form.email.trim().toLowerCase(),
+          password: form.password
+        }),
+        credentials: 'include', // Để gửi cookie nếu cần
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        // Handle specific error cases
+        if (response.status === 403 && data.error.includes('Vui lòng đăng nhập qua')) {
+          throw new Error(data.error);
+        }
+        throw new Error(data.error || 'Đăng nhập thất bại');
+      }
+
+      // Lưu thông tin người dùng vào context
+      const { user, accessToken } = data;
+      setUserData(user, accessToken);  
+      sessionStorage.setItem("accessToken", accessToken);    
       showToast("Đăng nhập thành công!", "success");
-      // Gọi callback khi đăng nhập thành công (nếu có)
+
+      // Redirect với delay
       setTimeout(() => {
         onSuccess?.();
+        // Clear form
+        setForm({ email: "", password: "" });
       }, 1500);
+
     } catch (err) {
-      // Xử lý lỗi đăng nhập và hiển thị thông báo lỗi
-      const errorMessage = err instanceof Error 
-        ? err.message 
-        : "Đăng nhập thất bại. Vui lòng kiểm tra lại thông tin.";
+      // Xử lý lỗi cụ thể
+      let errorMessage = 'Đăng nhập thất bại. Vui lòng thử lại.';
+      
+      if (err instanceof Error) {
+        errorMessage = err.message.includes('Vui lòng đăng nhập qua')
+          ? err.message
+          : 'Thông tin đăng nhập không chính xác';
+      }
+
       showToast(errorMessage, "error");
+    } finally {
+      setLoadingSubmit(false);
     }
   };
 
@@ -111,9 +160,11 @@ const LoginForm = ({ onSuccess }: LoginFormProps) => {
         {/* Nút submit đăng nhập */}
         <button
           type="submit"
-          className="w-full py-3 mt-2 bg-black text-white font-bold rounded-full hover:bg-blue-700 transition-all text-lg shadow"
+          disabled={loadingSubmit}
+          className={`w-full py-3 mt-2 font-bold rounded-full text-lg shadow transition-all 
+            ${loadingSubmit ? 'bg-gray-400 cursor-not-allowed' : 'bg-black text-white hover:bg-blue-700'}`}
         >
-          Log in
+          {loadingSubmit ? "Đang đăng nhập..." : "Log in"}
         </button>
       </form>
 

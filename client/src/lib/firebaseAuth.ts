@@ -13,18 +13,3 @@ export const signInWithFacebook = async () => {
   const provider = new FacebookAuthProvider();
   return signInWithPopup(auth, provider);
 };
-
-// Đăng ký với email/password
-export const signUpWithEmail = (email: string, password: string): Promise<UserCredential> => {
-  return createUserWithEmailAndPassword(auth, email, password);
-};
-
-// Đăng nhập với email/password
-export const signInWithEmail = (email: string, password: string): Promise<UserCredential> => {
-  return signInWithEmailAndPassword(auth, email, password);
-};
-
-// Đăng xuất
-export const logout = (): Promise<void> => {
-  return signOut(auth);
-};

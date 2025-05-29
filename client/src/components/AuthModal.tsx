@@ -8,6 +8,8 @@ import Toast from "./Toast";
 import { signInWithGoogle, signInWithFacebook } from "../lib/firebaseAuth";
 import { FcGoogle } from "react-icons/fc";
 import { FaFacebookF } from "react-icons/fa";
+import React from "react";
+import { useUser } from "@/contexts/UserContext";
 import { gsap } from 'gsap';
 import axios from "axios";
 
@@ -24,6 +26,8 @@ const AuthModal = ({ onClose, defaultTab = 'signup', onSuccess }: AuthModalProps
   const [tab, setTab] = useState<'signup' | 'login'>(defaultTab);
   // State quản lý Toast thông báo
   const [toast, setToast] = useState<{message: string; type: 'success' | 'error'} | null>(null);
+  // Hook để lấy thông tin người dùng từ context
+  const { setUserData } = useUser();
 
   // Ref cho các phần tử phục vụ hiệu ứng GSAP
   const overlayRef = useRef(null);
@@ -69,17 +73,37 @@ const AuthModal = ({ onClose, defaultTab = 'signup', onSuccess }: AuthModalProps
   const handleGoogleLogin = async () => {
     try {
       const userCredential = await signInWithGoogle();
+      
       if (userCredential.user) {
-        // Gửi thông tin user lên backend
-        await axios.post('/api/auth/google', {
-          id: userCredential.user.uid,
-          email: userCredential.user.email,
-          first_name: userCredential.user.displayName?.split(' ')[0] || '',
-          last_name: userCredential.user.displayName?.split(' ').slice(1).join(' ') || '',
-          avatar: userCredential.user.photoURL,
-        }, {
-          baseURL: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000',
+        const idToken = await userCredential.user.getIdToken();
+        // Lấy thông tin người dùng từ Firebase
+        const user = {
+          displayName: userCredential.user.displayName || 'Người Dùng',
+          email: userCredential.user.email || 'Không có email',
+          photoURL: userCredential.user.photoURL || 'https://placehold.co/150x150?text=Avatar',
+        };
+
+        const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/auth/google-login`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(user),
+          credentials: "include", // Để gửi cookie nếu cần
         });
+        // Lưu thông tin người dùng vào localStorage (hoặc có thể gửi lên server)
+        if( !res.ok) {
+          throw new Error("Lỗi khi lưu thông tin người dùng.");
+        }
+        const data = await res.json();
+        // Kiểm tra xem có dữ liệu người dùng trả về không
+        if (!data || !data.user) {
+          throw new Error("Không có dữ liệu người dùng trả về từ server.");
+        }
+        
+        // Lưu thông tin người dùng vào context hoặc state
+        setUserData(data.user, data.accessToken);
+        
+        
+        // Hiển thị thông báo thành công
         setToast({ message: `Đăng nhập thành công! Chào mừng, ${userCredential.user.displayName || 'người dùng'}!`, type: "success" });
         onSuccess?.();
       } else {

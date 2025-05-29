@@ -1,11 +1,23 @@
-import type { NextConfig } from "next";
-
-const nextConfig: NextConfig = {
+// next.config.js
+const nextConfig = {
   images: {
-    domains: [
-      'lh3.googleusercontent.com', // Google user avatars
-      'platform-lookaside.fbsbx.com', // Facebook user avatars
-      'graph.facebook.com' // Facebook user avatars (alternate domain)
+    remotePatterns: [
+      {
+        protocol: 'https',
+        hostname: 'lh3.googleusercontent.com',
+      },
+      {
+        protocol: 'https',
+        hostname: 'platform-lookaside.fbsbx.com',
+      },
+      {
+        protocol: 'https',
+        hostname: 'graph.facebook.com',
+      },
+      {
+        protocol: 'https',
+        hostname: 'media.istockphoto.com',
+      },
     ],
   },
   async rewrites() {

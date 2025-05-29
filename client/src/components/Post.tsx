@@ -36,7 +36,7 @@ const Post = ({ id, name, date, content, likes, comments, shares, images, avatar
   const [showReport, setShowReport] = useState(false);
   const bgColor = theme === 'reflective' ? '#E3D5CA' : '#E1ECF7';
   const { user } = useUser();
-  const reporterId = user?.uid || '';
+  const reporterId = user?.id || '';
 
   // Hàm chuyển sang trang chi tiết
   const handleOpenDetail = (e?: React.MouseEvent) => {

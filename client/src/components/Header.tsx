@@ -4,7 +4,6 @@ import React, { FC, useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { useUser } from "@/contexts/UserContext";
-import { logout } from "@/lib/firebaseAuth";
 import Toast, { ToastProps } from "./Toast";
 import gsap from "gsap";
 
@@ -28,7 +27,10 @@ const Header: FC<HeaderProps> = ({
   onSearchKeyDown,
 }) => {
   const router = useRouter();
-  const { user } = useUser();
+  const { user, loading, logout } = useUser();
+  console.log("Header rendered with user:", user);
+
+
   // State quản lý giá trị ô tìm kiếm
   const [search, setSearch] = React.useState("");
   // State hiển thị danh sách gợi ý
@@ -39,6 +41,7 @@ const Header: FC<HeaderProps> = ({
   const [showUserMenu, setShowUserMenu] = React.useState(false);
   // State hiển thị Toast thông báo
   const [toast, setToast] = React.useState<{ message: string; type: ToastProps["type"] } | null>(null);
+
 
   // Ref cho các phần tử DOM cần thao tác
   const inputRef = useRef<HTMLDivElement>(null);
@@ -116,11 +119,12 @@ const Header: FC<HeaderProps> = ({
 
   // Xử lý đăng xuất người dùng
   const handleLogout = async () => {
+    if (loading) return; // Nếu đang tải, không thực hiện đăng xuất
     try {
       await logout();
-      setShowUserMenu(false);
+      // Có thể thêm thông báo nếu bạn có hàm showToast
       showToast("Đăng xuất thành công!", "success");
-      router.push("/");
+      router.push("/"); // Chuyển hướng về trang chủ sau khi đăng xuất
     } catch (error) {
       console.error("Logout error:", error);
       const errorMessage = error instanceof Error ? error.message : "Có lỗi xảy ra khi đăng xuất";
@@ -204,7 +208,14 @@ const Header: FC<HeaderProps> = ({
           )}
         </div>
         <div className="flex items-center gap-3 justify-end">
-          {!user && (
+          {loading ? (
+            // Hiển thị placeholder khi đang tải
+            <div className="flex items-center gap-2 p-2">
+              <div className="bg-gray-200 rounded-full w-8 h-8 animate-pulse" />
+              <div className="bg-gray-200 rounded-full w-20 h-4 animate-pulse" />
+            </div>
+          ) : !user ? (
+            // Hiển thị nút đăng nhập/đăng ký nếu chưa đăng nhập
             <>
               <button
                 ref={loginBtnRef}
@@ -233,15 +244,16 @@ const Header: FC<HeaderProps> = ({
                 Sign up
               </button>
             </>
-          )}
-          {user && (
+          ) : (
+            // Hiển thị menu người dùng nếu đã đăng nhập
             <div className="relative" ref={userMenuRef}>
               <button
                 className="flex items-center gap-2 hover:bg-gray-50 rounded-full p-2 transition-all duration-300 ease-in-out group"
                 onClick={() => setShowUserMenu(!showUserMenu)}
               >
-                <Image src={user.photoURL || "/images/default-avatar.png"} alt="User Avatar" width={36} height={36} className="rounded-full ring-2 ring-offset-2 ring-[#8CA9D5] group-hover:ring-blue-600 transition-all" />
-                <span className="text-sm font-medium text-gray-700 group-hover:text-blue-600">{user.displayName}</span>
+                <Image src={user.avatar_url || "https://media.istockphoto.com/id/1337144146/vector/default-avatar-profile-icon-vector.jpg?s=612x612&w=0&k=20&c=BIbFwuv7FxTWvh5S3vB6bkT0Qv8Vn8N5Ffseq84ClGI="} 
+                  alt="User Avatar" width={36} height={36} className="rounded-full ring-2 ring-offset-2 ring-[#8CA9D5] group-hover:ring-blue-600 transition-all" />
+                <span className="text-sm font-medium text-gray-700 group-hover:text-blue-600">{user.last_name} {user.first_name}</span>
               </button>
               {showUserMenu && (
                 <div className="absolute right-0 mt-2 w-48 bg-white rounded-xl shadow-lg py-1 z-50 transform transition-all duration-200 ease-out border border-gray-100">
