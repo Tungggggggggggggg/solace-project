@@ -1,4 +1,3 @@
-// db.js
 const { Pool } = require('pg')
 require('dotenv').config()
 
@@ -31,7 +30,7 @@ pool.on('error', (err) => {
 // Health check định kỳ
 const healthCheckInterval = setInterval(async () => {
   try {
-    await pool.query('SELECT NOW()')
+    await pool.query('SELECT NOW()', []); // Đảm bảo truyền mảng rỗng
   } catch (err) {
     console.error('Database health check failed:', err)
   }
@@ -62,12 +61,16 @@ const getClient = async () => {
   })
 }
 
-const query = async (text, params) => {
+const query = async (text, params = []) => {
   const start = Date.now()
   try {
-    const res = await pool.query(text, params)
+    const res = await pool.query(text, Array.isArray(params) ? params : [])
     const duration = Date.now() - start
-    console.log('Executed query:', { text, duration, rows: res.rowCount })
+    console.log('Executed query:', {
+      text,
+      duration,
+      rows: res?.rowCount ?? 0
+    })
     return res
   } catch (err) {
     console.error('Query error:', { text, params })

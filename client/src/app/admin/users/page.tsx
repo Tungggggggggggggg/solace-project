@@ -8,7 +8,8 @@ import AdminLayout from '@/components/AdminLayout';
 
 type User = {
   id: string;
-  full_name: string;
+  first_name: string;
+  last_name: string;
   email: string;
   role: string;
   user_info?: {
@@ -35,7 +36,7 @@ export default function UserManagementPage(): ReactElement {
       const params = new URLSearchParams();
       if (selectedStatus !== 'Tất cả trạng thái') params.set('status', selectedStatus);
       if (searchText.trim()) params.set('search', searchText);
-      const res = await fetch(`/api/users?${params.toString()}`);
+      const res = await fetch(`http://localhost:5000/api/users?${params.toString()}`);
       const data = await res.json();
       setUsers(data);
     } catch (error) {
@@ -47,13 +48,20 @@ export default function UserManagementPage(): ReactElement {
     fetchUsers();
   }, [selectedStatus]);
 
+  useEffect(() => {
+    if (searchText.trim() === '') {
+      fetchUsers();
+    }
+  }, [searchText]);
+  
+
   const handleSearch = () => {
     fetchUsers();
   };
 
   const toggleUserStatus = async (userId: string, currentStatus: boolean) => {
     try {
-      await fetch(`/api/users/${userId}/status`, {
+      await fetch(`http://localhost:5000/api/users/${userId}/status`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ is_active: !currentStatus })
@@ -146,7 +154,7 @@ export default function UserManagementPage(): ReactElement {
               <table className="w-full">
                 <thead className="bg-white border-b border-[#DBE0E5] sticky top-0 z-10">
                   <tr>
-                    <th className="text-left p-4 font-medium text-gray-900 bg-white">Họ tên</th>
+                    <th className="text-left p-4 font-medium text-gray-900 bg-white">Tên người dùng</th>
                     <th className="text-left p-4 font-medium text-gray-900 bg-white">Email</th>
                     <th className="text-left p-4 font-medium text-gray-900 bg-white">Trạng thái</th>
                     <th className="text-left p-4 font-medium text-gray-900 bg-white">Bài đăng</th>
@@ -156,7 +164,7 @@ export default function UserManagementPage(): ReactElement {
                 <tbody>
                   {users.map((user) => (
                     <tr key={user.id} className="border-b border-[#E5E8EB]">
-                      <td className="p-4 text-gray-800">{user.full_name}</td>
+                      <td className="p-4 text-gray-800">{user.first_name} {user.last_name}</td>
                       <td className="p-4 text-gray-800">{user.email}</td>
                       <td className="p-4">
                         <span
@@ -180,7 +188,7 @@ export default function UserManagementPage(): ReactElement {
                           <button
                             className="p-2 hover:bg-gray-100 rounded-full"
                             onClick={() =>
-                              toggleUserStatus(user.id, user.user_info?.is_active || false)
+                              toggleUserStatus(user.id, user.user_info?.is_active ?? false)
                             }
                           >
                             {user.user_info?.is_active ? (
@@ -211,14 +219,25 @@ export default function UserManagementPage(): ReactElement {
           >
             <h2 className="text-2xl text-gray-800 font-bold mb-4">Chỉnh sửa người dùng</h2>
             <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700">Họ tên</label>
+            <div>
+              <label className="block text-sm font-medium text-gray-700">First_name</label>
                 <input
                   type="text"
                   className="w-full px-4 py-2 text-gray-800 border rounded-xl mt-1"
-                  value={editingUser.full_name}
+                  value={editingUser.first_name}
                   onChange={(e) =>
-                    setEditingUser({ ...editingUser, full_name: e.target.value })
+                    setEditingUser({ ...editingUser, first_name: e.target.value })
+                  }
+                 />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700">Last_name</label>
+                <input
+                  type="text"
+                  className="w-full px-4 py-2 text-gray-800 border rounded-xl mt-1"
+                  value={editingUser.last_name}
+                  onChange={(e) =>
+                    setEditingUser({ ...editingUser, last_name: e.target.value })
                   }
                 />
               </div>
@@ -245,11 +264,12 @@ export default function UserManagementPage(): ReactElement {
               <button
                 className="px-4 py-2 bg-blue-500 text-white rounded-xl"
                 onClick={async () => {
-                  await fetch(`/api/users/${editingUser.id}`, {
+                  await fetch(`http://localhost:5000/api/users/${editingUser.id}`, {
                     method: 'PUT',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
-                      full_name: editingUser.full_name,
+                      first_name: editingUser.first_name,
+                      last_name: editingUser.last_name,
                       email: editingUser.email,
                     }),
                   });
