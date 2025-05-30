@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { FiSearch, FiChevronDown, FiTrash2, FiEye, FiCheck } from 'react-icons/fi';
 import AdminLayout from '@/components/AdminLayout';
 
@@ -21,6 +21,8 @@ export default function PostManagementPage() {
   const [type, setType] = useState<'all' | 'positive' | 'negative'>('all');
   const [status, setStatus] = useState<'all' | 'approved' | 'pending'>('all');
   const [showDropdown, setShowDropdown] = useState(false);
+  const dropdownRef = useRef<HTMLButtonElement>(null);
+  const [dropdownPos, setDropdownPos] = useState({ top: 0, left: 0 });
 
   const fetchPosts = async () => {
     const params = new URLSearchParams();
@@ -28,7 +30,7 @@ export default function PostManagementPage() {
     if (status !== 'all') params.set('status', status);
     if (search.trim()) params.set('search', search);
 
-    const res = await fetch(`http://localhost:5000/api/posts?${params.toString()}`);
+    const res = await fetch(`http://localhost:5000/api/admin/posts?${params.toString()}`);
     const data = await res.json();
     setPosts(data);
   };
@@ -42,13 +44,13 @@ export default function PostManagementPage() {
   }, [search]);
 
   const handleApprove = async (id: string) => {
-    await fetch(`http://localhost:5000/api/posts/${id}/approve`, { method: 'PUT' });
+    await fetch(`http://localhost:5000/api/admin/posts/${id}/approve`, { method: 'PUT' });
     fetchPosts();
   };
 
   const handleDelete = async (id: string) => {
     if (confirm('Bạn có chắc muốn xóa bài này?')) {
-      await fetch(`http://localhost:5000/api/posts/${id}`, { method: 'DELETE' });
+      await fetch(`http://localhost:5000/api/admin/posts/${id}`, { method: 'DELETE' });
       fetchPosts();
     }
   };
@@ -87,7 +89,17 @@ export default function PostManagementPage() {
 
           <div className="relative">
             <button
-              onClick={() => setShowDropdown(!showDropdown)}
+              ref={dropdownRef}
+              onClick={() => {
+                setShowDropdown(!showDropdown);
+                if (!showDropdown && dropdownRef.current) {
+                  const rect = dropdownRef.current.getBoundingClientRect();
+                  setDropdownPos({
+                    top: rect.bottom + window.scrollY + 4,
+                    left: rect.left + window.scrollX
+                  });
+                }
+              }}
               className="px-4 py-2 text-gray-800 border rounded-xl bg-white flex items-center gap-2"
             >
               {status === 'all' ? 'Tất cả trạng thái' : status === 'approved' ? 'Đã duyệt' : 'Chưa duyệt'}
@@ -95,7 +107,10 @@ export default function PostManagementPage() {
             </button>
 
             {showDropdown && (
-              <ul className="absolute bg-white shadow-md rounded-xl mt-1 w-40 z-10">
+              <ul
+                className="fixed w-40 bg-white shadow-md rounded-xl z-[9999] border"
+                style={{ top: dropdownPos.top, left: dropdownPos.left }}
+              >
                 {['all', 'approved', 'pending'].map((s) => (
                   <li
                     key={s}
@@ -133,8 +148,8 @@ export default function PostManagementPage() {
                   <tr>
                     <td colSpan={7} className="p-6 text-center text-gray-500">
                       {search.trim()
-                          ? 'Không có kết quả nào phù hợp với từ khóa tìm kiếm.'
-                          : 'Không có bài viết nào phù hợp với bộ lọc hiện tại.'}
+                        ? 'Không có kết quả nào phù hợp với từ khóa tìm kiếm.'
+                        : 'Không có bài viết nào phù hợp với bộ lọc hiện tại.'}
                     </td>
                   </tr>
                 ) : (
