@@ -9,6 +9,8 @@ const postRoutes = require("./routes/posts");
 const searchRoutes = require("./routes/search");
 const reportRoutes = require("./routes/reports");
 const adminPostRoutes = require("./routes/post.routes");  
+const commentsRouter = require('./routes/comments');
+const likesRouter = require('./routes/likes');
 
 const pool = require("./db");
 
@@ -56,7 +58,11 @@ app.use("/api/posts", postRoutes);
 app.use("/api", searchRoutes);
 app.use("/api/reports", reportRoutes);
 app.use("/api/admin/posts", adminPostRoutes); 
+app.use('/api/comments', commentsRouter);
+app.use('/api/likes', likesRouter);
 
 // Khởi động server
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => console.log(`Server chạy trên http://localhost:${PORT}`));
+
+module.exports = app;

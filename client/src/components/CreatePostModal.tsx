@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef, ChangeEvent, useLayoutEffect } from 'react';
+import { useState, useRef, ChangeEvent, useLayoutEffect, useEffect } from 'react';
 import { MaterialIcon } from './MaterialIcon';
 import axios from 'axios';
 import { useUser } from '../contexts/UserContext';
@@ -49,7 +49,7 @@ const POPULAR_LOCATIONS = [
   'Bắc Ninh',
 ];
 
-export default function CreatePostModal({ onClose, onPostCreated, theme }: { onClose?: () => void, onPostCreated?: (post: any) => void, theme?: string }) {
+export default function CreatePostModal({ onClose, onPostCreated, theme, defaultTypePost }: { onClose?: () => void, onPostCreated?: (post: any) => void, theme?: string, defaultTypePost?: 'positive' | 'negative' }) {
   const [content, setContent] = useState('');
   const [images, setImages] = useState<string[]>([]);
   const [privacy, setPrivacy] = useState<PrivacyOption>('public');
@@ -66,6 +66,11 @@ export default function CreatePostModal({ onClose, onPostCreated, theme }: { onC
   const feelingModalRef = useRef<HTMLDivElement>(null);
   const locationModalRef = useRef<HTMLDivElement>(null);
   const statusRef = useRef<HTMLDivElement>(null);
+  const [typePost, setTypePost] = useState<'positive' | 'negative'>(defaultTypePost || 'positive');
+
+  useEffect(() => {
+    if (defaultTypePost) setTypePost(defaultTypePost);
+  }, [defaultTypePost]);
 
   const handleAddImage = async (e: ChangeEvent<HTMLInputElement>) => {
     if (!e.target.files) return;
@@ -85,6 +90,7 @@ export default function CreatePostModal({ onClose, onPostCreated, theme }: { onC
         headers: { 'Content-Type': 'multipart/form-data' },
       });
       setImages(prev => [...prev, ...res.data.images]);
+      console.log('Uploaded images:', res.data.images);
     } catch (err) {
       alert('Upload ảnh thất bại');
     }
@@ -115,9 +121,10 @@ export default function CreatePostModal({ onClose, onPostCreated, theme }: { onC
         user_id: user?.id || '',
         content,
         privacy,
-        images,
+        images: images.length > 0 ? images : null,
         feeling: selectedFeeling ? { icon: selectedFeeling.icon, label: selectedFeeling.label } : null,
         location: selectedLocation || null,
+        type_post: typePost,
       }, {
         baseURL: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000',
       });
@@ -321,12 +328,12 @@ export default function CreatePostModal({ onClose, onPostCreated, theme }: { onC
           <button
             disabled={!isValid || uploading}
             onClick={handlePost}
-            style={theme === 'reflective' ? { background: '#E3D5CA', color: '#222' } : {}}
+            style={theme === 'reflective' ? { background: '#E3D5CA', color: '#222' } : theme === 'inspiring' ? { background: '#6c5ce7', color: '#fff' } : {}}
             className={`px-8 py-3 rounded-full font-semibold transition ${
               isValid && !uploading
                 ? (theme === 'reflective'
                     ? 'hover:brightness-95 shadow-lg'
-                    : 'bg-[--primary] hover:bg-[#5b4cd6] hover:-translate-y-0.5 shadow-lg text-white')
+                    : 'hover:bg-[#5b4cd6] hover:-translate-y-0.5 shadow-lg text-white')
                 : 'bg-[#ccd0d5] cursor-not-allowed text-white'
             }`}
           >

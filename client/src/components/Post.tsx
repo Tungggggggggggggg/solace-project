@@ -1,8 +1,9 @@
-import React from 'react';
-import { useState } from "react";
-import ReportPostModal from './ReportPostModal';
+import React, { useState, useEffect, useRef } from 'react';
 import { useUser } from '../contexts/UserContext';
-
+import ReportPostModal from './ReportPostModal';
+import axios from 'axios';
+import LikeListModal from './LikeListModal';
+import gsap from 'gsap';
 
 // Định nghĩa interface cho props của Post
 interface PostProps {
@@ -37,6 +38,79 @@ const Post = ({ id, name, date, content, likes, comments, shares, images, avatar
   const bgColor = theme === 'reflective' ? '#E3D5CA' : '#E1ECF7';
   const { user } = useUser();
   const reporterId = user?.id || '';
+  const [liked, setLiked] = useState(false);
+  const [likeCount, setLikeCount] = useState(likes);
+  const [showLikeList, setShowLikeList] = useState(false);
+  const likeBtnRef = useRef<HTMLButtonElement>(null);
+  const [likeList, setLikeList] = useState<string[]>([]); // Khai báo state cho danh sách người đã like
+  const [commentCount, setCommentCount] = useState(comments);
+
+  useEffect(() => {
+    // Kiểm tra user đã like chưa
+    if (user?.id) {
+      axios.get('/api/likes/is-liked', {
+        params: { post_id: id, user_id: user.id },
+        baseURL: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000',
+      }).then(res => {
+        console.log('API Response:', res.data); // Debug API response
+        setLiked(res.data.liked);
+        if (res.data.likeCount !== undefined) {
+          setLikeCount(res.data.likeCount); // Ensure like count is updated
+        } else {
+          console.warn('likeCount is undefined in API response');
+        }
+        setLikeList(res.data.likeList); // Update like list
+      });
+    }
+
+    // Fetch updated comment count if needed
+    axios.get(`/api/posts/${id}`).then(res => {
+      setCommentCount(res.data.comment_count);
+    });
+  }, [id, user]);
+
+  const handleLike = async () => {
+    if (!user?.id) return;
+    if (!id || !user.id) {
+      console.warn('Thiếu post_id hoặc user_id khi like post:', { post_id: id, user_id: user?.id });
+      return;
+    }
+    if (liked) {
+      const response = await axios.post('/api/likes/unlike', { post_id: id, user_id: user.id }, { baseURL: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000' });
+      console.log('Unlike Response:', response.data); // Debug unlike response
+      setLiked(false);
+      setLikeCount(response.data.likeCount); // Cập nhật số lượng like từ backend
+      setLikeList(response.data.likeList); // Cập nhật danh sách người đã like
+      // Hiệu ứng unlike: scale nhỏ, rung nhẹ
+      if (likeBtnRef.current) {
+        gsap.fromTo(
+          likeBtnRef.current,
+          { scale: 0.8, rotate: -10, filter: 'drop-shadow(0 0 8px #ff174488)' },
+          { scale: 1, rotate: 0, filter: 'drop-shadow(0 0 8px #ff174488)', duration: 0.35, ease: 'elastic.out(1, 0.5)' }
+        );
+      }
+    } else {
+      const response = await axios.post('/api/likes/like', { post_id: id, user_id: user.id }, { baseURL: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000' });
+      console.log('Like Response:', response.data); // Debug like response
+      setLiked(true);
+      setLikeCount(response.data.likeCount); // Cập nhật số lượng like từ backend
+      setLikeList(response.data.likeList); // Cập nhật danh sách người đã like
+      // Hiệu ứng like: scale lớn, rung, glow đỏ mạnh
+      if (likeBtnRef.current) {
+        gsap.fromTo(
+          likeBtnRef.current,
+          { scale: 1.4, rotate: 0, filter: 'drop-shadow(0 0 24px #ff1744cc)' },
+          { scale: 1, rotate: 0, filter: 'drop-shadow(0 0 18px #ff1744cc)', duration: 0.5, ease: 'elastic.out(1, 0.5)' }
+        );
+        // Rung trái tim
+        gsap.fromTo(
+          likeBtnRef.current,
+          { rotate: -15 },
+          { rotate: 15, yoyo: true, repeat: 3, duration: 0.08, ease: 'power1.inOut', clearProps: 'rotate' }
+        );
+      }
+    }
+  };
 
   // Hàm chuyển sang trang chi tiết
   const handleOpenDetail = (e?: React.MouseEvent) => {
@@ -47,6 +121,22 @@ const Post = ({ id, name, date, content, likes, comments, shares, images, avatar
       setClicked(false);
     }, 300);
   };
+
+  // Đảm bảo images luôn là mảng
+  let imagesArray: string[] = [];
+  if (Array.isArray(images)) {
+    imagesArray = images;
+  } else if (typeof images === 'string') {
+    try {
+      imagesArray = JSON.parse(images);
+    } catch {
+      imagesArray = [];
+    }
+  }
+
+  // Thống kê tương tác
+  console.log('Rendering likeCount:', likeCount, 'comments:', comments);
+
   return (
     // Container cho bài đăng
     <div 
@@ -115,9 +205,9 @@ const Post = ({ id, name, date, content, likes, comments, shares, images, avatar
       <div>
         <p className="text-black mb-4 font-[Inter] text-base font-medium cursor-pointer" onClick={handleOpenDetail}>{content}</p>
         {/* Hình ảnh minh họa (clickable) */}
-        {images && images.length > 0 && (
+        {imagesArray.length > 0 && (
           <div className="flex space-x-3 mb-4">
-            {images.map((img, idx) => (
+            {imagesArray.map((img, idx) => (
               <img
                 key={idx}
                 src={getOptimizedCloudinaryUrl(img, 1000)}
@@ -130,20 +220,49 @@ const Post = ({ id, name, date, content, likes, comments, shares, images, avatar
         )}
       </div>
       {/* Thống kê tương tác */}
+      {(likeCount > 0 || commentCount > 0) && (
+        <div className="flex justify-between items-center border-t border-gray-300 py-2 mt-4">
+          {likeCount > 0 && (
+            <div className="flex items-center space-x-1 cursor-pointer" onClick={() => setShowLikeList(true)}>
+              <span className="font-bold text-base">{likeCount} người đã thích</span>
+            </div>
+          )}
+          {commentCount > 0 && (
+            <div className="flex items-center space-x-1">
+              <span className="font-bold text-base">{commentCount} bình luận</span>
+            </div>
+          )}
+        </div>
+      )}
       <div className="flex justify-between text-gray-600 mt-2">
         <div className="flex items-center space-x-2">
-          <span className="material-symbols-outlined text-xl">mood</span>
-          <span className="font-bold text-base">{likes}</span>
+          <button
+            ref={likeBtnRef}
+            onClick={handleLike}
+            className={`text-xl transition-all duration-200 hover:scale-110`}
+            style={{
+              filter: liked ? 'drop-shadow(0 0 18px #ff1744cc)' : 'none',
+              transform: liked ? 'scale(1.18)' : 'scale(1)'
+            }}
+          >
+            {liked ? (
+              <img src="/heart_fill.svg" alt="liked" width="28" height="28" />
+            ) : (
+              <img src="/heart.svg" alt="unliked" width="28" height="28" />
+            )}
+          </button>
+          <span className="font-bold text-base ml-1" onClick={() => setShowLikeList(true)}>{likeCount}</span>
         </div>
         <div className="flex items-center space-x-2 cursor-pointer" onClick={handleOpenDetail}>
           <span className="material-symbols-outlined text-xl">comment</span>
-          <span className="font-bold text-base">{comments}</span>
+          <span className="font-bold text-base">{commentCount}</span>
         </div>
         <div className="flex items-center space-x-2">
           <span className="material-symbols-outlined text-xl">share</span>
           <span className="font-bold text-base">{shares}</span>
         </div>
       </div>
+      {showLikeList && <LikeListModal postId={id} onClose={() => setShowLikeList(false)} />}
     </div>
   );
 };

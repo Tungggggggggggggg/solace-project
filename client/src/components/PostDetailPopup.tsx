@@ -1,4 +1,7 @@
-import React, { useState } from "react";
+import React, { useState, useRef, useLayoutEffect } from "react";
+import CommentsSection from './CommentsSection';
+import { useUser } from '../contexts/UserContext';
+import gsap from 'gsap';
 
 interface PostDetailPopupProps {
   post: {
@@ -15,25 +18,48 @@ interface PostDetailPopupProps {
 }
 
 const PostDetailPopup = ({ post, onClose }: PostDetailPopupProps) => {
-  const [comments, setComments] = useState([
-    { user: post.name, text: "0 no flop r" },
-  ]);
-  const [input, setInput] = useState("");
   const [selectedImg, setSelectedImg] = useState(0);
+  const { user } = useUser();
+  const popupRef = useRef<HTMLDivElement>(null);
+  const imgRef = useRef<HTMLImageElement>(null);
+  const contentRef = useRef<HTMLDivElement>(null);
+  const commentsRef = useRef<HTMLDivElement>(null);
 
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => setInput(e.target.value);
-  const handleInputKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === "Enter" && input.trim()) {
-      setComments([...comments, { user: "Bạn", text: input }]);
-      setInput("");
+  useLayoutEffect(() => {
+    if (popupRef.current) {
+      gsap.fromTo(
+        popupRef.current,
+        { scale: 0.85, opacity: 0, y: 40 },
+        { scale: 1, opacity: 1, y: 0, duration: 0.5, ease: 'power3.out' }
+      );
     }
-  };
+    if (imgRef.current) {
+      gsap.fromTo(imgRef.current, { opacity: 0, y: 30 }, { opacity: 1, y: 0, duration: 0.5, delay: 0.2 });
+    }
+    if (contentRef.current) {
+      gsap.fromTo(contentRef.current, { opacity: 0, y: 20 }, { opacity: 1, y: 0, duration: 0.4, delay: 0.35 });
+    }
+    if (commentsRef.current) {
+      gsap.fromTo(commentsRef.current, { opacity: 0, y: 20 }, { opacity: 1, y: 0, duration: 0.4, delay: 0.5 });
+    }
+    return () => {
+      if (popupRef.current) {
+        gsap.to(popupRef.current, {
+          scale: 0.85,
+          opacity: 0,
+          y: 40,
+          duration: 0.3,
+          ease: 'power3.in',
+        });
+      }
+    };
+  }, []);
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
       {/* Nền mờ giữ nguyên Home */}
       <div className="absolute inset-0 bg-black/20 backdrop-blur-sm popup-overlay" onClick={onClose} />
-      <div className="relative bg-white rounded-2xl p-6 max-w-2xl w-full shadow-xl z-10 popup-content">
+      <div ref={popupRef} className="relative bg-white rounded-2xl p-6 max-w-2xl w-full shadow-xl z-10 popup-content">
         {/* Nút đóng */}
         <button
           className="absolute top-3 right-3 text-2xl text-black hover:scale-110 transition"
@@ -56,6 +82,7 @@ const PostDetailPopup = ({ post, onClose }: PostDetailPopupProps) => {
         {(post.images && post.images.length > 0 ? post.images : []).length > 0 && (
           <div className="flex flex-col items-center mb-4">
             <img
+              ref={imgRef}
               src={(post.images && post.images[selectedImg]) || ''}
               alt="post-large"
               className="max-h-[400px] max-w-full rounded-2xl mb-2 object-contain cursor-pointer"
@@ -76,7 +103,7 @@ const PostDetailPopup = ({ post, onClose }: PostDetailPopupProps) => {
             )}
           </div>
         )}
-        <div className="mb-4">
+        <div className="mb-4" ref={contentRef}>
           <p className="text-black text-base font-medium font-[Inter]">{post.content}</p>
         </div>
         {/* Thống kê tương tác */}
@@ -95,22 +122,8 @@ const PostDetailPopup = ({ post, onClose }: PostDetailPopupProps) => {
           </div>
         </div>
         {/* Khu vực bình luận */}
-        <div className="border-t pt-4">
-          <div className="mb-2 text-gray-700 font-semibold">Bình luận</div>
-          {comments.map((c, idx) => (
-            <div key={idx} className="flex items-center gap-2 mb-2">
-              <div className="w-8 h-8 rounded-full bg-gray-200" />
-              <span className="text-gray-800">{c.user}: {c.text}</span>
-            </div>
-          ))}
-          <input
-            type="text"
-            placeholder="Viết bình luận..."
-            className="w-full px-4 py-2 border rounded-full text-base mt-2"
-            value={input}
-            onChange={handleInputChange}
-            onKeyDown={handleInputKeyDown}
-          />
+        <div className="border-t pt-4" ref={commentsRef}>
+          <CommentsSection postId={post.id} currentUser={user} />
         </div>
       </div>
       <style jsx global>{`

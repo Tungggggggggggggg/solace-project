@@ -81,6 +81,11 @@ export default function Home() {
     fetchPosts();
   }, []);
 
+  // Lọc bài viết theo tab
+  const filteredPosts = posts.filter(post =>
+    activeTab === 0 ? post.type_post === 'positive' : post.type_post === 'negative'
+  );
+
   return (
     // Container chính với hiệu ứng nền phù hợp theme
     <div className={`min-h-screen w-full ${bgClass}`}>
@@ -110,24 +115,24 @@ export default function Home() {
             {/* Thay InputSection bằng CreatePost */}
             <InputSection onOpenModal={() => setShowCreatePost(true)} theme={theme} />
             {/* Hiển thị danh sách bài viết mới nhất */}
-            {posts.map(post => (
+            {filteredPosts.map(post => (
               <Post
                 key={post.id}
                 theme={theme}
                 id={post.id}
-                name={user?.displayName || "Ẩn danh"}
+                name={post.first_name && post.last_name ? `${post.first_name} ${post.last_name}` : ''}
                 date={post.created_at || ""}
                 content={post.content}
                 likes={post.likes || 0}
                 comments={post.comments || 0}
                 shares={post.shares || 0}
                 images={post.images}
-                avatar={user?.photoURL || undefined}
+                avatar={post.avatar_url || undefined}
                 feeling={post.feeling}
                 location={post.location}
                 onOpenDetail={() => setOpenPost({
                   id: post.id,
-                  name: user?.displayName || "Ẩn danh",
+                  name: post.first_name && post.last_name ? `${post.first_name} ${post.last_name}` : '',
                   date: post.created_at || "",
                   content: post.content,
                   likes: post.likes || 0,
@@ -151,7 +156,12 @@ export default function Home() {
         <PostDetailPopup post={openPost} onClose={() => setOpenPost(null)} />
       )}
       {showCreatePost && (
-        <CreatePostModal onClose={() => setShowCreatePost(false)} onPostCreated={handlePostCreated} theme={theme} />
+        <CreatePostModal 
+          onClose={() => setShowCreatePost(false)} 
+          onPostCreated={handlePostCreated} 
+          theme={theme}
+          defaultTypePost={activeTab === 0 ? 'positive' : 'negative'}
+        />
       )}
     </div>
   );
