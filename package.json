@@ -1,6 +1,6 @@
 {
   "dependencies": {
-    "@supabase/supabase-js": "^2.49.8",
+    "@supabase/supabase-js": "^2.49.9",
     "bcrypt": "^6.0.0",
     "cloudinary": "^2.6.1",
     "clsx": "^2.1.1",

@@ -104,11 +104,17 @@ const Header: FC<HeaderProps> = ({
 
   // Xử lý chọn gợi ý tìm kiếm
   const handleSuggestionClick = (suggestion: any) => {
-    if (onSearchChange) onSearchChange({ target: { value: suggestion.name } } as React.ChangeEvent<HTMLInputElement>);
-    else setSearch(suggestion.name);
     setShowSuggestions(false);
-    if (onSearch) onSearch();
-    else router.push(`/search?query=${encodeURIComponent(suggestion.name)}`);
+    if (suggestion.type === 'user') {
+      router.push(`/profile/${suggestion.id}`);
+    } else if (suggestion.type === 'post') {
+      router.push(`/posts/${suggestion.id}`);
+    } else {
+      if (onSearchChange) onSearchChange({ target: { value: suggestion.name } } as React.ChangeEvent<HTMLInputElement>);
+      else setSearch(suggestion.name);
+      if (onSearch) onSearch();
+      else router.push(`/search?query=${encodeURIComponent(suggestion.name)}`);
+    }
   };
 
   // Hiển thị Toast thông báo

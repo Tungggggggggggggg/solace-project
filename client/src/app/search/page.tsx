@@ -5,6 +5,9 @@ import Header from "@/components/Header";
 import Sidebar from "@/components/LeftSidebar";
 import RightSidebar from "@/components/RightSidebar";
 import { useState, KeyboardEvent, ChangeEvent, useEffect } from "react";
+import Post from '@/components/Post';
+import PostDetailPopup from '@/components/PostDetailPopup';
+import gsap from "gsap";
 
 export default function SearchPage() {
   const router = useRouter();
@@ -14,6 +17,8 @@ export default function SearchPage() {
   const [tab, setTab] = useState<"all" | "post" | "friend">("all");
   const [results, setResults] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
+  const [selectedPost, setSelectedPost] = useState<any | null>(null);
+  const [friendRequests, setFriendRequests] = useState<{ [userId: string]: boolean }>({});
 
   // Gọi API lấy kết quả tìm kiếm
   useEffect(() => {
@@ -105,18 +110,21 @@ export default function SearchPage() {
                   <div className="text-gray-400 text-lg py-8 bg-white rounded-[32px] shadow border-2 border-[#E3E3E3] text-center">Không có bài viết phù hợp.</div>
                 ) : (
                   posts.map((item) => (
-                    <div
+                    <Post
                       key={item.id}
-                      className="flex items-center gap-5 bg-white rounded-[32px] shadow px-8 py-6 border-2 border-[#E3E3E3] search-card"
-                    >
-                      <div className="w-16 h-16 rounded-full bg-[#F5F5F5] flex items-center justify-center border">
-                        {item.avatar && <Image src={item.avatar} alt={item.name} width={48} height={48} className="rounded-full" />}
-                      </div>
-                      <div className="flex flex-col flex-1">
-                        <span className="font-semibold text-xl">{item.name}</span>
-                        {item.type === 'post' && <span className="text-base text-gray-500">Bài viết</span>}
-                      </div>
-                    </div>
+                      id={item.id}
+                      name={`${item.first_name || ''} ${item.last_name || ''}`.trim() || "Người dùng ẩn danh"}
+                      date={item.created_at || ''}
+                      content={item.content}
+                      likes={item.like_count || 0}
+                      comments={item.comment_count || 0}
+                      shares={item.shares || 0}
+                      images={item.images || []}
+                      avatar={item.avatar_url}
+                      feeling={item.feeling}
+                      location={item.location}
+                      onOpenDetail={() => setSelectedPost(item)}
+                    />
                   ))
                 )}
                 <div className="font-bold text-blue-700 mt-6 mb-2">Người dùng</div>
@@ -126,12 +134,36 @@ export default function SearchPage() {
                   users.map((item) => (
                     <div
                       key={item.id}
-                      className="flex items-center gap-5 bg-white rounded-[32px] shadow px-8 py-4 border-2 border-[#E3E3E3] search-card"
+                      className="flex items-center gap-5 bg-white rounded-[32px] shadow px-8 py-4 border-2 border-[#E3E3E3] search-card hover:bg-blue-50 mb-4"
                     >
                       <div className="w-14 h-14 rounded-full bg-[#F5F5F5] flex items-center justify-center border">
                         {item.avatar && <Image src={item.avatar} alt={item.name} width={40} height={40} className="rounded-full" />}
                       </div>
                       <span className="font-semibold text-lg flex-1">{item.name}</span>
+                      {friendRequests[item.id] ? (
+                        <button
+                          className="friend-btn px-5 py-2 rounded-full bg-gray-400 text-white font-semibold shadow cursor-not-allowed"
+                          disabled
+                        >
+                          Đã gửi lời mời
+                        </button>
+                      ) : (
+                        <button
+                          className="friend-btn px-5 py-2 rounded-full bg-blue-500 text-white font-semibold shadow transition-all"
+                          onClick={() => {
+                            setFriendRequests(prev => ({ ...prev, [item.id]: true }));
+                            // TODO: Gửi request kết bạn lên server ở đây nếu muốn
+                          }}
+                          onMouseEnter={e => {
+                            gsap.to(e.currentTarget, { scale: 1.12, boxShadow: '0 4px 24px 0 rgba(8,90,180,0.18)', background: '#2563eb', duration: 0.25 });
+                          }}
+                          onMouseLeave={e => {
+                            gsap.to(e.currentTarget, { scale: 1, boxShadow: '0 2px 8px 0 rgba(8,90,180,0.10)', background: '#3b82f6', duration: 0.25 });
+                          }}
+                        >
+                          Kết bạn
+                        </button>
+                      )}
                     </div>
                   ))
                 )}
@@ -143,18 +175,21 @@ export default function SearchPage() {
                   <div className="text-gray-400 text-lg py-8 bg-white rounded-[32px] shadow border-2 border-[#E3E3E3] text-center">Không có bài viết phù hợp.</div>
                 ) : (
                   posts.map((item) => (
-                    <div
+                    <Post
                       key={item.id}
-                      className="flex items-center gap-5 bg-white rounded-[32px] shadow px-8 py-6 border-2 border-[#E3E3E3] search-card"
-                    >
-                      <div className="w-16 h-16 rounded-full bg-[#F5F5F5] flex items-center justify-center border">
-                        {item.avatar && <Image src={item.avatar} alt={item.name} width={48} height={48} className="rounded-full" />}
-                      </div>
-                      <div className="flex flex-col flex-1">
-                        <span className="font-semibold text-xl">{item.name}</span>
-                        {item.type === 'post' && <span className="text-base text-gray-500">Bài viết</span>}
-                      </div>
-                    </div>
+                      id={item.id}
+                      name={`${item.first_name || ''} ${item.last_name || ''}`.trim() || "Người dùng ẩn danh"}
+                      date={item.created_at || ''}
+                      content={item.content}
+                      likes={item.like_count || 0}
+                      comments={item.comment_count || 0}
+                      shares={item.shares || 0}
+                      images={item.images || []}
+                      avatar={item.avatar_url}
+                      feeling={item.feeling}
+                      location={item.location}
+                      onOpenDetail={() => setSelectedPost(item)}
+                    />
                   ))
                 )}
               </>
@@ -165,18 +200,27 @@ export default function SearchPage() {
                   <div className="text-gray-400 text-lg py-8 bg-white rounded-[32px] shadow border-2 border-[#E3E3E3] text-center">Không có người dùng phù hợp.</div>
                 ) : (
                   users.map((item) => (
-                    <div
+                    <Post
                       key={item.id}
-                      className="flex items-center gap-5 bg-white rounded-[32px] shadow px-8 py-4 border-2 border-[#E3E3E3] search-card"
-                    >
-                      <div className="w-14 h-14 rounded-full bg-[#F5F5F5] flex items-center justify-center border">
-                        {item.avatar && <Image src={item.avatar} alt={item.name} width={40} height={40} className="rounded-full" />}
-                      </div>
-                      <span className="font-semibold text-lg flex-1">{item.name}</span>
-                    </div>
+                      id={item.id}
+                      name={`${item.first_name || ''} ${item.last_name || ''}`.trim() || "Người dùng ẩn danh"}
+                      date={item.created_at || ''}
+                      content={item.content}
+                      likes={item.like_count || 0}
+                      comments={item.comment_count || 0}
+                      shares={item.shares || 0}
+                      images={item.images || []}
+                      avatar={item.avatar_url}
+                      feeling={item.feeling}
+                      location={item.location}
+                      onOpenDetail={() => setSelectedPost(item)}
+                    />
                   ))
                 )}
               </>
+            )}
+            {selectedPost && (
+              <PostDetailPopup post={selectedPost} onClose={() => setSelectedPost(null)} />
             )}
           </div>
         </main>

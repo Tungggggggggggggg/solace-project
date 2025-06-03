@@ -109,7 +109,7 @@ export default function Home() {
             <LeftSidebar theme={theme} />
           </div>
           {/* Nội dung trung tâm, thêm margin-left để không bị che */}
-          <div className="flex-1" style={{ marginLeft: 120, marginRight: 120 }}>
+          <div className="flex-1 flex flex-col items-center" style={{ marginLeft: 120, marginRight: 120 }}>
             {/* Tabs: Chuyển đổi giữa các loại bài đăng (Inspiring/Reflective) */}
             <Tabs onTabChange={setActiveTab} />
             {/* Thay InputSection bằng CreatePost */}

@@ -1,37 +1,41 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import type { ReactElement } from 'react';
 import { FiSearch, FiChevronDown } from 'react-icons/fi';
 import AdminLayout from '@/components/AdminLayout';
 
+type Report = {
+  report_id: string;
+  date_reported: string;
+  reported_by: string;
+  reported_account: string;
+  content: string;
+  status: string;
+};
+
 export default function ReportsPage(): ReactElement {
-  // Dữ liệu giả lập cho bảng báo cáo
-  
-  const reportsData = [
-    {
-      stt: 1,
-      reportId: 'R001',
-      dateReported: '12/05/2025',
-      reportedBy: 'User 1',
-      reportedAccount: 'nguyenva@example.com',
-      content: 'Bài đăng không phù hợp',
-      status: 'Chưa xử lý',
-    },
-    {
-      stt: 2,
-      reportId: 'R002',
-      dateReported: '10/05/2025',
-      reportedBy: 'User 2',
-      reportedAccount: 'tranb@example.com',
-      content: 'Nội dung xúc phạm',
-      status: 'Đã xử lý',
-    },
-  ];
+  const [reportsData, setReportsData] = useState<Report[]>([]);
 
   // State cho bộ lọc trạng thái
   const [selectedStatus, setSelectedStatus] = useState('Tất cả trạng thái');
   const [showDropdown, setShowDropdown] = useState(false);
+
+  useEffect(() => {
+    const fetchReports = async () => {
+      try {
+        const response = await fetch('/api/reports');
+        const result = await response.json();
+        if (result.success) {
+          setReportsData(result.reports);
+        }
+      } catch (error) {
+        console.error('Error fetching reports:', error);
+      }
+    };
+
+    fetchReports();
+  }, []);
 
   // Lọc dữ liệu dựa trên trạng thái
   const filteredReports = selectedStatus === 'Tất cả trạng thái'
@@ -118,13 +122,13 @@ export default function ReportsPage(): ReactElement {
                   </tr>
                 </thead>
                 <tbody>
-                  {filteredReports.map((report) => (
-                    <tr key={report.stt} className="border-b border-[#E5E8EB]">
-                      <td className="p-4 text-gray-800 whitespace-nowrap">{report.stt}</td>
-                      <td className="p-4 text-gray-800 whitespace-nowrap">{report.reportId}</td>
-                      <td className="p-4 text-gray-800 whitespace-nowrap">{report.dateReported}</td>
-                      <td className="p-4 text-gray-800 whitespace-nowrap">{report.reportedBy}</td>
-                      <td className="p-4 text-gray-800 whitespace-nowrap">{report.reportedAccount}</td>
+                  {filteredReports.map((report, index) => (
+                    <tr key={report.report_id} className="border-b border-[#E5E8EB]">
+                      <td className="p-4 text-gray-800 whitespace-nowrap">{index + 1}</td>
+                      <td className="p-4 text-gray-800 whitespace-nowrap">{report.report_id}</td>
+                      <td className="p-4 text-gray-800 whitespace-nowrap">{report.date_reported}</td>
+                      <td className="p-4 text-gray-800 whitespace-nowrap">{report.reported_by || 'Không xác định'}</td>
+                      <td className="p-4 text-gray-800 whitespace-nowrap">{report.reported_account || 'Không xác định'}</td>
                       <td className="p-4 text-gray-800 whitespace-nowrap">{report.content}</td>
                       <td className="p-4 whitespace-nowrap">
                         <span

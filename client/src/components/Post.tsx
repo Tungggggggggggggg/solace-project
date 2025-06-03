@@ -20,6 +20,7 @@ interface PostProps {
   location?: string | null;
   onOpenDetail?: () => void;
   theme?: string;
+  hideActions?: boolean; // Ẩn các nút like, comment, share
 }
 
 // Hàm tối ưu URL ảnh Cloudinary
@@ -32,7 +33,7 @@ function getOptimizedCloudinaryUrl(url: string, width = 1000) {
 }
 
 // Component Post hiển thị một bài đăng
-const Post = ({ id, name, date, content, likes, comments, shares, images, avatar, feeling, location, onOpenDetail, theme }: PostProps) => {
+const Post = ({ id, name, date, content, likes, comments, shares, images, avatar, feeling, location, onOpenDetail, theme, hideActions }: PostProps) => {
   const [clicked, setClicked] = useState(false);
   const [showReport, setShowReport] = useState(false);
   const bgColor = theme === 'reflective' ? '#E3D5CA' : '#E1ECF7';
@@ -142,7 +143,7 @@ const Post = ({ id, name, date, content, likes, comments, shares, images, avatar
     <div 
       id={`post-${id}`}
       style={{ background: bgColor }}
-      className={`relative rounded-[40px] shadow max-w-xl mx-auto my-6 px-8 py-6 post-card animate-fadein ${clicked ? 'clicked' : ''}`}
+      className={`relative rounded-[40px] shadow w-full max-w-3xl my-6 px-8 py-6 post-card animate-fadein ${clicked ? 'clicked' : ''}`}
     >
       {/* Nút 3 chấm báo cáo */}
       <button
@@ -219,50 +220,54 @@ const Post = ({ id, name, date, content, likes, comments, shares, images, avatar
           </div>
         )}
       </div>
-      {/* Thống kê tương tác */}
-      {(likeCount > 0 || commentCount > 0) && (
-        <div className="flex justify-between items-center border-t border-gray-300 py-2 mt-4">
-          {likeCount > 0 && (
-            <div className="flex items-center space-x-1 cursor-pointer" onClick={() => setShowLikeList(true)}>
-              <span className="font-bold text-base">{likeCount} người đã thích</span>
+      {/* Thống kê tương tác và các nút like, comment, share */}
+      {!hideActions && (
+        <>
+          {(likeCount > 0 || commentCount > 0) && (
+            <div className="flex justify-between items-center border-t border-gray-300 py-2 mt-4">
+              {likeCount > 0 && (
+                <div className="flex items-center space-x-1 cursor-pointer" onClick={() => setShowLikeList(true)}>
+                  <span className="font-bold text-base">{likeCount} người đã thích</span>
+                </div>
+              )}
+              {commentCount > 0 && (
+                <div className="flex items-center space-x-1">
+                  <span className="font-bold text-base">{commentCount} bình luận</span>
+                </div>
+              )}
             </div>
           )}
-          {commentCount > 0 && (
-            <div className="flex items-center space-x-1">
-              <span className="font-bold text-base">{commentCount} bình luận</span>
+          <div className="flex justify-between text-gray-600 mt-2">
+            <div className="flex items-center space-x-2">
+              <button
+                ref={likeBtnRef}
+                onClick={handleLike}
+                className={`text-xl transition-all duration-200 hover:scale-110`}
+                style={{
+                  filter: liked ? 'drop-shadow(0 0 18px #ff1744cc)' : 'none',
+                  transform: liked ? 'scale(1.18)' : 'scale(1)'
+                }}
+              >
+                {liked ? (
+                  <img src="/heart_fill.svg" alt="liked" width="28" height="28" />
+                ) : (
+                  <img src="/heart.svg" alt="unliked" width="28" height="28" />
+                )}
+              </button>
+              <span className="font-bold text-base ml-1" onClick={() => setShowLikeList(true)}>{likeCount}</span>
             </div>
-          )}
-        </div>
+            <div className="flex items-center space-x-2 cursor-pointer" onClick={handleOpenDetail}>
+              <span className="material-symbols-outlined text-xl">comment</span>
+              <span className="font-bold text-base">{commentCount}</span>
+            </div>
+            <div className="flex items-center space-x-2">
+              <span className="material-symbols-outlined text-xl">share</span>
+              <span className="font-bold text-base">{shares}</span>
+            </div>
+          </div>
+          {showLikeList && <LikeListModal postId={id} onClose={() => setShowLikeList(false)} />}
+        </>
       )}
-      <div className="flex justify-between text-gray-600 mt-2">
-        <div className="flex items-center space-x-2">
-          <button
-            ref={likeBtnRef}
-            onClick={handleLike}
-            className={`text-xl transition-all duration-200 hover:scale-110`}
-            style={{
-              filter: liked ? 'drop-shadow(0 0 18px #ff1744cc)' : 'none',
-              transform: liked ? 'scale(1.18)' : 'scale(1)'
-            }}
-          >
-            {liked ? (
-              <img src="/heart_fill.svg" alt="liked" width="28" height="28" />
-            ) : (
-              <img src="/heart.svg" alt="unliked" width="28" height="28" />
-            )}
-          </button>
-          <span className="font-bold text-base ml-1" onClick={() => setShowLikeList(true)}>{likeCount}</span>
-        </div>
-        <div className="flex items-center space-x-2 cursor-pointer" onClick={handleOpenDetail}>
-          <span className="material-symbols-outlined text-xl">comment</span>
-          <span className="font-bold text-base">{commentCount}</span>
-        </div>
-        <div className="flex items-center space-x-2">
-          <span className="material-symbols-outlined text-xl">share</span>
-          <span className="font-bold text-base">{shares}</span>
-        </div>
-      </div>
-      {showLikeList && <LikeListModal postId={id} onClose={() => setShowLikeList(false)} />}
     </div>
   );
 };
