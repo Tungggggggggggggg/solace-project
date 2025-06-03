@@ -20,6 +20,7 @@ interface PostProps {
   location?: string | null;
   onOpenDetail?: () => void;
   theme?: string;
+  hideActions?: boolean; // Ẩn các nút like, comment, share
 }
 
 // Hàm tối ưu URL ảnh Cloudinary
@@ -32,7 +33,7 @@ function getOptimizedCloudinaryUrl(url: string, width = 1000) {
 }
 
 // Component Post hiển thị một bài đăng
-const Post = ({ id, name, date, content, likes, comments, shares, images, avatar, feeling, location, onOpenDetail, theme }: PostProps) => {
+const Post = ({ id, name, date, content, likes, comments, shares, images, avatar, feeling, location, onOpenDetail, theme, hideActions }: PostProps) => {
   const [clicked, setClicked] = useState(false);
   const [showReport, setShowReport] = useState(false);
   const bgColor = theme === 'reflective' ? '#E3D5CA' : '#E1ECF7';
@@ -155,7 +156,7 @@ const Post = ({ id, name, date, content, likes, comments, shares, images, avatar
     <div 
       id={`post-${id}`}
       style={{ background: bgColor }}
-      className={`relative rounded-[40px] shadow max-w-xl mx-auto my-6 px-8 py-6 post-card animate-fadein ${clicked ? 'clicked' : ''}`}
+      className={`relative rounded-[40px] shadow w-full max-w-3xl my-6 px-8 py-6 post-card animate-fadein ${clicked ? 'clicked' : ''}`}
     >
       {/* Nút 3 chấm báo cáo */}
       <button

@@ -10,12 +10,28 @@ router.get('/search-suggestions', async (req, res) => {
   try {
     // Lấy user
     const users = await pool.query(
-      "SELECT id, (first_name || ' ' || last_name) AS name, avatar AS avatar, 'user' AS type FROM users WHERE first_name IS NOT NULL AND last_name IS NOT NULL AND LOWER(first_name || ' ' || last_name) LIKE $1 LIMIT 5",
+      "SELECT id, (first_name || ' ' || last_name) AS name, avatar_url AS avatar, 'user' AS type FROM users WHERE first_name IS NOT NULL AND last_name IS NOT NULL AND unaccent(LOWER(first_name || ' ' || last_name)) LIKE unaccent($1) LIMIT 5",
       [`%${query}%`]
     );
     // Lấy post
     const posts = await pool.query(
-      "SELECT id, content AS name, '' AS avatar, 'post' AS type FROM posts WHERE content IS NOT NULL AND LOWER(content) LIKE $1 LIMIT 5",
+      `SELECT 
+        p.id, 
+        p.content, 
+        p.created_at, 
+        p.images, 
+        p.feeling, 
+        p.location, 
+        p.type_post, 
+        p.user_id,
+        u.first_name, 
+        u.last_name, 
+        u.avatar_url, 
+        'post' AS type
+      FROM posts p
+      JOIN users u ON p.user_id = u.id
+      WHERE p.content IS NOT NULL AND LOWER(p.content) LIKE $1
+      LIMIT 5`,
       [`%${query}%`]
     );
     // Gộp lại
@@ -23,7 +39,7 @@ router.get('/search-suggestions', async (req, res) => {
     res.json(suggestions);
   } catch (err) {
     console.error('Search API error:', err); // Log chi tiết lỗi ra terminal
-    res.status(500).json({ error: 'Lỗi lấy gợi ý tìm kiếm', detail: err.message });
+    res.status(500).json({ error: 'Lỗi lấy gợi ý tìm kiếm', detail: err.message, stack: err.stack });
   }
 });
 

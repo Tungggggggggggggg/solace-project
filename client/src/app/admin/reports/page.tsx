@@ -21,9 +21,12 @@ export default function ReportsPage(): ReactElement {
   const [selectedStatus, setSelectedStatus] = useState('Tất cả trạng thái');
   const [showDropdown, setShowDropdown] = useState(false);
 
+<<<<<<< HEAD
   // State cho các dòng đã mở rộng nội dung
   const [expandedRows, setExpandedRows] = useState<{ [key: string]: boolean }>({});
 
+=======
+>>>>>>> 24d19c3f5bee1222c338fde9095f8fd3bf26b531
   useEffect(() => {
     const fetchReports = async () => {
       try {
@@ -125,6 +128,7 @@ export default function ReportsPage(): ReactElement {
                   </tr>
                 </thead>
                 <tbody>
+<<<<<<< HEAD
                   {filteredReports.map((report, index) => {
                     const isLongContent = report.content.length > 50;
                     const isExpanded = expandedRows[report.report_id];
@@ -153,6 +157,32 @@ export default function ReportsPage(): ReactElement {
                       </tr>
                     );
                   })}
+=======
+                  {filteredReports.map((report, index) => (
+                    <tr key={report.report_id} className="border-b border-[#E5E8EB]">
+                      <td className="p-4 text-gray-800 whitespace-nowrap">{index + 1}</td>
+                      <td className="p-4 text-gray-800 whitespace-nowrap">{report.report_id}</td>
+                      <td className="p-4 text-gray-800 whitespace-nowrap">{report.date_reported}</td>
+                      <td className="p-4 text-gray-800 whitespace-nowrap">{report.reported_by || 'Không xác định'}</td>
+                      <td className="p-4 text-gray-800 whitespace-nowrap">{report.reported_account || 'Không xác định'}</td>
+                      <td className="p-4 text-gray-800 whitespace-nowrap">{report.content}</td>
+                      <td className="p-4 whitespace-nowrap">
+                        <span
+                          className={`px-4 py-1 rounded-2xl text-gray-900 whitespace-nowrap ${
+                            report.status === 'Đã xử lý' ? 'bg-[#AECBEB]' : 'bg-[#F0F2F5]'
+                          }`}
+                        >
+                          {report.status}
+                        </span>
+                      </td>
+                      <td className="p-4 flex gap-2 whitespace-nowrap">
+                        <span className="material-symbols-outlined text-blue-500">mail</span>
+                        <span className="material-symbols-outlined text-blue-500">visibility</span>
+                        <span className="material-symbols-outlined text-gray-500">delete</span>
+                      </td>
+                    </tr>
+                  ))}
+>>>>>>> 24d19c3f5bee1222c338fde9095f8fd3bf26b531
                 </tbody>
               </table>
             </div>
