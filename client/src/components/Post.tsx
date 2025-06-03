@@ -44,6 +44,8 @@ const Post = ({ id, name, date, content, likes, comments, shares, images, avatar
   const likeBtnRef = useRef<HTMLButtonElement>(null);
   const [likeList, setLikeList] = useState<string[]>([]); // Khai báo state cho danh sách người đã like
   const [commentCount, setCommentCount] = useState(comments);
+  const [forbiddenWords, setForbiddenWords] = useState<string[]>([]);
+  const [filteredContent, setFilteredContent] = useState(content);
 
   useEffect(() => {
     // Kiểm tra user đã like chưa
@@ -67,7 +69,18 @@ const Post = ({ id, name, date, content, likes, comments, shares, images, avatar
     axios.get(`/api/posts/${id}`).then(res => {
       setCommentCount(res.data.comment_count);
     });
-  }, [id, user]);
+
+    let ignore = false;
+    async function getWords() {
+      const words = await fetchForbiddenWords();
+      if (!ignore) {
+        setForbiddenWords(words);
+        setFilteredContent(filterForbiddenWords(content, words));
+      }
+    }
+    getWords();
+    return () => { ignore = true; };
+  }, [id, user, content]);
 
   const handleLike = async () => {
     if (!user?.id) return;
@@ -201,24 +214,24 @@ const Post = ({ id, name, date, content, likes, comments, shares, images, avatar
           <span className="font-semibold text-[#6c5ce7]">{feeling.label}</span>
         </div>
       )}
-      {/* Nội dung bài đăng (clickable) */}
-      <div>
-        <p className="text-black mb-4 font-[Inter] text-base font-medium cursor-pointer" onClick={handleOpenDetail}>{content}</p>
-        {/* Hình ảnh minh họa (clickable) */}
-        {imagesArray.length > 0 && (
-          <div className="flex space-x-3 mb-4">
-            {imagesArray.map((img, idx) => (
-              <img
-                key={idx}
-                src={getOptimizedCloudinaryUrl(img, 1000)}
-                alt={`post-img-${idx}`}
-                className="w-1/3 h-28 object-cover rounded-[20px] cursor-pointer"
-                onClick={handleOpenDetail}
-              />
-            ))}
-          </div>
-        )}
+      {/* Nội dung bài đăng */}
+      <div className="whitespace-pre-line text-base text-gray-800 mb-4 cursor-pointer" onClick={handleOpenDetail}>
+        {filteredContent}
       </div>
+      {/* Hình ảnh minh họa (clickable) */}
+      {imagesArray.length > 0 && (
+        <div className="flex space-x-3 mb-4">
+          {imagesArray.map((img, idx) => (
+            <img
+              key={idx}
+              src={getOptimizedCloudinaryUrl(img, 1000)}
+              alt={`post-img-${idx}`}
+              className="w-1/3 h-28 object-cover rounded-[20px] cursor-pointer"
+              onClick={handleOpenDetail}
+            />
+          ))}
+        </div>
+      )}
       {/* Thống kê tương tác */}
       {(likeCount > 0 || commentCount > 0) && (
         <div className="flex justify-between items-center border-t border-gray-300 py-2 mt-4">

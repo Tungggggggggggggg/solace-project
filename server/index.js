@@ -8,10 +8,10 @@ const authRoutes = require("./routes/auth.routes");
 const postRoutes = require("./routes/posts"); 
 const searchRoutes = require("./routes/search");
 const reportRoutes = require("./routes/reports");
+const forbiddenWordsRoutes = require("./routes/forbidden_words");
 const adminPostRoutes = require("./routes/post.routes");  
 const commentsRouter = require('./routes/comments');
 const likesRouter = require('./routes/likes');
-
 const pool = require("./db");
 
 dotenv.config();
@@ -60,6 +60,7 @@ app.use("/api/reports", reportRoutes);
 app.use("/api/admin/posts", adminPostRoutes); 
 app.use('/api/comments', commentsRouter);
 app.use('/api/likes', likesRouter);
+app.use("/api/forbidden_words", forbiddenWordsRoutes);
 
 // Khởi động server
 const PORT = process.env.PORT || 5000;

@@ -1,37 +1,44 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import type { ReactElement } from 'react';
 import { FiSearch, FiChevronDown } from 'react-icons/fi';
 import AdminLayout from '@/components/AdminLayout';
 
+type Report = {
+  report_id: string;
+  date_reported: string;
+  reported_by: string;
+  reported_account: string;
+  content: string;
+  status: string;
+};
+
 export default function ReportsPage(): ReactElement {
-  // Dữ liệu giả lập cho bảng báo cáo
-  
-  const reportsData = [
-    {
-      stt: 1,
-      reportId: 'R001',
-      dateReported: '12/05/2025',
-      reportedBy: 'User 1',
-      reportedAccount: 'nguyenva@example.com',
-      content: 'Bài đăng không phù hợp',
-      status: 'Chưa xử lý',
-    },
-    {
-      stt: 2,
-      reportId: 'R002',
-      dateReported: '10/05/2025',
-      reportedBy: 'User 2',
-      reportedAccount: 'tranb@example.com',
-      content: 'Nội dung xúc phạm',
-      status: 'Đã xử lý',
-    },
-  ];
+  const [reportsData, setReportsData] = useState<Report[]>([]);
 
   // State cho bộ lọc trạng thái
   const [selectedStatus, setSelectedStatus] = useState('Tất cả trạng thái');
   const [showDropdown, setShowDropdown] = useState(false);
+
+  // State cho các dòng đã mở rộng nội dung
+  const [expandedRows, setExpandedRows] = useState<{ [key: string]: boolean }>({});
+
+  useEffect(() => {
+    const fetchReports = async () => {
+      try {
+        const response = await fetch('/api/reports');
+        const result = await response.json();
+        if (result.success) {
+          setReportsData(result.reports);
+        }
+      } catch (error) {
+        console.error('Error fetching reports:', error);
+      }
+    };
+
+    fetchReports();
+  }, []);
 
   // Lọc dữ liệu dựa trên trạng thái
   const filteredReports = selectedStatus === 'Tất cả trạng thái'
@@ -118,61 +125,41 @@ export default function ReportsPage(): ReactElement {
                   </tr>
                 </thead>
                 <tbody>
-                  {filteredReports.map((report) => (
-                    <tr key={report.stt} className="border-b border-[#E5E8EB]">
-                      <td className="p-4 text-gray-800 whitespace-nowrap">{report.stt}</td>
-                      <td className="p-4 text-gray-800 whitespace-nowrap">{report.reportId}</td>
-                      <td className="p-4 text-gray-800 whitespace-nowrap">{report.dateReported}</td>
-                      <td className="p-4 text-gray-800 whitespace-nowrap">{report.reportedBy}</td>
-                      <td className="p-4 text-gray-800 whitespace-nowrap">{report.reportedAccount}</td>
-                      <td className="p-4 text-gray-800 whitespace-nowrap">{report.content}</td>
-                      <td className="p-4 whitespace-nowrap">
-                        <span
-                          className={`px-4 py-1 rounded-2xl text-gray-900 whitespace-nowrap ${
-                            report.status === 'Đã xử lý' ? 'bg-[#AECBEB]' : 'bg-[#F0F2F5]'
-                          }`}
-                        >
-                          {report.status}
-                        </span>
-                      </td>
-                      <td className="p-4 flex gap-2 whitespace-nowrap">
-                        <span className="material-symbols-outlined text-blue-500">mail</span>
-                        <span className="material-symbols-outlined text-blue-500">visibility</span>
-                        <span className="material-symbols-outlined text-gray-500">delete</span>
-                      </td>
-                    </tr>
-                  ))}
+                  {filteredReports.map((report, index) => {
+                    const isLongContent = report.content.length > 50;
+                    const isExpanded = expandedRows[report.report_id];
+                    return (
+                      <tr key={report.report_id} className="border-b border-[#E5E8EB]">
+                        <td className="p-4 text-gray-800 whitespace-nowrap">{index + 1}</td>
+                        <td className="p-4 text-gray-800 whitespace-nowrap">{report.report_id}</td>
+                        <td className="p-4 text-gray-800 whitespace-nowrap">{report.date_reported}</td>
+                        <td className="p-4 text-gray-800 whitespace-nowrap">{report.reported_by || 'Không xác định'}</td>
+                        <td className="p-4 text-gray-800 whitespace-nowrap">{report.reported_account || 'Không xác định'}</td>
+                        <td className="p-4 text-gray-800 max-w-[400px] break-words align-top">{report.content}</td>
+                        <td className="p-4 whitespace-nowrap">
+                          <span
+                            className={`px-4 py-1 rounded-2xl text-gray-900 whitespace-nowrap ${
+                              report.status === 'Đã xử lý' ? 'bg-[#AECBEB]' : 'bg-[#F0F2F5]'
+                            }`}
+                          >
+                            {report.status}
+                          </span>
+                        </td>
+                        <td className="p-4 flex gap-2 whitespace-nowrap">
+                          <span className="material-symbols-outlined text-blue-500">mail</span>
+                          <span className="material-symbols-outlined text-blue-500">visibility</span>
+                          <span className="material-symbols-outlined text-gray-500">delete</span>
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
 
-            {/* Phân trang */}
-            <div className="flex justify-center items-center gap-2 mt-6">
-              <button className="w-10 h-10 flex items-center justify-center rounded-full hover:bg-gray-100" disabled>
-                <FiChevronDown className="w-5 h-5 rotate-90 text-gray-900" />
-              </button>
-              <button
-                className="w-10 h-10 flex items-center justify-center rounded-full bg-[#F8F9FB] text-gray-900 font-bold"
-                disabled
-              >
-                1
-              </button>
-              <button
-                className="w-10 h-10 flex items-center justify-center rounded-full hover:bg-gray-100 text-gray-900"
-                disabled
-              >
-                2
-              </button>
-              <button
-                className="w-10 h-10 flex items-center justify-center rounded-full hover:bg-gray-100 text-gray-900"
-                disabled
-              >
-                3
-              </button>
-              <button className="w-10 h-10 flex items-center justify-center rounded-full hover:bg-gray-100" disabled>
-                <FiChevronDown className="w-5 h-5 -rotate-90 text-gray-900" />
-              </button>
-            </div>
+           
+           
+          
           </div>
         </div>
       </main>

@@ -5,6 +5,7 @@ import { MaterialIcon } from './MaterialIcon';
 import axios from 'axios';
 import { useUser } from '../contexts/UserContext';
 import gsap from 'gsap';
+import { fetchForbiddenWords, filterForbiddenWords } from '../lib/forbiddenWords';
 
 type PrivacyOption = 'public' | 'friends' | 'onlyme';
 
@@ -67,9 +68,11 @@ export default function CreatePostModal({ onClose, onPostCreated, theme, default
   const locationModalRef = useRef<HTMLDivElement>(null);
   const statusRef = useRef<HTMLDivElement>(null);
   const [typePost, setTypePost] = useState<'positive' | 'negative'>(defaultTypePost || 'positive');
+  const [forbiddenWords, setForbiddenWords] = useState<string[]>([]);
 
   useEffect(() => {
     if (defaultTypePost) setTypePost(defaultTypePost);
+    fetchForbiddenWords().then(setForbiddenWords);
   }, [defaultTypePost]);
 
   const handleAddImage = async (e: ChangeEvent<HTMLInputElement>) => {
@@ -139,6 +142,11 @@ export default function CreatePostModal({ onClose, onPostCreated, theme, default
       alert('Đăng bài thất bại');
     }
     setUploading(false);
+  };
+
+  const handleContentChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    const value = e.target.value;
+    setContent(filterForbiddenWords(value, forbiddenWords));
   };
 
   useLayoutEffect(() => {
@@ -244,7 +252,7 @@ export default function CreatePostModal({ onClose, onPostCreated, theme, default
             placeholder="Bạn đang nghĩ gì?"
             className="w-full min-h-[160px] border border-black/10 bg-[#f0f2f5] p-4 rounded-xl text-base resize-none focus:outline-none focus:ring-2 focus:ring-[--primary-light] mb-6 text-[#1c1e21]"
             value={content}
-            onChange={(e) => setContent(e.target.value)}
+            onChange={handleContentChange}
           />
 
           {images.length > 0 && (
