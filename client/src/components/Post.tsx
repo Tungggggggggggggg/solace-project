@@ -4,6 +4,7 @@ import ReportPostModal from './ReportPostModal';
 import axios from 'axios';
 import LikeListModal from './LikeListModal';
 import gsap from 'gsap';
+import { fetchForbiddenWords, filterForbiddenWords } from '../lib/forbiddenWords';
 
 // Định nghĩa interface cho props của Post
 interface PostProps {

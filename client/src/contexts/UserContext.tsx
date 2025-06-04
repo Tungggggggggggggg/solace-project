@@ -20,7 +20,7 @@ interface UserContextType {
   logout: (reason?: string) => Promise<void>;
 }
 
-const UserContext = createContext<UserContextType>({
+export const UserContext = createContext<UserContextType>({
   user: null,
   accessToken: null,
   loading: true,
