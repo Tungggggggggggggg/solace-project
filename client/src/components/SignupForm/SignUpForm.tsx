@@ -28,7 +28,7 @@ const SignUpForm = ({ onSuccess }: SignUpFormProps) => {
     type: 'info'
   });
 
-  const { setUserData } = useUser();
+  const { signup } = useUser();
 
   // Hàm hiển thị Toast với nội dung và loại thông báo tương ứng
   const showToast = (message: string, type: 'success' | 'error' | 'info' | 'warning') => {
@@ -54,102 +54,37 @@ const SignUpForm = ({ onSuccess }: SignUpFormProps) => {
   // Hàm xử lý submit form
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
-    // Reset error state
     setError("");
 
-    // Basic validation
+    // Validate input
     if (!form.firstName || !form.lastName || !form.email || !form.password) {
-      setError("Vui lòng điền đầy đủ thông tin.");
-      return;
+      return setError("Vui lòng điền đầy đủ thông tin.");
     }
-
-    // Email validation
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(form.email)) {
-      setError("Địa chỉ email không hợp lệ.");
-      return;
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) {
+      return setError("Địa chỉ email không hợp lệ.");
     }
-
-    // Password strength validation
-    const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{8,}$/;
-    if (!passwordRegex.test(form.password)) {
-      setError("Mật khẩu cần ít nhất 8 ký tự, bao gồm chữ hoa, chữ thường và số.");
-      return;
+    if (!/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{8,}$/.test(form.password)) {
+      return setError("Mật khẩu cần ít nhất 8 ký tự, bao gồm chữ hoa, chữ thường và số.");
     }
 
     try {
-       // Gọi API
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/auth/signup`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          email: form.email.toLowerCase().trim(),
-          password: form.password,
-          firstName: form.firstName.trim(),
-          lastName: form.lastName.trim(),
-        }),
-      });
+      const check = await signup(
+        form.email,
+        form.password,
+        form.firstName.trim(),
+        form.lastName.trim()
+      );
 
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.message || 'Đăng ký thất bại');
+      if (check) {
+        showToast("Đăng ký thành công!", "success");
+        setForm({ firstName: '', lastName: '', email: '', password: '' });
+        setTimeout(() => onSuccess?.(), 1500);
+      } else {
+        setError("Đăng ký thất bại. Vui lòng thử lại.");
+        showToast("Đăng ký thất bại. Vui lòng thử lại.", "error");
       }
-
-      // Xử lý thành công
-      showToast("Đăng ký thành công!", "success");
-      setForm({
-        firstName: '',
-        lastName: '',
-        email: '',
-        password: ''
-      });
-      setError("");
-
-      // Auto-login after successful registration
-      const loginResponse = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/auth/login`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          email: form.email.trim().toLowerCase(),
-          password: form.password
-        }),
-      });
-
-      const loginData = await loginResponse.json();
-
-      if (loginResponse.ok) {
-        // Show success feedback
-        showToast("Đăng nhập thành công!", "success");
-        
-        // Clear form
-        setForm({
-          firstName: '',
-          lastName: '',
-          email: '',
-          password: ''
-        });
-
-        // Lưu thông tin người dùng vào context
-        const { user, accessToken } = data;
-        setUserData(user, accessToken);      
-        showToast("Đăng nhập thành công!", "success");
-
-        // Redirect after delay
-        setTimeout(() => {
-          onSuccess?.();
-        }, 1500);
-      }
-
-    } catch (err) {
-      // Handle specific error cases
+    } catch (err: any) {
       let errorMessage = 'Đăng ký thất bại. Vui lòng thử lại.';
-      
       if (err instanceof Error) {
         if (err.message.includes('Email already exists')) {
           errorMessage = "Email đã được đăng ký. Vui lòng sử dụng email khác.";
@@ -159,7 +94,6 @@ const SignUpForm = ({ onSuccess }: SignUpFormProps) => {
           errorMessage = err.message;
         }
       }
-      
       setError(errorMessage);
       showToast(errorMessage, "error");
     }

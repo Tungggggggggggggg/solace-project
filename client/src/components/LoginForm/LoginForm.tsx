@@ -13,7 +13,7 @@ interface LoginFormProps {
 const LoginForm = ({ onSuccess }: LoginFormProps) => {
   // Sử dụng hook để lấy hàm setUserData từ context UserContext
   // Hàm này sẽ được gọi để lưu thông tin người dùng sau khi đăng nhập thành công
-  const { setUserData } = useUser();
+  const { login } = useUser();
   // State lưu trữ giá trị các trường nhập liệu của form
   const [form, setForm] = useState({
     email: "",
@@ -54,14 +54,12 @@ const LoginForm = ({ onSuccess }: LoginFormProps) => {
   // Xử lý submit form đăng nhập
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
-    // Kiểm tra dữ liệu đầu vào
+
     if (!form.email || !form.password) {
       showToast("Vui lòng điền đầy đủ thông tin", "warning");
       return;
     }
 
-    // Validate email format
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(form.email)) {
       showToast("Email không hợp lệ", "warning");
@@ -70,51 +68,16 @@ const LoginForm = ({ onSuccess }: LoginFormProps) => {
 
     setLoadingSubmit(true);
     try {
-      // Gọi API login
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/auth/login`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          email: form.email.trim().toLowerCase(),
-          password: form.password
-        }),
-        credentials: 'include', // Để gửi cookie nếu cần
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        // Handle specific error cases
-        if (response.status === 403 && data.error.includes('Vui lòng đăng nhập qua')) {
-          throw new Error(data.error);
-        }
-        throw new Error(data.error || 'Đăng nhập thất bại');
+      const check = await login(form.email, form.password);
+      if (check) {
+        if (onSuccess) onSuccess();
+        showToast("Đăng nhập thành công", "success");
+      } else {
+        showToast("Đăng nhập thất bại. Vui lòng kiểm tra lại thông tin.", "error");
       }
-
-      // Lưu thông tin người dùng vào context
-      const { user, accessToken } = data;
-      setUserData(user, accessToken);  
-      sessionStorage.setItem("accessToken", accessToken);    
-      showToast("Đăng nhập thành công!", "success");
-
-      // Redirect với delay
-      setTimeout(() => {
-        onSuccess?.();
-        // Clear form
-        setForm({ email: "", password: "" });
-      }, 1500);
-
-    } catch (err) {
-      // Xử lý lỗi cụ thể
-      let errorMessage = 'Đăng nhập thất bại. Vui lòng thử lại.';
-      
-      if (err instanceof Error) {
-        errorMessage = err.message.includes('Vui lòng đăng nhập qua')
-          ? err.message
-          : 'Thông tin đăng nhập không chính xác';
-      }
-
-      showToast(errorMessage, "error");
+    } catch (error) {
+      console.error("Login error:", error);
+      showToast("Đã xảy ra lỗi khi đăng nhập. Vui lòng thử lại sau.", "error");
     } finally {
       setLoadingSubmit(false);
     }

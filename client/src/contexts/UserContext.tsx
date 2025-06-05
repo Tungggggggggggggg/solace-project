@@ -17,6 +17,8 @@ interface UserContextType {
   accessToken: string | null;
   loading: boolean;
   setUserData: (user: UserData, token: string) => void;
+  signup: (email: string, password: string, firstName: string, lastName: string) => Promise<boolean>;
+  login: (email: string, password: string) => Promise<boolean>;
   logout: (reason?: string) => Promise<void>;
 }
 
@@ -25,6 +27,8 @@ export const UserContext = createContext<UserContextType>({
   accessToken: null,
   loading: true,
   setUserData: () => {},
+  login: async () => false,
+  signup: async () => false,
   logout: async () => {},
 });
 
@@ -108,6 +112,53 @@ export function UserContextProvider({ children }: { children: ReactNode }) {
     initialize();
   }, []); // Chỉ chạy một lần khi component mount
 
+  const signup = async (email: string, password: string, firstName: string, lastName: string) => {
+    try {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/auth/signup`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ email, password, firstName, lastName }),
+      });
+
+      if (!res.ok) {
+        throw new Error('Đăng ký không thành công. Vui lòng kiểm tra lại thông tin.');
+      }
+
+      const data = await res.json();
+      setUserData(data.user, data.accessToken);
+      return true;
+    } catch (error) {
+      console.error("Lỗi khi đăng ký:", error);
+      return false;
+    }
+  };
+  
+  const login = async (email: string, password: string) => {
+    try {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/auth/login`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ email, password }),
+        credentials: 'include',
+      });
+
+      if (!res.ok) {
+        throw new Error('Đăng nhập không thành công. Vui lòng kiểm tra lại thông tin.');
+      }
+
+      const data = await res.json();
+      setUserData(data.user, data.accessToken);
+      return true;
+    } catch (error) {
+      console.error("Lỗi khi đăng nhập:", error);
+      return false;
+    }
+  };
+
   const setUserData = (userData: UserData, token: string) => {
     setUser(userData);
     setAccessToken(token);
@@ -135,7 +186,7 @@ export function UserContextProvider({ children }: { children: ReactNode }) {
   };
 
   return (
-    <UserContext.Provider value={{ user, accessToken, loading, setUserData, logout }}>
+    <UserContext.Provider value={{ user, accessToken, loading, setUserData, signup, login, logout }}>
       {children}
     </UserContext.Provider>
   );

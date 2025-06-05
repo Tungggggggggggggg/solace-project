@@ -76,18 +76,17 @@ const AuthModal = ({ onClose, defaultTab = 'signup', onSuccess }: AuthModalProps
       
       if (userCredential.user) {
         const idToken = await userCredential.user.getIdToken();
-        // Lấy thông tin người dùng từ Firebase
-        const user = {
-          displayName: userCredential.user.displayName || 'Người Dùng',
-          email: userCredential.user.email || 'Không có email',
-          photoURL: userCredential.user.photoURL || 'https://placehold.co/150x150?text=Avatar',
-        };
+        // Gửi token lên server để xác thực và lấy thông tin người dùng
+        if (!idToken) {
+          throw new Error("Không thể lấy ID token từ người dùng.");
+        }
 
         const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/auth/google-login`, {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(user),
-          credentials: "include", // Để gửi cookie nếu cần
+          headers: {
+            Authorization: `Bearer ${idToken}`,
+          },
+          credentials: "include",
         });
         // Lưu thông tin người dùng vào localStorage (hoặc có thể gửi lên server)
         if( !res.ok) {
