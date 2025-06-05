@@ -69,15 +69,12 @@ const LoginForm = ({ onSuccess }: LoginFormProps) => {
     setLoadingSubmit(true);
     try {
       const check = await login(form.email, form.password);
-      if (check) {
-        if (onSuccess) onSuccess();
-        showToast("Đăng nhập thành công", "success");
-      } else {
-        showToast("Đăng nhập thất bại. Vui lòng kiểm tra lại thông tin.", "error");
-      }
-    } catch (error) {
+      if (onSuccess) onSuccess();
+      showToast("Đăng nhập thành công", "success");
+    } catch (error: any) {
       console.error("Login error:", error);
-      showToast("Đã xảy ra lỗi khi đăng nhập. Vui lòng thử lại sau.", "error");
+      const errorMessage = error.message || "Đã xảy ra lỗi khi đăng nhập. Vui lòng thử lại sau.";
+      showToast(errorMessage, "error");
     } finally {
       setLoadingSubmit(false);
     }

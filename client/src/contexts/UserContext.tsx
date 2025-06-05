@@ -17,8 +17,8 @@ interface UserContextType {
   accessToken: string | null;
   loading: boolean;
   setUserData: (user: UserData, token: string) => void;
-  signup: (email: string, password: string, firstName: string, lastName: string) => Promise<boolean>;
-  login: (email: string, password: string) => Promise<boolean>;
+  signup: (email: string, password: string, firstName: string, lastName: string) => void;
+  login: (email: string, password: string) => void;
   logout: (reason?: string) => Promise<void>;
 }
 
@@ -27,8 +27,8 @@ export const UserContext = createContext<UserContextType>({
   accessToken: null,
   loading: true,
   setUserData: () => {},
-  login: async () => false,
-  signup: async () => false,
+  login: async () => {},
+  signup: async () => {},
   logout: async () => {},
 });
 
@@ -123,15 +123,16 @@ export function UserContextProvider({ children }: { children: ReactNode }) {
       });
 
       if (!res.ok) {
-        throw new Error('Đăng ký không thành công. Vui lòng kiểm tra lại thông tin.');
+        const errorData = await res.json();
+        throw new Error(errorData.error || 'Đăng ký không thành công. Vui lòng kiểm tra lại thông tin.');
       }
 
       const data = await res.json();
       setUserData(data.user, data.accessToken);
-      return true;
+      return;
     } catch (error) {
       console.error("Lỗi khi đăng ký:", error);
-      return false;
+      throw error;
     }
   };
   
@@ -147,15 +148,16 @@ export function UserContextProvider({ children }: { children: ReactNode }) {
       });
 
       if (!res.ok) {
-        throw new Error('Đăng nhập không thành công. Vui lòng kiểm tra lại thông tin.');
+        const errorData = await res.json(); 
+        throw new Error(errorData.error || 'Đăng nhập không thành công. Vui lòng kiểm tra lại thông tin.');
       }
 
       const data = await res.json();
       setUserData(data.user, data.accessToken);
-      return true;
-    } catch (error) {
+      return;
+    } catch (error: any) {
       console.error("Lỗi khi đăng nhập:", error);
-      return false;
+      throw error; 
     }
   };
 

@@ -74,26 +74,14 @@ const SignUpForm = ({ onSuccess }: SignUpFormProps) => {
         form.firstName.trim(),
         form.lastName.trim()
       );
+      console.log("Đăng ký thành công:", check);
 
-      if (check) {
-        showToast("Đăng ký thành công!", "success");
-        setForm({ firstName: '', lastName: '', email: '', password: '' });
-        setTimeout(() => onSuccess?.(), 1500);
-      } else {
-        setError("Đăng ký thất bại. Vui lòng thử lại.");
-        showToast("Đăng ký thất bại. Vui lòng thử lại.", "error");
-      }
-    } catch (err: any) {
-      let errorMessage = 'Đăng ký thất bại. Vui lòng thử lại.';
-      if (err instanceof Error) {
-        if (err.message.includes('Email already exists')) {
-          errorMessage = "Email đã được đăng ký. Vui lòng sử dụng email khác.";
-        } else if (err.message.includes('Weak password')) {
-          errorMessage = "Mật khẩu không đủ mạnh.";
-        } else {
-          errorMessage = err.message;
-        }
-      }
+      showToast("Đăng ký thành công!", "success");
+      setForm({ firstName: '', lastName: '', email: '', password: '' });
+      setTimeout(() => onSuccess?.(), 1500);
+    } catch (error: any) {
+      const errorMessage = error.message || "Đã xảy ra lỗi trong quá trình đăng ký.";
+      console.error("Lỗi đăng kýwwww:", errorMessage);
       setError(errorMessage);
       showToast(errorMessage, "error");
     }
