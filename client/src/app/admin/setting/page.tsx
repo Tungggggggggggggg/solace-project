@@ -4,6 +4,7 @@ import React, { useState, useEffect } from 'react';
 import type { ReactElement } from 'react';
 import { FiSearch, FiChevronDown } from 'react-icons/fi';
 import AdminLayout from '@/components/AdminLayout';
+import Toast from '@/components/Toast';
 
 export default function SettingsPage(): ReactElement {
   const [forbiddenWords, setForbiddenWords] = useState<any[]>([]);
@@ -13,6 +14,7 @@ export default function SettingsPage(): ReactElement {
   const [showAddModal, setShowAddModal] = useState(false);
   const [newWord, setNewWord] = useState('');
   const [adding, setAdding] = useState(false);
+  const [toast, setToast] = useState<{message: string, type: 'success' | 'error' | 'info' | 'warning'}|null>(null);
 
   useEffect(() => {
     const fetchForbiddenWords = async () => {
@@ -51,7 +53,7 @@ export default function SettingsPage(): ReactElement {
         setForbiddenWords(prev => [data.forbiddenWord, ...prev]);
         setShowAddModal(false);
         setNewWord('');
-        alert('Thêm từ cấm thành công!');
+        setToast({ message: 'Thêm từ cấm thành công!', type: 'success' });
       }
     } finally {
       setAdding(false);
@@ -68,7 +70,7 @@ export default function SettingsPage(): ReactElement {
     if (data.success) {
       setForbiddenWords(prev => prev.filter(w => w.id !== id));
     } else {
-      alert('Xóa thất bại!');
+      setToast({ message: 'Xóa thất bại!', type: 'error' });
     }
   };
 
@@ -80,6 +82,8 @@ export default function SettingsPage(): ReactElement {
   return (
     <AdminLayout onOpenAuth={handleOpenAuth}>
       <main className="flex-1 bg-white">
+        {/* Toast notification */}
+        {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
         <div className="p-6">
           <div className="flex justify-between items-center mb-6">
             <h1 className="text-3xl font-bold text-gray-900">Quản lý từ cấm</h1>

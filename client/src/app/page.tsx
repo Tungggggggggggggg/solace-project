@@ -1,7 +1,7 @@
 "use client";
 
 // Import các component và hook cần thiết cho trang chủ
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import Header from "@/components/Header";
 import Tabs from "@/components/Tabs";
 import InputSection from "@/components/InputSection";
@@ -39,6 +39,7 @@ export default function Home() {
   }>(null);
   const [showCreatePost, setShowCreatePost] = useState(false);
   const [posts, setPosts] = useState<any[]>([]); // State lưu danh sách bài viết
+  const [visibleCount, setVisibleCount] = useState(3); // Số post hiển thị ban đầu
 
   // Mở modal xác thực với tab tương ứng (login/signup), chỉ khi chưa đăng nhập
   const handleOpenAuth = (tab: 'login' | 'signup') => {
@@ -86,6 +87,22 @@ export default function Home() {
     activeTab === 0 ? post.type_post === 'positive' : post.type_post === 'negative'
   );
 
+  // Lazy load: tăng số lượng post hiển thị khi kéo gần cuối trang
+  const handleScroll = useCallback(() => {
+    if (window.innerHeight + window.scrollY >= document.body.offsetHeight - 200) {
+      setVisibleCount((prev) => Math.min(prev + 4, filteredPosts.length));
+    }
+  }, [filteredPosts.length]);
+
+  useEffect(() => {
+    window.addEventListener('scroll', handleScroll);
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, [handleScroll]);
+
+  useEffect(() => {
+    setVisibleCount(4); // Reset khi đổi tab hoặc posts
+  }, [activeTab, posts]);
+
   return (
     // Container chính với hiệu ứng nền phù hợp theme
     <div className={`min-h-screen w-full ${bgClass}`}>
@@ -111,11 +128,14 @@ export default function Home() {
           {/* Nội dung trung tâm, thêm margin-left để không bị che */}
           <div className="flex-1 flex flex-col items-center" style={{ marginLeft: 120, marginRight: 120 }}>
             {/* Tabs: Chuyển đổi giữa các loại bài đăng (Inspiring/Reflective) */}
+            <div style={{ marginTop: 32 }} />
             <Tabs onTabChange={setActiveTab} />
             {/* Thay InputSection bằng CreatePost */}
-            <InputSection onOpenModal={() => setShowCreatePost(true)} theme={theme} />
+            <div style={{ width: 'calc(100% - 60px)', maxWidth: '836px', margin: '16px auto 0 auto' }}>
+              <InputSection onOpenModal={() => setShowCreatePost(true)} theme={theme} />
+            </div>
             {/* Hiển thị danh sách bài viết mới nhất */}
-            {filteredPosts.map(post => (
+            {filteredPosts.slice(0, visibleCount).map(post => (
               <Post
                 key={post.id}
                 theme={theme}

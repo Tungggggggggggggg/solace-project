@@ -235,18 +235,9 @@ const Post = ({ id, name, date, content, likes, comments, shares, images, avatar
         </div>
       )}
       {/* Thống kê tương tác */}
-      {(likeCount > 0 || commentCount > 0) && (
-        <div className="flex justify-between items-center border-t border-gray-300 py-2 mt-4">
-          {likeCount > 0 && (
-            <div className="flex items-center space-x-1 cursor-pointer" onClick={() => setShowLikeList(true)}>
-              <span className="font-bold text-base">{likeCount} người đã thích</span>
-            </div>
-          )}
-          {commentCount > 0 && (
-            <div className="flex items-center space-x-1">
-              <span className="font-bold text-base">{commentCount} bình luận</span>
-            </div>
-          )}
+      {likeCount > 0 && (
+        <div className="flex items-center space-x-1 border-t border-gray-300 py-2 mt-4 cursor-pointer" onClick={() => setShowLikeList(true)}>
+          <span className="font-bold text-base">{likeCount} người đã thích</span>
         </div>
       )}
       <div className="flex justify-between text-gray-600 mt-2">

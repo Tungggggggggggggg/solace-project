@@ -15,6 +15,9 @@ const Tabs = ({ onTabChange }: TabsProps) => {
 
   const handleTabClick = (index: number) => {
     setActive(index);
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('activeTab', String(index));
+    }
     if (onTabChange) onTabChange(index);
   };
 

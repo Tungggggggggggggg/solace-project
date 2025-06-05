@@ -15,15 +15,18 @@ interface PostDetailPopupProps {
     images?: string[];
   };
   onClose: () => void;
+  theme?: 'inspiring' | 'reflective';
 }
 
-const PostDetailPopup = ({ post, onClose }: PostDetailPopupProps) => {
+const PostDetailPopup = ({ post, onClose, theme = 'inspiring' }: PostDetailPopupProps) => {
   const [selectedImg, setSelectedImg] = useState(0);
   const { user } = useUser();
   const popupRef = useRef<HTMLDivElement>(null);
   const imgRef = useRef<HTMLImageElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
   const commentsRef = useRef<HTMLDivElement>(null);
+
+  const bgColor = theme === 'reflective' ? '#E3D5CA' : '#E1ECF7';
 
   useLayoutEffect(() => {
     if (popupRef.current) {
@@ -59,7 +62,7 @@ const PostDetailPopup = ({ post, onClose }: PostDetailPopupProps) => {
     <div className="fixed inset-0 z-50 flex items-center justify-center">
       {/* Nền mờ giữ nguyên Home */}
       <div className="absolute inset-0 bg-black/20 backdrop-blur-sm popup-overlay" onClick={onClose} />
-      <div ref={popupRef} className="relative bg-white rounded-2xl p-6 max-w-2xl w-full shadow-xl z-10 popup-content">
+      <div ref={popupRef} className="relative rounded-2xl p-6 max-w-2xl w-full shadow-xl z-10 popup-content" style={{ background: bgColor }}>
         {/* Nút đóng */}
         <button
           className="absolute top-3 right-3 text-2xl text-black hover:scale-110 transition"
@@ -105,21 +108,6 @@ const PostDetailPopup = ({ post, onClose }: PostDetailPopupProps) => {
         )}
         <div className="mb-4" ref={contentRef}>
           <p className="text-black text-base font-medium font-[Inter]">{post.content}</p>
-        </div>
-        {/* Thống kê tương tác */}
-        <div className="flex justify-between text-gray-600 mt-2 mb-4">
-          <div className="flex items-center space-x-2">
-            <span className="material-symbols-outlined text-xl">mood</span>
-            <span className="font-bold text-base">{post.likes}</span>
-          </div>
-          <div className="flex items-center space-x-2">
-            <span className="material-symbols-outlined text-xl">comment</span>
-            <span className="font-bold text-base">{post.comments}</span>
-          </div>
-          <div className="flex items-center space-x-2">
-            <span className="material-symbols-outlined text-xl">share</span>
-            <span className="font-bold text-base">{post.shares}</span>
-          </div>
         </div>
         {/* Khu vực bình luận */}
         <div className="border-t pt-4" ref={commentsRef}>

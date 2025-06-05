@@ -6,6 +6,7 @@ import axios from 'axios';
 import { useUser } from '../contexts/UserContext';
 import gsap from 'gsap';
 import { fetchForbiddenWords, filterForbiddenWords } from '../lib/forbiddenWords';
+import Toast from './Toast';
 
 type PrivacyOption = 'public' | 'friends' | 'onlyme';
 
@@ -69,6 +70,7 @@ export default function CreatePostModal({ onClose, onPostCreated, theme, default
   const statusRef = useRef<HTMLDivElement>(null);
   const [typePost, setTypePost] = useState<'positive' | 'negative'>(defaultTypePost || 'positive');
   const [forbiddenWords, setForbiddenWords] = useState<string[]>([]);
+  const [toast, setToast] = useState<{message: string, type: 'success' | 'error' | 'info' | 'warning'}|null>(null);
 
   useEffect(() => {
     if (defaultTypePost) setTypePost(defaultTypePost);
@@ -78,7 +80,7 @@ export default function CreatePostModal({ onClose, onPostCreated, theme, default
   const handleAddImage = async (e: ChangeEvent<HTMLInputElement>) => {
     if (!e.target.files) return;
     if (images.length + e.target.files.length > 9) {
-      alert('Bạn chỉ có thể tải lên tối đa 9 ảnh');
+      setToast({ message: 'Bạn chỉ có thể tải lên tối đa 9 ảnh', type: 'warning' });
       return;
     }
     setUploading(true);
@@ -95,7 +97,7 @@ export default function CreatePostModal({ onClose, onPostCreated, theme, default
       setImages(prev => [...prev, ...res.data.images]);
       console.log('Uploaded images:', res.data.images);
     } catch (err) {
-      alert('Upload ảnh thất bại');
+      setToast({ message: 'Upload ảnh thất bại', type: 'error' });
     }
     setUploading(false);
   };
@@ -111,11 +113,11 @@ export default function CreatePostModal({ onClose, onPostCreated, theme, default
   const handlePost = async () => {
     if (uploading) return;
     if (!user?.id) {
-      alert('Bạn cần đăng nhập để đăng bài!');
+      setToast({ message: 'Bạn cần đăng nhập để đăng bài!', type: 'warning' });
       return;
     }
     if (!content.trim() && images.length === 0) {
-      alert('Nội dung bài viết không được để trống!');
+      setToast({ message: 'Nội dung bài viết không được để trống!', type: 'warning' });
       return;
     }
     setUploading(true);
@@ -131,7 +133,7 @@ export default function CreatePostModal({ onClose, onPostCreated, theme, default
       }, {
         baseURL: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000',
       });
-      alert('Bài viết đã được đăng!');
+      setToast({ message: 'Bài viết đã được đăng!', type: 'success' });
       setContent('');
       setImages([]);
       setSelectedFeeling(null);
@@ -139,7 +141,7 @@ export default function CreatePostModal({ onClose, onPostCreated, theme, default
       if (onClose) onClose();
       if (onPostCreated) onPostCreated(res.data);
     } catch (err) {
-      alert('Đăng bài thất bại');
+      setToast({ message: 'Đăng bài thất bại', type: 'error' });
     }
     setUploading(false);
   };
@@ -188,6 +190,8 @@ export default function CreatePostModal({ onClose, onPostCreated, theme, default
         className="bg-white w-full max-w-xl rounded-[20px] overflow-hidden shadow-lg animate-[modalFadeIn_0.4s_ease-out]"
         onClick={e => e.stopPropagation()}
       >
+        {/* Toast notification */}
+        {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
         <div className="flex justify-between items-center px-8 py-6 border-b bg-gradient-to-r from-white to-[#f8f9fd]">
           <h3 className="text-[22px] font-bold text-[#1c1e21] tracking-tight">Tạo bài viết</h3>
           <button

@@ -1,6 +1,7 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState, useCallback } from 'react';
 import axios from 'axios';
 import gsap from 'gsap';
+import Toast from './Toast';
 
 interface Comment {
   id: string;
@@ -19,17 +20,27 @@ export default function CommentsSection({ postId, currentUser }: { postId: strin
   const inputGroupRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const [isFocused, setIsFocused] = useState(false);
+  const [visibleCount, setVisibleCount] = useState(4); // Số comment hiển thị ban đầu
+  const [page, setPage] = useState(1);
+  const [hasMore, setHasMore] = useState(true);
+  const COMMENTS_PER_PAGE = 10;
+  const [toast, setToast] = useState<{message: string, type: 'success' | 'error' | 'info' | 'warning'}|null>(null);
 
-  // Lấy danh sách comment khi mở post
+  // Lấy danh sách comment khi mở post hoặc khi page thay đổi
   useEffect(() => {
     const fetchComments = async () => {
-      const res = await axios.get(`/api/comments?post_id=${postId}`, {
+      const res = await axios.get(`/api/comments?post_id=${postId}&page=${page}&limit=${COMMENTS_PER_PAGE}`, {
         baseURL: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000',
       });
-      setComments(res.data);
+      if (page === 1) {
+        setComments(res.data);
+      } else {
+        setComments(prev => [...prev, ...res.data]);
+      }
+      setHasMore(res.data.length === COMMENTS_PER_PAGE);
     };
     fetchComments();
-  }, [postId]);
+  }, [postId, page]);
 
   useEffect(() => {
     if (inputGroupRef.current) {
@@ -40,6 +51,23 @@ export default function CommentsSection({ postId, currentUser }: { postId: strin
       );
     }
   }, []);
+
+  useEffect(() => {
+    setVisibleCount(COMMENTS_PER_PAGE); // Reset khi đổi post
+    setPage(1);
+  }, [postId]);
+
+  // Lazy load: tăng số lượng comment hiển thị khi kéo gần cuối vùng comment
+  const handleScroll = useCallback((e: React.UIEvent<HTMLDivElement>) => {
+    const el = e.currentTarget;
+    if (el.scrollHeight - el.scrollTop - el.clientHeight < 100) {
+      if (visibleCount < comments.length) {
+        setVisibleCount((prev) => Math.min(prev + COMMENTS_PER_PAGE, comments.length));
+      } else if (hasMore) {
+        setPage((prev) => prev + 1);
+      }
+    }
+  }, [comments.length, visibleCount, hasMore]);
 
   // Thêm comment mới
   const handleAddComment = async () => {
@@ -56,16 +84,18 @@ export default function CommentsSection({ postId, currentUser }: { postId: strin
       setComments(prev => [...prev, res.data]);
       setNewComment('');
     } catch (err) {
-      alert('Bình luận thất bại');
+      setToast({ message: 'Bình luận thất bại', type: 'error' });
     }
     setLoading(false);
   };
 
   return (
     <div className="mt-4">
+      {/* Toast notification */}
+      {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
       <h4 className="font-semibold mb-2">Bình luận</h4>
-      <div className="space-y-4 mb-4">
-        {comments.map(c => (
+      <div className="space-y-4 mb-4" style={{ maxHeight: 350, overflowY: 'auto' }} onScroll={handleScroll}>
+        {comments.slice(0, visibleCount).map(c => (
           <div key={c.id} className="flex items-start gap-3">
             <img src={c.avatar_url || '/images/default-avatar.png'} className="w-8 h-8 rounded-full object-cover" alt="avatar" />
             <div>
