@@ -5,6 +5,9 @@ import { useState, useEffect } from 'react';
 import type { ReactElement } from 'react';
 import { FiSearch, FiChevronDown, FiEdit2, FiLock, FiUnlock } from 'react-icons/fi';
 import AdminLayout from '@/components/AdminLayout';
+import { ToastContainer, toast } from 'react-toastify';
+import 'react-toastify/dist/ReactToastify.css';
+
 
 type User = {
   id: string;
@@ -27,6 +30,8 @@ export default function UserManagementPage(): ReactElement {
   const [editingUser, setEditingUser] = useState<User | null>(null);
   const dropdownButtonRef = useRef<HTMLButtonElement>(null);
   const [dropdownPosition, setDropdownPosition] = useState<{ top: number; left: number }>({ top: 0, left: 0 });
+  const [emptyReason, setEmptyReason] = useState<'search' | 'filter' | null>(null);
+
 
 
 
@@ -34,15 +39,26 @@ export default function UserManagementPage(): ReactElement {
   const fetchUsers = async () => {
     try {
       const params = new URLSearchParams();
-      if (selectedStatus !== 'Tất cả trạng thái') params.set('status', selectedStatus);
-      if (searchText.trim()) params.set('search', searchText);
+      let reason: 'search' | 'filter' | null = null;
+  
+      if (selectedStatus !== 'Tất cả trạng thái') {
+        params.set('status', selectedStatus);
+        reason = 'filter';
+      }
+  
+      if (searchText.trim()) {
+        params.set('search', searchText);
+        reason = 'search';
+      }
+  
       const res = await fetch(`http://localhost:5000/api/users?${params.toString()}`);
       const data = await res.json();
       setUsers(data);
+      setEmptyReason(data.length === 0 ? reason : null);
     } catch (error) {
       console.error('Lỗi khi tải người dùng:', error);
     }
-  };
+  };  
 
   useEffect(() => {
     fetchUsers();
@@ -66,11 +82,13 @@ export default function UserManagementPage(): ReactElement {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ is_active: !currentStatus })
       });
+      toast.success(`Tài khoản đã được ${currentStatus ? 'khóa' : 'mở khóa'} thành công!`);
   
       // Refresh danh sách
       fetchUsers();
     } catch (err) {
       console.error('Lỗi khi cập nhật trạng thái:', err);
+      toast.error('Đã xảy ra lỗi khi cập nhật trạng thái tài khoản.');
     }
   };
   
@@ -162,6 +180,17 @@ export default function UserManagementPage(): ReactElement {
                   </tr>
                 </thead>
                 <tbody>
+                  {users.length === 0 && (
+                    <tr>
+                      <td colSpan={5} className="p-4 text-center text-gray-500">
+                        {emptyReason === 'search'
+                          ? 'Không có kết quả nào phù hợp với từ khóa tìm kiếm.'
+                          : emptyReason === 'filter'
+                          ? 'Không có người nào phù hợp với bộ lọc hiện tại.'
+                          : 'Không có người dùng nào.'}
+                      </td>
+                    </tr>
+                  )}
                   {users.map((user) => (
                     <tr key={user.id} className="border-b border-[#E5E8EB]">
                       <td className="p-4 text-gray-800">{user.first_name} {user.last_name}</td>
@@ -208,6 +237,7 @@ export default function UserManagementPage(): ReactElement {
           </div>
         </div>
       </main>
+      <ToastContainer position="top-right" autoClose={3000} aria-label="Thông báo hệ thống" />
       {editingUser && (
         <div
           className="fixed inset-0 bg-black/20 backdrop-blur-sm flex items-center justify-center z-50"
@@ -264,6 +294,15 @@ export default function UserManagementPage(): ReactElement {
               <button
                 className="px-4 py-2 bg-blue-500 text-white rounded-xl"
                 onClick={async () => {
+                  if (
+                    !editingUser.first_name.trim() ||
+                    !editingUser.last_name.trim() ||
+                    !editingUser.email.trim()
+                  ) {
+                    toast.error('Vui lòng nhập đầy đủ họ, tên và email!');
+                    return;
+                  }
+                
                   await fetch(`http://localhost:5000/api/users/${editingUser.id}`, {
                     method: 'PUT',
                     headers: { 'Content-Type': 'application/json' },
@@ -273,9 +312,11 @@ export default function UserManagementPage(): ReactElement {
                       email: editingUser.email,
                     }),
                   });
+                
+                  toast.success('Đã lưu thông tin chỉnh sửa thành công!');
                   setEditingUser(null);
                   fetchUsers();
-                }}
+                }}                
               >
                 Lưu thay đổi
               </button>

@@ -12,6 +12,8 @@ const forbiddenWordsRoutes = require("./routes/forbidden_words");
 const adminPostRoutes = require("./routes/post.routes");  
 const commentsRouter = require('./routes/comments');
 const likesRouter = require('./routes/likes');
+const dashboardRoutes = require('./routes/dashboard.routes');
+const visitsRoutes = require('./routes/visits.routes'); 
 const pool = require("./db");
 
 dotenv.config();
@@ -61,6 +63,8 @@ app.use("/api/admin/posts", adminPostRoutes);
 app.use('/api/comments', commentsRouter);
 app.use('/api/likes', likesRouter);
 app.use("/api/forbidden_words", forbiddenWordsRoutes);
+app.use('/api/dashboard', dashboardRoutes);
+app.use('/api/visits', visitsRoutes);
 
 // Khởi động server
 const PORT = process.env.PORT || 5000;

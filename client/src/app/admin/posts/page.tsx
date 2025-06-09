@@ -3,6 +3,9 @@
 import { useEffect, useRef, useState } from 'react';
 import { FiSearch, FiChevronDown, FiTrash2, FiEye, FiCheck } from 'react-icons/fi';
 import AdminLayout from '@/components/AdminLayout';
+import { toast, ToastContainer } from 'react-toastify';
+import 'react-toastify/dist/ReactToastify.css';
+
 
 type Post = {
   id: string;
@@ -13,6 +16,7 @@ type Post = {
   like_count: number;
   first_name: string;
   last_name: string;
+  images?: string[];
 };
 
 export default function PostManagementPage() {
@@ -44,16 +48,28 @@ export default function PostManagementPage() {
   }, [search]);
 
   const handleApprove = async (id: string) => {
+    const post = posts.find((p) => p.id === id);
+    if (!post) return;
+  
     await fetch(`http://localhost:5000/api/admin/posts/${id}/approve`, { method: 'PUT' });
+    toast.success(`Đã duyệt bài: "${post.content.slice(0, 50)}..."`);
     fetchPosts();
   };
+  
 
   const handleDelete = async (id: string) => {
-    if (confirm('Bạn có chắc muốn xóa bài này?')) {
+    const post = posts.find((p) => p.id === id);
+    if (!post) return;
+  
+    if (window.confirm(`Bạn có chắc chắn muốn xóa bài: "${post.content.slice(0, 50)}..."?`)) {
       await fetch(`http://localhost:5000/api/admin/posts/${id}`, { method: 'DELETE' });
+      toast.success(`Đã xóa bài: "${post.content.slice(0, 50)}..."`);
       fetchPosts();
     }
   };
+  const [selectedPost, setSelectedPost] = useState<Post | null>(null);
+
+  
 
   return (
     <AdminLayout onOpenAuth={() => {}}>
@@ -129,24 +145,24 @@ export default function PostManagementPage() {
         </div>
 
         {/* Posts Table */}
-        <div className="border rounded-xl overflow-x-auto">
-          <div className="max-h-[500px] overflow-y-auto min-w-[700px]">
+        <div className="border border-[#DBE0E5] rounded-xl overflow-hidden">
+          <div className="max-h-[500px] overflow-y-auto">
             <table className="w-full">
-              <thead className="sticky top-0 bg-gray-50 z-10">
+              <thead className="bg-white border-b border-[#DBE0E5] sticky top-0 z-10">
                 <tr className="text-left">
-                  <th className="p-4 text-gray-800">Nội dung</th>
-                  <th className="p-4 text-gray-800">Loại</th>
-                  <th className="p-4 text-gray-800">Người đăng</th>
-                  <th className="p-4 text-gray-800">Ngày đăng</th>
-                  <th className="p-4 text-gray-800">Cảm xúc</th>
-                  <th className="p-4 text-gray-800">Trạng thái</th>
-                  <th className="p-4 text-gray-800">Hành động</th>
+                  <th className="p-4 text-gray-800 bg-white">Nội dung</th>
+                  <th className="p-4 text-gray-800 bg-white">Loại</th>
+                  <th className="p-4 text-gray-800 bg-white">Người đăng</th>
+                  <th className="p-4 text-gray-800 bg-white">Ngày đăng</th>
+                  <th className="p-4 text-gray-800 bg-white">Cảm xúc</th>
+                  <th className="p-4 text-gray-800 bg-white">Trạng thái</th>
+                  <th className="p-4 text-gray-800 bg-white">Hành động</th>
                 </tr>
               </thead>
               <tbody>
                 {posts.length === 0 ? (
                   <tr>
-                    <td colSpan={7} className="p-6 text-center text-gray-500">
+                    <td colSpan={7} className="p-6 text-center text-gray-500 bg-white">
                       {search.trim()
                         ? 'Không có kết quả nào phù hợp với từ khóa tìm kiếm.'
                         : 'Không có bài viết nào phù hợp với bộ lọc hiện tại.'}
@@ -154,7 +170,7 @@ export default function PostManagementPage() {
                   </tr>
                 ) : (
                   posts.map((post) => (
-                    <tr key={post.id} className="border-t">
+                    <tr key={post.id} className="bg-white border-b border-[#E5E8EB]">
                       <td className="p-4 text-gray-800">{post.content}</td>
                       <td className="p-4 text-gray-800">
                         <span className={`px-2 py-1 rounded-full text-sm ${post.type_post === 'positive' ? 'bg-blue-200' : 'bg-red-100'}`}>
@@ -172,7 +188,9 @@ export default function PostManagementPage() {
                         )}
                       </td>
                       <td className="p-4 flex gap-2">
-                        <button className="text-blue-500 hover:underline">
+                        <button className="text-blue-500 hover:underline"
+                          onClick={() => setSelectedPost(post)}
+                        >
                           <FiEye />
                         </button>
                         {!post.is_approved && (
@@ -192,6 +210,67 @@ export default function PostManagementPage() {
           </div>
         </div>
       </main>
+      <ToastContainer position="top-right" autoClose={3000} aria-label="Thông báo hệ thống" />
+      {selectedPost && (
+        <div
+          className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-[9999]"
+          onClick={() => setSelectedPost(null)}
+        >
+          <div
+            className="bg-white rounded-2xl shadow-xl p-6 max-w-2xl w-full max-h-[90vh] overflow-y-auto animate-fadeIn"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-2xl font-bold text-gray-800">Chi tiết bài viết</h2>
+              <button
+                onClick={() => setSelectedPost(null)}
+                className="text-gray-500 hover:text-red-500 transition"
+              >
+                ✕
+              </button>
+            </div>
+
+            <p className="text-gray-700 mb-4 whitespace-pre-line">{selectedPost.content}</p>
+
+            {(() => {
+              let parsedImages: string[] = [];
+              if (selectedPost.images) {
+                if (typeof selectedPost.images === 'string') {
+                  try {
+                    parsedImages = JSON.parse(selectedPost.images);
+                  } catch (err) {
+                    console.error('Lỗi khi parse images:', err);
+                  }
+                } else if (Array.isArray(selectedPost.images)) {
+                  parsedImages = selectedPost.images;
+                }
+              }
+
+              return parsedImages.length > 0 ? (
+                <div className="grid grid-cols-2 gap-3 mb-4">
+                  {parsedImages.map((img, i) => (
+                    <img
+                      key={i}
+                      src={img}
+                      alt={`Image ${i}`}
+                      className="w-full rounded-xl object-cover shadow"
+                    />
+                  ))}
+                </div>
+              ) : null;
+            })()}
+
+            <div className="flex justify-end">
+              <button
+                className="px-4 py-2 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition"
+                onClick={() => setSelectedPost(null)}
+              >
+                Đóng
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </AdminLayout>
   );
 }

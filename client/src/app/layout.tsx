@@ -3,6 +3,8 @@ import type { Metadata } from "next";
 import { Be_Vietnam_Pro } from "next/font/google";
 import "./globals.css";
 import { UserContextProvider } from "@/contexts/UserContext";
+import VisitTracker from '@/components/VisitTracker'; 
+
 
 // Cấu hình font Be Vietnam Pro với các trọng lượng và hỗ trợ tiếng Việt
 const beVietnamPro = Be_Vietnam_Pro({
@@ -39,6 +41,7 @@ export default function RootLayout({
         className={`${beVietnamPro.variable} font-be-vietnam antialiased`}
         suppressHydrationWarning
       >
+        <VisitTracker /> {/*  Gọi API visits khi user mở web */}
         <UserContextProvider>{children}</UserContextProvider>
       </body>
     </html>
