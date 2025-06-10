@@ -16,6 +16,8 @@ type Post = {
   like_count: number;
   first_name: string;
   last_name: string;
+  avatar_url?: string;
+  access_modifier?: 'public' | 'people' | 'lock';
   images?: string[];
 };
 
@@ -88,6 +90,13 @@ export default function PostManagementPage() {
               className="pl-10 pr-4 py-2 bg-[#F5F0E5] rounded-xl text-gray-800 w-full outline-none"
             />
           </div>
+          <button
+            onClick={() => setType('all')}
+            className={`px-4 py-2 text-gray-800 rounded-lg transition-all duration-200 
+            bg-gray-100 ${type === 'all' ? 'ring-2 ring-gray-400 font-semibold' : ''}`}
+          >
+            Tất cả
+          </button>
           <button
             onClick={() => setType('positive')}
             className={`px-4 py-2 text-gray-800 rounded-lg transition-all duration-200 
@@ -171,13 +180,17 @@ export default function PostManagementPage() {
                 ) : (
                   posts.map((post) => (
                     <tr key={post.id} className="bg-white border-b border-[#E5E8EB]">
-                      <td className="p-4 text-gray-800">{post.content}</td>
+                      <td className="p-4 text-gray-800 max-w-[300px] truncate" title={post.content}>
+                        {post.content}
+                      </td>
                       <td className="p-4 text-gray-800">
                         <span className={`px-2 py-1 rounded-full text-sm ${post.type_post === 'positive' ? 'bg-blue-200' : 'bg-red-100'}`}>
                           {post.type_post === 'positive' ? 'Tích cực' : 'Tiêu cực'}
                         </span>
                       </td>
-                      <td className="p-4 text-gray-800">{post.first_name} {post.last_name}</td>
+                      <td className="p-4 text-gray-800 max-w-[200px] truncate" title={`${post.first_name} ${post.last_name}`}>
+                        {post.first_name} {post.last_name}
+                      </td>
                       <td className="p-4 text-gray-800">{new Date(post.created_at).toLocaleDateString()}</td>
                       <td className="p-4 text-gray-800">{post.like_count}</td>
                       <td className="p-4 text-gray-800">
@@ -220,18 +233,31 @@ export default function PostManagementPage() {
             className="bg-white rounded-2xl shadow-xl p-6 max-w-2xl w-full max-h-[90vh] overflow-y-auto animate-fadeIn"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="flex justify-between items-center mb-4">
-              <h2 className="text-2xl font-bold text-gray-800">Chi tiết bài viết</h2>
-              <button
-                onClick={() => setSelectedPost(null)}
-                className="text-gray-500 hover:text-red-500 transition"
-              >
-                ✕
-              </button>
+            {/* Header */}
+            <div className="flex items-center gap-4 mb-4">
+              <img
+                src={selectedPost.avatar_url || '/avatar.jpg'}
+                alt="avatar"
+                className="w-12 h-12 rounded-full object-cover border"
+              />
+              <div>
+                <h3 className="text-lg font-semibold text-gray-800">
+                  Bài viết của {selectedPost.first_name} {selectedPost.last_name}
+                </h3>
+                <p className="text-sm text-gray-500">
+                  {new Date(selectedPost.created_at).toLocaleString()} · {selectedPost.access_modifier === 'lock'
+                    ? 'Chỉ mình tôi'
+                    : selectedPost.access_modifier === 'people'
+                    ? 'Mọi người'
+                    : 'Công khai'}
+                </p>
+              </div>
             </div>
 
+            {/* Nội dung bài viết */}
             <p className="text-gray-700 mb-4 whitespace-pre-line">{selectedPost.content}</p>
 
+            {/* Hình ảnh (nếu có) */}
             {(() => {
               let parsedImages: string[] = [];
               if (selectedPost.images) {
@@ -260,6 +286,7 @@ export default function PostManagementPage() {
               ) : null;
             })()}
 
+            {/* Nút đóng */}
             <div className="flex justify-end">
               <button
                 className="px-4 py-2 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition"

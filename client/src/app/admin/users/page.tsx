@@ -91,8 +91,12 @@ export default function UserManagementPage(): ReactElement {
       toast.error('Đã xảy ra lỗi khi cập nhật trạng thái tài khoản.');
     }
   };
+  // Kiểm tra email hợp lệ
+  const isValidEmail = (email: string): boolean => {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    return emailRegex.test(email);
+  };
   
-
   const handleOpenAuth = (tab: 'login' | 'signup') => {
     console.log(`Mở tab ${tab}`);
   };
@@ -237,7 +241,7 @@ export default function UserManagementPage(): ReactElement {
           </div>
         </div>
       </main>
-      <ToastContainer position="top-right" autoClose={3000} aria-label="Thông báo hệ thống" />
+      <ToastContainer position="top-right" autoClose={4000} aria-label="Thông báo hệ thống" />
       {editingUser && (
         <div
           className="fixed inset-0 bg-black/20 backdrop-blur-sm flex items-center justify-center z-50"
@@ -302,6 +306,11 @@ export default function UserManagementPage(): ReactElement {
                     toast.error('Vui lòng nhập đầy đủ họ, tên và email!');
                     return;
                   }
+                  
+                  if (!isValidEmail(editingUser.email)) {
+                    toast.error('Email không đúng định dạng!');
+                    return;
+                  }                  
                 
                   await fetch(`http://localhost:5000/api/users/${editingUser.id}`, {
                     method: 'PUT',

@@ -8,7 +8,7 @@ router.get('/', async (req, res) => {
 
   try {
     let query = `
-      SELECT p.*, u.first_name, u.last_name
+      SELECT p.*, u.first_name, u.last_name, u.avatar_url
       FROM posts p
       JOIN users u ON p.user_id = u.id
     `;
