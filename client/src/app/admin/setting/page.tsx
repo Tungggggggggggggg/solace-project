@@ -2,205 +2,213 @@
 
 import React, { useState, useEffect } from 'react';
 import type { ReactElement } from 'react';
-import { FiSearch, FiChevronDown } from 'react-icons/fi';
 import AdminLayout from '@/components/AdminLayout';
-import Toast from '@/components/Toast';
+import { toast, ToastContainer } from 'react-toastify';
+import 'react-toastify/dist/ReactToastify.css';
+import { FiSearch, FiEye, FiTrash2 } from 'react-icons/fi';
 
-export default function SettingsPage(): ReactElement {
-  const [forbiddenWords, setForbiddenWords] = useState<any[]>([]);
-  const [selectedStatus, setSelectedStatus] = useState('Tất cả trạng thái');
-  const [showDropdown, setShowDropdown] = useState(false);
-  const [loading, setLoading] = useState(true);
+type ForbiddenWord = {
+  id: string;
+  word: string;
+  added_at: string;
+};
+
+export default function SettingPage(): ReactElement {
+  const [words, setWords] = useState<ForbiddenWord[]>([]);
+  const [search, setSearch] = useState('');
+  const [selectedWord, setSelectedWord] = useState<ForbiddenWord | null>(null);
   const [showAddModal, setShowAddModal] = useState(false);
   const [newWord, setNewWord] = useState('');
   const [adding, setAdding] = useState(false);
-  const [toast, setToast] = useState<{message: string, type: 'success' | 'error' | 'info' | 'warning'}|null>(null);
+
+  const fetchWords = async () => {
+    const params = new URLSearchParams();
+    if (search.trim()) params.set('search', search);
+    const res = await fetch(`/api/forbidden_words?${params.toString()}`);
+    const result = await res.json();
+    if (result.success) setWords(result.forbiddenWords);
+    else setWords([]);
+  };
 
   useEffect(() => {
-    const fetchForbiddenWords = async () => {
-      try {
-        const response = await fetch('/api/forbidden_words');
-        const result = await response.json();
-        if (result.success) {
-          setForbiddenWords(result.forbiddenWords);
-        }
-      } catch (error) {
-        setForbiddenWords([]);
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchForbiddenWords();
+    fetchWords();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Lọc dữ liệu dựa trên trạng thái
-  const filteredWords = selectedStatus === 'Tất cả trạng thái'
-    ? forbiddenWords
-    : forbiddenWords.filter(word => word.status === selectedStatus);
+  useEffect(() => {
+    if (search.trim() === '') fetchWords();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [search]);
 
-  // Thêm từ cấm
-  const handleAddForbiddenWord = async () => {
+  const handleDelete = async (id: string) => {
+    if (window.confirm('Bạn có chắc chắn muốn xóa từ cấm này?')) {
+      await fetch(`/api/forbidden_words/${id}`, { method: 'DELETE' });
+      toast.success('Đã xóa từ cấm!');
+      fetchWords();
+    }
+  };
+
+  const handleAddWord = async () => {
     if (!newWord.trim()) return;
     setAdding(true);
-    try {
-      const res = await fetch('/api/forbidden_words', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ word: newWord, added_by: 'Admin', status: 'Chưa duyệt' }),
-      });
-      const data = await res.json();
-      if (data.success) {
-        setForbiddenWords(prev => [data.forbiddenWord, ...prev]);
-        setShowAddModal(false);
-        setNewWord('');
-        setToast({ message: 'Thêm từ cấm thành công!', type: 'success' });
-      }
-    } finally {
-      setAdding(false);
-    }
-  };
-
-  // Xóa từ cấm
-  const handleDeleteForbiddenWord = async (id: string) => {
-    console.log('Xóa từ cấm id:', id);
-    if (!window.confirm('Bạn có chắc muốn xóa từ này?')) return;
-    const res = await fetch(`/api/forbidden_words/${id}`, { method: 'DELETE' });
-    const data = await res.json();
-    console.log('Kết quả xóa:', data);
-    if (data.success) {
-      setForbiddenWords(prev => prev.filter(w => w.id !== id));
+    const res = await fetch('/api/forbidden_words', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ word: newWord.trim() })
+    });
+    const result = await res.json();
+    setAdding(false);
+    if (result.success) {
+      toast.success('Đã thêm từ cấm mới!');
+      setNewWord('');
+      setShowAddModal(false);
+      fetchWords();
     } else {
-      setToast({ message: 'Xóa thất bại!', type: 'error' });
+      toast.error('Có lỗi xảy ra, vui lòng thử lại.');
     }
-  };
-
-  // Hàm xử lý mở auth modal
-  const handleOpenAuth = (tab: 'login' | 'signup') => {
-    console.log(`Mở tab ${tab}`); // Thay bằng logic mở modal
   };
 
   return (
-    <AdminLayout onOpenAuth={handleOpenAuth}>
-      <main className="flex-1 bg-white">
-        {/* Toast notification */}
-        {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
-        <div className="p-6">
-          <div className="flex justify-between items-center mb-6">
-            <h1 className="text-3xl font-bold text-gray-900">Quản lý từ cấm</h1>
+    <AdminLayout onOpenAuth={() => {}}>
+      <main className="p-6">
+        <h1 className="text-3xl font-bold mb-6 text-gray-900">Quản lý từ cấm</h1>
+        {/* Filters */}
+        <div className="flex gap-4 mb-6">
+          <div className="relative flex-1">
+            <FiSearch
+              className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500 cursor-pointer"
+              onClick={fetchWords}
+              style={{ zIndex: 2 }}
+              title="Tìm kiếm"
+            />
+            <input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && fetchWords()}
+              placeholder="Tìm kiếm từ cấm..."
+              className="pl-10 pr-4 py-2 bg-[#F5F0E5] rounded-xl text-gray-800 w-full outline-none"
+            />
           </div>
-          <div className="overflow-x-auto">
-            {/* Thanh tìm kiếm, bộ lọc và nút Thêm */}
-            <div className="flex gap-4 mb-6 flex-nowrap items-center min-w-max">
-              <div className="flex-1 flex min-w-0">
-                <div className="w-10 h-10 bg-[#F0F2F5] flex items-center justify-center rounded-l-xl">
-                  <FiSearch className="w-5 h-5 text-[#3D4D5C]" />
-                </div>
-                <input
-                  type="text"
-                  placeholder="Tìm kiếm từ cấm..."
-                  className="flex-1 px-4 py-2 bg-[#F0F2F5] rounded-r-xl text-[#3D4D5C] outline-none min-w-0"
-                  disabled
-                />
-              </div>
-              <div className="relative flex-shrink-0">
-                <button
-                  onClick={() => setShowDropdown(!showDropdown)}
-                  className="px-4 py-2 border border-[#E8DECF] rounded-xl flex items-center gap-2 text-gray-800 bg-white shadow-sm hover:bg-gray-50 whitespace-nowrap"
-                >
-                  <span>{selectedStatus}</span>
-                  <FiChevronDown className="w-5 h-5" />
-                </button>
-                {showDropdown && (
-                  <div className="absolute top-full left-0 mt-1 w-48 bg-white border border-[#E8DECF] rounded-xl shadow-lg z-10">
-                    <ul className="py-1">
-                      {['Tất cả trạng thái', 'Đã duyệt', 'Chưa duyệt'].map((status) => (
-                        <li
-                          key={status}
-                          onClick={() => {
-                            setSelectedStatus(status);
-                            setShowDropdown(false);
-                          }}
-                          className={`px-4 py-2 hover:bg-gray-100 cursor-pointer text-gray-800 ${
-                            selectedStatus === status ? 'bg-gray-100 font-medium' : ''
-                          }`}
-                        >
-                          {status}
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                )}
-              </div>
-              <button
-                className="bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-600 flex items-center gap-2 flex-shrink-0 whitespace-nowrap"
-                onClick={() => setShowAddModal(true)}
-              >
-                <span className="material-symbols-outlined">add</span>
-                Thêm từ cấm
-              </button>
-            </div>
-
-            {/* Bảng dữ liệu */}
-            <div className="overflow-x-auto">
-              <table className="w-full min-w-[1000px] table-fixed">
-                <thead className="bg-white border-b border-[#DBE0E5]">
+          <button
+            className="px-4 py-2 bg-blue-500 text-white rounded-xl font-semibold hover:bg-blue-600"
+            onClick={() => setShowAddModal(true)}
+          >
+            + Thêm từ cấm
+          </button>
+        </div>
+        {/* Forbidden Words Table */}
+        <div className="border border-[#DBE0E5] rounded-xl overflow-hidden">
+          <div className="max-h-[500px] overflow-y-auto">
+            <table className="w-full">
+              <thead className="bg-white border-b border-[#DBE0E5] sticky top-0 z-10">
+                <tr className="text-left">
+                  <th className="p-4 text-gray-800 bg-white">Mã</th>
+                  <th className="p-4 text-gray-800 bg-white">Từ cấm</th>
+                  <th className="p-4 text-gray-800 bg-white">Ngày thêm</th>
+                  <th className="p-4 text-gray-800 bg-white">Hành động</th>
+                </tr>
+              </thead>
+              <tbody>
+                {words.length === 0 ? (
                   <tr>
-                    <th className="text-left p-4 font-medium text-gray-900 w-[50px]">STT</th>
-                    <th className="text-left p-4 font-medium text-gray-900 w-[200px]">Từ cấm</th>
-                    <th className="text-left p-4 font-medium text-gray-900 w-[150px]">Ngày thêm</th>
-                    <th className="text-left p-4 font-medium text-gray-900 w-[150px]">Người thêm</th>
-                    <th className="text-left p-4 font-medium text-gray-900 w-[150px]">Trạng thái</th>
-                    <th className="text-left p-4 font-medium text-gray-900 w-[150px]">Hành động</th>
+                    <td colSpan={4} className="p-6 text-center text-gray-500 bg-white">
+                      {search.trim()
+                        ? 'Không có kết quả nào phù hợp với từ khóa tìm kiếm.'
+                        : 'Không có từ cấm nào phù hợp với bộ lọc hiện tại.'}
+                    </td>
                   </tr>
-                </thead>
-                <tbody>
-                  {loading ? (
-                    <tr><td colSpan={6} className="p-4 text-center">Đang tải...</td></tr>
-                  ) : filteredWords.length === 0 ? (
-                    <tr><td colSpan={6} className="p-4 text-center">Không có từ cấm nào</td></tr>
-                  ) : (
-                    filteredWords.map((fw) => (
-                      <tr key={fw.id} className="border-b border-[#E5E8EB]">
-                        <td className="p-4 text-gray-800 whitespace-nowrap">{fw.stt}</td>
-                        <td className="p-4 text-gray-800 whitespace-nowrap">{fw.word}</td>
-                        <td className="p-4 text-gray-800 whitespace-nowrap">{fw.added_at}</td>
-                        <td className="p-4 text-gray-800 whitespace-nowrap">{fw.added_by}</td>
-                        <td className="p-4">
-                          <span className={`px-4 py-1 rounded-2xl text-gray-900 whitespace-nowrap ${
-                            fw.status === 'Đã duyệt' ? 'bg-[#AECBEB]' : 'bg-[#F0F2F5]'
-                          }`}>
-                            {fw.status}
-                          </span>
-                        </td>
-                        <td className="p-4 flex gap-2 whitespace-nowrap">
-                          <span className="material-symbols-outlined text-blue-500">visibility</span>
-                          <span className="material-symbols-outlined text-gray-500 cursor-pointer hover:text-red-500" onClick={() => handleDeleteForbiddenWord(fw.id)} title="Xóa">delete</span>
-                        </td>
-                      </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
-            </div>
+                ) : (
+                  words.map((word) => (
+                    <tr key={word.id} className="bg-white border-b border-[#E5E8EB]">
+                      <td className="p-4 text-gray-800">{word.id}</td>
+                      <td className="p-4 text-gray-800">{word.word}</td>
+                      <td className="p-4 text-gray-800">{word.added_at}</td>
+                      <td className="p-4 flex gap-2">
+                        <button className="text-blue-500 hover:underline" onClick={() => setSelectedWord(word)}>
+                          <FiEye />
+                        </button>
+                        <button onClick={() => handleDelete(word.id)} className="text-red-500 hover:underline">
+                          <FiTrash2 />
+                        </button>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
           </div>
         </div>
       </main>
+      <ToastContainer position="top-right" autoClose={3000} aria-label="Thông báo hệ thống" />
+      {selectedWord && (
+        <div
+          className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-[9999]"
+          onClick={() => setSelectedWord(null)}
+        >
+          <div
+            className="bg-white rounded-2xl shadow-xl p-6 max-w-md w-full animate-fadeIn"
+            onClick={e => e.stopPropagation()}
+          >
+            <h2 className="text-xl font-bold mb-6 text-center text-gray-800">Chi tiết từ cấm</h2>
+            <div className="space-y-4">
+              <div className="flex justify-between items-center">
+                <span className="font-medium text-base text-gray-700">Mã:</span>
+                <span className="text-base text-gray-800">{selectedWord.id}</span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="font-medium text-base text-gray-700">Từ cấm:</span>
+                <span className="text-base text-gray-800">{selectedWord.word}</span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="font-medium text-base text-gray-700">Ngày thêm:</span>
+                <span className="text-base text-gray-800">{selectedWord.added_at}</span>
+              </div>
+            </div>
+            <div className="flex justify-end mt-6">
+              <button
+                className="px-4 py-2 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300"
+                onClick={() => setSelectedWord(null)}
+              >
+                Đóng
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Modal thêm từ cấm */}
       {showAddModal && (
-        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
-          <div className="bg-white p-6 rounded-xl w-full max-w-md shadow-xl animate-[modalFadeIn_0.3s_ease-out]" onClick={e => e.stopPropagation()}>
+        <div
+          className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-[9999]"
+          onClick={() => setShowAddModal(false)}
+        >
+          <div
+            className="bg-white rounded-2xl shadow-xl p-6 max-w-md w-full animate-fadeIn"
+            onClick={e => e.stopPropagation()}
+          >
             <h2 className="text-xl font-bold mb-4">Thêm từ cấm mới</h2>
             <input
-              className="w-full border px-4 py-2 rounded mb-4"
+              className="w-full p-3 border rounded-lg mb-4"
               placeholder="Nhập từ cấm..."
               value={newWord}
               onChange={e => setNewWord(e.target.value)}
-              autoFocus
+              disabled={adding}
             />
             <div className="flex justify-end gap-2">
-              <button className="px-4 py-2 rounded bg-gray-200" onClick={() => setShowAddModal(false)}>Hủy</button>
-              <button className="px-4 py-2 rounded bg-blue-500 text-white" onClick={handleAddForbiddenWord} disabled={adding}>{adding ? 'Đang thêm...' : 'Thêm'}</button>
+              <button
+                className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600"
+                onClick={handleAddWord}
+                disabled={adding}
+              >
+                {adding ? 'Đang thêm...' : 'Thêm'}
+              </button>
+              <button
+                className="px-4 py-2 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300"
+                onClick={() => setShowAddModal(false)}
+                disabled={adding}
+              >
+                Hủy
+              </button>
             </div>
           </div>
         </div>

@@ -5,7 +5,8 @@ const router = express.Router();
 // Lấy danh sách báo cáo
 router.get('/', async (req, res) => {
   try {
-    const query = `
+    const { search, status } = req.query;
+    let query = `
       SELECT 
         r.id,
         r.post_id,
@@ -13,21 +14,41 @@ router.get('/', async (req, res) => {
         r.reason,
         r.description,
         r.status,
-        u1.email AS reporter_email,
-        u2.email AS reported_user_email
+        u1.first_name AS reporter_first_name,
+        u1.last_name AS reporter_last_name,
+        u2.first_name AS reported_first_name,
+        u2.last_name AS reported_last_name
       FROM reports r
       LEFT JOIN users u1 ON r.reporter_id = u1.id
       LEFT JOIN users u2 ON r.reported_user_id = u2.id
-      ORDER BY r.created_at DESC;
     `;
-    const { rows } = await pool.query(query);
+    let where = [];
+    let params = [];
+    if (status && status !== 'all') {
+      where.push('r.status = $' + (params.length + 1));
+      params.push(status);
+    }
+    if (search) {
+      where.push(`(
+        LOWER(u1.first_name) LIKE $${params.length + 1} OR
+        LOWER(u1.last_name) LIKE $${params.length + 1} OR
+        LOWER(u2.first_name) LIKE $${params.length + 1} OR
+        LOWER(u2.last_name) LIKE $${params.length + 1}
+      )`);
+      params.push(`%${search.toLowerCase()}%`);
+    }
+    if (where.length > 0) {
+      query += ' WHERE ' + where.join(' AND ');
+    }
+    query += ' ORDER BY r.created_at DESC;';
+    const { rows } = await pool.query(query, params);
 
     const reports = rows.map((report, index) => ({
       stt: index + 1,
       report_id: report.id,
       date_reported: new Date(report.created_at).toLocaleDateString('en-US'),
-      reported_by: report.reporter_email || 'Không xác định',
-      reported_account: report.reported_user_email || 'Không xác định',
+      reported_by: ((report.reporter_first_name || '') + ' ' + (report.reporter_last_name || '')).trim() || 'Không xác định',
+      reported_account: ((report.reported_first_name || '') + ' ' + (report.reported_last_name || '')).trim() || 'Không xác định',
       content: report.reason + (report.description ? `: ${report.description}` : ''),
       status: report.status === 'pending' ? 'Chưa xử lý' : 'Đã xử lý',
     }));
@@ -80,6 +101,28 @@ router.post('/', async (req, res) => {
   } catch (err) {
     console.error('Report error:', err);
     res.status(500).json({ error: 'Lỗi server', detail: err.message });
+  }
+});
+
+// Đánh dấu báo cáo đã xử lý
+router.put('/:id/process', async (req, res) => {
+  try {
+    const { id } = req.params;
+    await pool.query('UPDATE reports SET status = $1 WHERE id = $2', ['processed', id]);
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Xóa báo cáo
+router.delete('/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    await pool.query('DELETE FROM reports WHERE id = $1', [id]);
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
   }
 });
 

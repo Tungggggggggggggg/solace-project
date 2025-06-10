@@ -49,6 +49,18 @@ router.post('/', async (req, res) => {
     if (!content || !privacy || !user_id) {
       return res.status(400).json({ error: 'Thiếu trường bắt buộc: content, privacy, user_id' });
     }
+
+    // --- KIỂM TRA TỪ CẤM ---
+    const forbiddenRes = await pool.query('SELECT word FROM forbidden_words');
+    const forbiddenWords = forbiddenRes.rows.map(row => row.word.toLowerCase());
+    const found = forbiddenWords.find(word =>
+      content.toLowerCase().includes(word)
+    );
+    if (found) {
+      return res.status(400).json({ error: `Nội dung chứa từ cấm: "${found}"` });
+    }
+    // --- HẾT KIỂM TRA TỪ CẤM ---
+
     // Đảm bảo images luôn là mảng string trước khi stringify
     let imagesArray = [];
     if (Array.isArray(images)) {
@@ -59,14 +71,10 @@ router.post('/', async (req, res) => {
       imagesArray = Object.values(images);
     }
     const imagesStr = JSON.stringify(imagesArray);
-    // Lưu cảm xúc dạng JSON string (để lưu cả icon và label)
     const feelingStr = feeling && typeof feeling === 'object' ? JSON.stringify(feeling) : (feeling || null);
 
     const allowedTypes = ['positive', 'negative'];
     const safeTypePost = allowedTypes.includes(type_post) ? type_post : 'positive';
-
-    console.log('type_post received:', type_post);
-    console.log('safeTypePost:', safeTypePost);
 
     const insertQuery = `
       INSERT INTO posts (user_id, content, images, access_modifier, type_post, created_at, feeling, location)
@@ -76,7 +84,7 @@ router.post('/', async (req, res) => {
     const values = [
       user_id,
       content,
-      imagesStr, // luôn là string JSON
+      imagesStr,
       privacy,
       safeTypePost,
       new Date().toISOString(),
@@ -85,7 +93,6 @@ router.post('/', async (req, res) => {
     ];
     const { rows } = await pool.query(insertQuery, values);
 
-    // Parse lại cảm xúc và images trước khi trả về cho FE
     if (rows[0].feeling) {
       try {
         rows[0].feeling = JSON.parse(rows[0].feeling);
@@ -168,3 +175,24 @@ router.get('/:id', async (req, res) => {
 });
 
 module.exports = router;
+
+// Ví dụ trong CreatePostModal hoặc nơi gọi API đăng bài
+const handleCreatePost = async (data) => {
+  try {
+    const res = await fetch('/api/posts', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    });
+    const result = await res.json();
+    if (!res.ok) {
+      // Hiển thị thông báo lỗi khi có từ cấm
+      alert(result.error || 'Đăng bài thất bại!'); // hoặc toast.error(result.error)
+      return;
+    }
+    // Thành công: reset form, đóng modal, v.v.
+    alert('Đăng bài thành công!');
+  } catch (err) {
+    alert('Đăng bài thất bại!');
+  }
+};

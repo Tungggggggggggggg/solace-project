@@ -1,13 +1,10 @@
 'use client';
 
-import { useState } from 'react';
+import { ReactElement } from 'react';
 import Image from 'next/image';
-import type { ReactElement } from 'react';
-import { FiBell, FiUser, FiSearch } from 'react-icons/fi';
+import { FiBell, FiUser } from 'react-icons/fi';
 
 export default function HeaderAdmin({ onOpenAuth }: { onOpenAuth: (tab: 'login' | 'signup') => void }): ReactElement {
-  const [searchQuery, setSearchQuery] = useState('');
-
   return (
     <header className=" h-16 bg-[#AECBEB] px-6 flex items-center justify-between fixed top-0 left-64 right-0 z-30 ">
       {/* Logo bên trái */}
@@ -20,20 +17,6 @@ export default function HeaderAdmin({ onOpenAuth }: { onOpenAuth: (tab: 'login' 
             height={48}
             className="object-contain"
             priority
-          />
-        </div>
-      </div>
-
-      {/* Thanh tìm kiếm ở giữa */}
-      <div className="flex-1 flex justify-center">
-        <div className="relative w-96">
-          <FiSearch className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500" />
-          <input
-            type="text"
-            placeholder="Tìm kiếm..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full pl-10 pr-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:border-[#AECBEB] bg-white"
           />
         </div>
       </div>
