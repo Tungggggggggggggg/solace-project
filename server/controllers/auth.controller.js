@@ -174,7 +174,7 @@ exports.login = async (req, res) => {
   try {
     const result = await pool.query(
         "SELECT u.*, ui.is_active FROM users u LEFT JOIN user_info ui ON u.id = ui.id WHERE u.email = $1",
-        [email]
+        [email.toLowerCase()]
       );
     const user = result.rows[0];
 
@@ -185,6 +185,11 @@ exports.login = async (req, res) => {
     // Kiểm tra trạng thái active
     if (!user.is_active) {
       return res.status(403).json({ error: "Tài khoản của bạn đã bị khóa" });
+    }
+
+    // Kiểm tra password có tồn tại không
+    if (!user.password) {
+      return res.status(400).json({ error: 'Tài khoản này chưa đặt có mật khẩu. Vui lòng đăng nhập bằng Google hoặc phương thức khác.' });
     }
 
     const valid = await bcrypt.compare(password, user.password);
@@ -206,8 +211,6 @@ exports.login = async (req, res) => {
       );
     });
 
-    delete user.password;
-
     res.cookie("refreshToken", refreshToken, {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
@@ -215,16 +218,13 @@ exports.login = async (req, res) => {
       maxAge: 15 * 24 * 60 * 60 * 1000, // 15 ngày
       path: "/", // Đặt path để cookie có thể truy cập từ mọi route
     });
-    // Xóa password trước khi trả về
-    delete user.password;
 
-    // Trả về access token và thông tin user
     // Trả về access token và thông tin user
     res.json({
       message: "Đăng nhập thành công",
       user: {
         id: user.id,
-        email: user.email,
+        email: user.email.toLowerCase(),
         first_name: user.first_name,
         last_name: user.last_name,
         avatar_url: user.avatar_url,
@@ -264,7 +264,7 @@ exports.signup = async (req, res) => {
         `INSERT INTO users (email, first_name, last_name, password)
          VALUES ($1, $2, $3, $4)
          RETURNING id, email, first_name, last_name, avatar_url, role`,
-        [email, firstName, lastName, hashedPassword]
+        [email.toLowerCase(), firstName, lastName, hashedPassword]
       );
       const user = userResult.rows[0];
 
@@ -277,16 +277,27 @@ exports.signup = async (req, res) => {
       return { user };
     });
 
+    const { accessToken, refreshToken } = createTokens(user);
+
+    res.cookie("refreshToken", refreshToken, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "Strict",
+      maxAge: 15 * 24 * 60 * 60 * 1000, // 15 ngày
+      path: "/", // Đặt path để cookie có thể truy cập từ mọi route
+    });
+
     res.status(201).json({
       message: 'Đăng ký thành công',
       user: {
         id: user.id,
-        email: user.email,
+        email: user.email.toLowerCase(),
         first_name: user.first_name,
         last_name: user.last_name,
         avatar_url: user.avatar_url,
         role: user.role,
       },
+      accessToken,
     });
   } catch (err) {
     if (err.code === '23505') {
@@ -311,12 +322,11 @@ exports.refreshToken = async (req, res) => {
       [token]
     );
 
-    if (tokenCheck.rows.length === 0) {
+    if (tokenCheck.rowCount === 0) {
       return res.status(403).json({ error: 'Invalid refresh token' });
     }
 
-    const { user_id } = tokenCheck.rows[0];
-
+    const user_id = tokenCheck.rows[0].user_id;
 
     // Xác thực refresh token
     const decoded = await new Promise((resolve, reject) => {
@@ -326,33 +336,35 @@ exports.refreshToken = async (req, res) => {
       });
     });
 
-    if (decoded.userId !== user_id) {
-      await pool.query('DELETE FROM refresh_tokens WHERE token = $1', [token]);
+    if (decoded.id !== user_id) {
       return res.status(403).json({ error: 'Refresh token không hợp lệ' });
     }
 
     // Kiểm tra user
     const userResult = await pool.query(
-      'SELECT * FROM users WHERE id = $1',
+      'SELECT id, email FROM users WHERE id = $1',
       [user_id]
     );
 
-    if (!userResult.length) {
+    if (userResult.rowCount === 0) {
       await pool.query('DELETE FROM refresh_tokens WHERE token = $1', [token]);
       return res.status(404).json({ error: 'Người dùng không tồn tại' });
     }
 
-    const user = userResult[0];
+    const user = userResult.rows[0];
 
     // Kiểm tra trạng thái active
     const is_active = await checkUserInfo(user.id);
+    console.log("Active: ", is_active);
     if (!is_active) {
       await pool.query('DELETE FROM refresh_tokens WHERE token = $1', [token]);
       return res.status(403).json({ error: 'Tài khoản của bạn đã bị khóa' });
     }
 
+    console.log("User: ", user);
     // Tạo token mới và xóa token cũ
-    const { accessToken } = createAccessToken(userResult.rows[0]);
+    const accessToken = createAccessToken(user);
+    console.log("Access token: ", accessToken);
 
     res.json({ accessToken });
   } catch (err) {

@@ -3,6 +3,7 @@
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
 import { useRouter } from 'next/navigation';
 import { jwtDecode } from 'jwt-decode';
+import { socket } from '@/socket';
 
 interface UserData {
   id: string;
@@ -16,7 +17,9 @@ interface UserContextType {
   user: UserData | null;
   accessToken: string | null;
   loading: boolean;
+  currentConversationId: string | null;
   setUserData: (user: UserData, token: string) => void;
+  setCurrentConversationId: (id: string | null) => void;
   signup: (email: string, password: string, firstName: string, lastName: string) => void;
   login: (email: string, password: string) => void;
   logout: (reason?: string) => Promise<void>;
@@ -26,7 +29,9 @@ export const UserContext = createContext<UserContextType>({
   user: null,
   accessToken: null,
   loading: true,
+  currentConversationId: null,
   setUserData: () => {},
+  setCurrentConversationId: () => {},
   login: async () => {},
   signup: async () => {},
   logout: async () => {},
@@ -36,6 +41,7 @@ export function UserContextProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<UserData | null>(null);
   const [accessToken, setAccessToken] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [currentConversationId, setCurrentConversationIdState] = useState<string | null>(null);
   const router = useRouter();
 
   // Hàm để lấy thông tin người dùng từ server
@@ -67,7 +73,6 @@ export function UserContextProvider({ children }: { children: ReactNode }) {
       });
 
       if (!res.ok) {
-        await logout("Phiên đăng nhập đã hết, vui lòng đăng nhập lại.");
         return false;
       }
 
@@ -85,9 +90,19 @@ export function UserContextProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  const setCurrentConversationId = (id: string | null) => {
+  setCurrentConversationIdState(id);
+  if (id) {
+    sessionStorage.setItem('currentConversationId', id);
+  } else {
+    sessionStorage.removeItem('currentConversationId');
+  }
+};
+
   useEffect(() => {
     const initialize = async () => {
       let storedToken = sessionStorage.getItem("accessToken");
+      let storedCurrentConversationId = sessionStorage.getItem("currentConversationId")
       if (storedToken) {
         try {
           const decoded: { exp: number } = jwtDecode(storedToken);
@@ -95,7 +110,7 @@ export function UserContextProvider({ children }: { children: ReactNode }) {
           if (decoded.exp > now) {
             setAccessToken(storedToken);
             // KHI CÓ TOKEN HỢP LỆ, LẤY THÔNG TIN USER NGAY LẬP TỨC
-            await fetchUser(storedToken); 
+            await fetchUser(storedToken);
           } else {
             // Token hết hạn, thử refresh
             console.log("AccessToken hết hạn, đang thử làm mới...");
@@ -103,14 +118,44 @@ export function UserContextProvider({ children }: { children: ReactNode }) {
           }
         } catch (err) {
           console.warn("AccessToken không hợp lệ trong sessionStorage, đang thử làm mới hoặc yêu cầu đăng nhập.");
-          await refreshAccessToken(); // Hoặc đơn giản là logout nếu bạn không muốn auto-refresh
+          await refreshAccessToken(); // auto-refresh
         }
+      } else {
+        await refreshAccessToken();
+      }
+
+      if(storedCurrentConversationId) {
+        setCurrentConversationId(storedCurrentConversationId);
       }
       setLoading(false); // Đặt loading thành false sau khi hoàn tất kiểm tra và fetch
     };
 
     initialize();
   }, []); // Chỉ chạy một lần khi component mount
+
+  // Khi user thay đổi, connect/disconnect socket
+  useEffect(() => {
+    if (user && !socket.connected) {
+      socket.connect();
+    }
+    if (!user && socket.connected) {
+      socket.disconnect();
+    }
+  }, [user]);
+
+  // Emit userOnline khi socket connect và có user
+  useEffect(() => {
+    if (!user?.id) return;
+    const handleConnect = () => {
+      socket.emit('register', user.id);
+    };
+    socket.on('connect', handleConnect);
+    if (socket.connected) handleConnect();
+    return () => {
+      socket.off('connect', handleConnect);
+    };
+  }, [user]);
+  
 
   const signup = async (email: string, password: string, firstName: string, lastName: string) => {
     try {
@@ -129,6 +174,7 @@ export function UserContextProvider({ children }: { children: ReactNode }) {
 
       const data = await res.json();
       setUserData(data.user, data.accessToken);
+      if (!socket.connected) socket.connect();
       return;
     } catch (error) {
       console.error("Lỗi khi đăng ký:", error);
@@ -148,12 +194,13 @@ export function UserContextProvider({ children }: { children: ReactNode }) {
       });
 
       if (!res.ok) {
-        const errorData = await res.json(); 
+        const errorData = await res.json();
         throw new Error(errorData.error || 'Đăng nhập không thành công. Vui lòng kiểm tra lại thông tin.');
       }
 
       const data = await res.json();
       setUserData(data.user, data.accessToken);
+      if (!socket.connected) socket.connect();
       return;
     } catch (error: any) {
       console.error("Lỗi khi đăng nhập:", error);
@@ -179,6 +226,7 @@ export function UserContextProvider({ children }: { children: ReactNode }) {
     setUser(null);
     setAccessToken(null);
     sessionStorage.removeItem("accessToken");
+    socket.disconnect();
 
     if (reason) {
       alert(reason); // Hoặc thay bằng modal
@@ -188,7 +236,17 @@ export function UserContextProvider({ children }: { children: ReactNode }) {
   };
 
   return (
-    <UserContext.Provider value={{ user, accessToken, loading, setUserData, signup, login, logout }}>
+    <UserContext.Provider value={{
+      user,
+      accessToken,
+      loading,
+      currentConversationId,
+      setUserData,
+      setCurrentConversationId,
+      signup,
+      login,
+      logout
+    }}>
       {children}
     </UserContext.Provider>
   );
