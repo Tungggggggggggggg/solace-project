@@ -10,6 +10,8 @@ import Image from 'next/image';
 import Link from 'next/link';
 import SharePostModal from './SharePostModal';
 import SkeletonPost from './SkeletonPost';
+import { ToastContainer, toast } from 'react-toastify';
+import 'react-toastify/dist/ReactToastify.css';
 
 interface Author {
   name: string;
@@ -143,7 +145,10 @@ const Post = ({
   }, [id, currentUser, content, comments, shared_post_id]);
 
   const handleLike = async () => {
-    if (!currentUser?.id || !id) return;
+    if (!currentUser?.id || !id) {
+      toast.info('Bạn cần đăng nhập để thực hiện chức năng này!');
+      return;
+    }
 
     const endpoint = liked ? '/api/likes/unlike' : '/api/likes/like';
     try {
@@ -180,6 +185,47 @@ const Post = ({
     } catch (error) {
       console.error('Error handling like:', error);
     }
+  };
+
+  const handleCommentClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!currentUser?.id) {
+      toast.info('Bạn cần đăng nhập để thực hiện chức năng này!');
+      return;
+    }
+    if (onOpenDetail && id) {
+      onOpenDetail({
+        id,
+        name,
+        date,
+        content,
+        likes: likeCount,
+        comments: commentCount,
+        shares: shareCount,
+        images,
+        feeling: sharedPost?.feeling || feeling,
+        location: sharedPost?.location || location,
+        avatar_url: avatar
+      });
+    }
+  };
+
+  const handleShareClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!currentUser?.id) {
+      toast.info('Bạn cần đăng nhập để thực hiện chức năng này!');
+      return;
+    }
+    setShowShareModal(true);
+  };
+
+  const handleReportClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!currentUser?.id) {
+      toast.info('Bạn cần đăng nhập để thực hiện chức năng này!');
+      return;
+    }
+    setShowReport(true);
   };
 
   const imagesArray: string[] = Array.isArray(images) ? images :
@@ -250,7 +296,7 @@ const Post = ({
           }
         }} style={{ cursor: 'pointer' }}>
           {/* Người share */}
-          <div className="flex items-center gap-3 mb-2">
+          <div className="flex items-start gap-3 mb-2 relative">
             <div className="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center overflow-hidden">
               {avatar ? (
                 <img src={avatar} alt={name} width={40} height={40} className="object-cover w-10 h-10" />
@@ -258,13 +304,19 @@ const Post = ({
                 <span className="material-symbols-outlined text-slate-400">person</span>
               )}
             </div>
-            <div>
-              <span className="font-medium text-slate-900">{name}</span>
-              <span className="text-gray-500 text-sm ml-2">
+            <div className="flex-grow">
+              <span className="font-medium text-slate-900 block">{name}</span>
+              <span className="text-gray-500 text-sm block">
                 đã chia sẻ bài viết của <span className="font-semibold">{sharedPost.first_name} {sharedPost.last_name}</span>
               </span>
+              <span className="text-sm text-slate-500 block">{formatDate(date)}</span>
             </div>
-            <span className="text-sm text-slate-500 ml-auto">{formatDate(date)}</span>
+            <button
+              className="absolute top-0 right-0 p-2 hover:bg-slate-50 rounded-full transition-colors"
+              onClick={handleReportClick}
+            >
+              <span className="material-symbols-outlined text-slate-400">more_horiz</span>
+            </button>
           </div>
           {/* Nội dung shareText nếu có */}
           {content && <div className="mb-2 text-slate-900">{content}</div>}
@@ -294,7 +346,7 @@ const Post = ({
             <div className="flex items-center justify-between text-sm border-t border-slate-100 pt-4 mt-4">
               <button
                 ref={likeBtnRef}
-                onClick={e => { e.stopPropagation(); handleLike(); }}
+                onClick={handleLike}
                 className="flex-1 flex items-center justify-center gap-1 py-2 text-slate-600 hover:text-rose-500 transition-all duration-200 rounded-lg hover:bg-slate-50"
               >
                 <span className="material-symbols-outlined" style={{ color: liked ? '#f43f5e' : 'currentColor' }}>
@@ -308,24 +360,7 @@ const Post = ({
                 </span>
               </button>
               <button
-                onClick={e => {
-                  e.stopPropagation();
-                  if (onOpenDetail && id) {
-                    onOpenDetail({
-                      id,
-                      name,
-                      date,
-                      content,
-                      likes: likeCount,
-                      comments: commentCount,
-                      shares: shareCount,
-                      images,
-                      feeling: sharedPost.feeling,
-                      location: sharedPost.location,
-                      avatar_url: avatar
-                    });
-                  }
-                }}
+                onClick={handleCommentClick}
                 className="flex-1 flex items-center justify-center gap-1 py-2 text-slate-600 hover:text-indigo-500 transition-all duration-200 rounded-lg hover:bg-slate-50"
               >
                 <span className="material-symbols-outlined">chat_bubble</span>
@@ -333,7 +368,7 @@ const Post = ({
               </button>
               <button
                 className="flex-1 flex items-center justify-center gap-1 py-2 text-slate-600 hover:text-emerald-500 transition-all duration-200 rounded-lg hover:bg-slate-50"
-                onClick={e => { e.stopPropagation(); setShowShareModal(true); }}
+                onClick={handleShareClick}
               >
                 <span className="material-symbols-outlined">share</span>
                 <span>{shareCount}</span>
@@ -373,7 +408,7 @@ const Post = ({
             </div>
             <button
               className="p-2 hover:bg-slate-50 rounded-full transition-colors"
-              onClick={() => setShowReport(true)}
+              onClick={handleReportClick}
             >
               <span className="material-symbols-outlined text-slate-400">more_horiz</span>
             </button>
@@ -426,24 +461,7 @@ const Post = ({
                   </span>
                 </button>
                 <button
-                  onClick={e => {
-                    e.stopPropagation();
-                    if (onOpenDetail && id) {
-                      onOpenDetail({
-                        id,
-                        name,
-                        date,
-                        content,
-                        likes: likeCount,
-                        comments: commentCount,
-                        shares: shareCount,
-                        images,
-                        feeling: feeling,
-                        location: location,
-                        avatar_url: avatar
-                      });
-                    }
-                  }}
+                  onClick={handleCommentClick}
                   className="flex-1 flex items-center justify-center gap-1 py-2 text-slate-600 hover:text-indigo-500 transition-all duration-200 rounded-lg hover:bg-slate-50"
                 >
                   <span className="material-symbols-outlined">chat_bubble</span>
@@ -451,7 +469,7 @@ const Post = ({
                 </button>
                 <button
                   className="flex-1 flex items-center justify-center gap-1 py-2 text-slate-600 hover:text-emerald-500 transition-all duration-200 rounded-lg hover:bg-slate-50"
-                  onClick={() => setShowShareModal(true)}
+                  onClick={handleShareClick}
                 >
                   <span className="material-symbols-outlined">share</span>
                   <span>{shareCount}</span>
@@ -488,6 +506,7 @@ const Post = ({
           typePost={theme === 'reflective' ? 'negative' : 'positive'}
         />
       )}
+      <ToastContainer position="bottom-right" autoClose={3000} hideProgressBar newestOnTop closeOnClick rtl={false} pauseOnFocusLoss draggable pauseOnHover />
     </div>
   );
 };

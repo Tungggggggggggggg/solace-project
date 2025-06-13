@@ -11,6 +11,7 @@ interface PostContent {
   name: string;
   content: string;
   images?: string[];
+  avatar_url?: string;
 }
 
 interface SharePostModalProps {
@@ -61,46 +62,72 @@ const SharePostModal: React.FC<SharePostModalProps> = ({ isOpen, onClose, post, 
     }
   };
 
+  const handleReport = () => {
+    if (!user?.id) {
+      toast.info('Bạn cần đăng nhập để thực hiện chức năng này!');
+      return;
+    }
+    // TODO: Hiện modal report hoặc xử lý report
+    toast.info('Chức năng report sẽ được cập nhật!');
+  };
+
   const modalContent = (
     <div className="fixed inset-0 bg-black/40 flex justify-center items-center z-50" style={{ backdropFilter: 'blur(5px)' }}>
       <motion.div
         initial={{ opacity: 0, y: -50 }}
         animate={{ opacity: 1, y: 0 }}
         exit={{ opacity: 0, y: -50 }}
-        className="bg-white p-6 rounded-lg shadow-xl w-full max-w-md mx-4"
+        className="bg-white p-6 rounded-lg shadow-xl w-full max-w-md mx-4 relative"
       >
-        <div className="flex justify-between items-center pb-4 mb-4 border-b border-gray-200">
-          <h3 className="text-xl font-semibold">Chia sẻ</h3>
-          <button onClick={onClose} className="text-gray-500 hover:text-gray-700">
-            <span className="material-symbols-outlined text-2xl">close</span>
+        <div className="flex items-center gap-3 mb-2">
+          {user && (
+            <img src={user.avatar_url || '/images/default-avatar.png'} alt="User Avatar" className="w-12 h-12 rounded-full object-cover" />
+          )}
+          <div className="flex-grow">
+            <span className="font-medium text-slate-900 block">{user ? `${user.first_name} ${user.last_name}` : ''}</span>
+            <span className="text-sm text-slate-500 block">{new Date().toLocaleString('vi-VN')}</span>
+          </div>
+          <button onClick={handleReport} className="text-gray-500 hover:text-gray-700 ml-auto">
+            <span className="material-symbols-outlined text-2xl">more_horiz</span>
           </button>
         </div>
 
-        <div className="flex items-center mb-4">
-          {user && <img src={user.avatar_url || '/images/default-avatar.png'} alt="User Avatar" className="w-12 h-12 rounded-full object-cover" />}
-          <div className="ml-3 flex-1">
-            <p className="font-semibold">{user ? `${user.first_name} ${user.last_name}` : ''}</p>
+        <div className="space-y-4 mt-2">
+          <textarea
+            className="w-full p-3 border border-gray-300 rounded-lg mb-4 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            rows={4}
+            placeholder="Hãy nói gì đó về nội dung này..."
+            value={shareText}
+            onChange={(e) => setShareText(e.target.value)}
+          ></textarea>
+          <div className="bg-gray-50 border rounded-lg p-4">
+            <div className="flex items-center gap-2 mb-2">
+              <img src={post.avatar_url || '/images/default-avatar.png'} alt={post.name} className="w-8 h-8 rounded-full object-cover" />
+              <span className="font-semibold">{post.name}</span>
+              <span className="text-gray-500 text-xs">{new Date().toLocaleString('vi-VN')}</span>
+            </div>
+            <div className="mb-2 text-slate-900 whitespace-pre-wrap">{post.content}</div>
+            {post.images && post.images.length > 0 && (
+              <div className={`grid ${post.images.length > 1 ? 'grid-cols-2' : 'grid-cols-1'} gap-2 mb-2`}>
+                {post.images.map((img, idx) => (
+                  <div key={idx} className="aspect-video bg-slate-100 rounded-xl flex items-center justify-center">
+                    <img src={img} alt={`post-img-${idx}`} className="object-cover w-full h-full rounded-xl" />
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+          <div className="flex justify-end mt-4">
+            <button
+              onClick={handleShare}
+              className="px-6 py-3 rounded-lg bg-blue-500 text-white font-bold hover:bg-blue-600 transition-colors w-full"
+            >
+              Chia sẻ ngay
+            </button>
           </div>
         </div>
-
-        <textarea
-          className="w-full p-3 border border-gray-300 rounded-lg mb-4 focus:outline-none focus:ring-2 focus:ring-blue-500"
-          rows={4}
-          placeholder="Hãy nói gì đó về nội dung này..."
-          value={shareText}
-          onChange={(e) => setShareText(e.target.value)}
-        ></textarea>
-
-        <div className="flex justify-end mt-4">
-          <button
-            onClick={handleShare}
-            className="px-6 py-3 rounded-lg bg-blue-500 text-white font-bold hover:bg-blue-600 transition-colors w-full"
-          >
-            Chia sẻ ngay
-          </button>
-        </div>
+        <ToastContainer position="bottom-right" autoClose={3000} hideProgressBar newestOnTop closeOnClick rtl={false} pauseOnFocusLoss draggable pauseOnHover />
       </motion.div>
-      <ToastContainer position="bottom-right" autoClose={3000} hideProgressBar newestOnTop closeOnClick rtl={false} pauseOnFocusLoss draggable pauseOnHover />
     </div>
   );
 
