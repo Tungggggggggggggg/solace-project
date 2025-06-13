@@ -53,7 +53,9 @@ const getClient = async () => {
       if (prop === 'release') {
         return () => {
           target.release()
-          console.log('Client released back to pool')
+          if (process.env.NODE_ENV !== 'production') {
+            console.log('Client released back to pool')
+          }
         }
       }
       return target[prop]
@@ -66,11 +68,13 @@ const query = async (text, params = []) => {
   try {
     const res = await pool.query(text, Array.isArray(params) ? params : [])
     const duration = Date.now() - start
-    console.log('Executed query:', {
-      text,
-      duration,
-      rows: res?.rowCount ?? 0
-    })
+    if (process.env.NODE_ENV !== 'production') {
+      console.log('Executed query:', {
+        text,
+        duration,
+        rows: res?.rowCount ?? 0
+      })
+    }
     return res
   } catch (err) {
     console.error('Query error:', { text, params })

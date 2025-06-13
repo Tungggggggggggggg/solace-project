@@ -9,7 +9,9 @@ cloudinary.config({
   api_key: process.env.CLOUDINARY_API_KEY,
   api_secret: process.env.CLOUDINARY_API_SECRET,
 });
-console.log('Cloudinary config:', cloudinary.config());
+if (process.env.NODE_ENV !== 'production') {
+  console.log('Cloudinary config:', cloudinary.config());
+}
 
 const storage = multer.memoryStorage();
 const upload = multer({ storage });
@@ -92,19 +94,24 @@ router.post('/', async (req, res) => {
       location || null
     ];
     const { rows } = await pool.query(insertQuery, values);
+    const post = rows[0];
 
-    if (rows[0].feeling) {
-      try {
-        rows[0].feeling = JSON.parse(rows[0].feeling);
-      } catch {}
+    // Truy vấn lại để lấy thông tin user kèm theo post
+    const selectQuery = `
+      SELECT p.*, u.first_name, u.last_name, u.avatar_url
+      FROM posts p
+      JOIN users u ON p.user_id = u.id
+      WHERE p.id = $1
+    `;
+    const { rows: postRows } = await pool.query(selectQuery, [post.id]);
+    const fullPost = postRows[0];
+    if (fullPost.feeling) {
+      try { fullPost.feeling = JSON.parse(fullPost.feeling); } catch {}
     }
-    if (rows[0].images && typeof rows[0].images === 'string') {
-      try {
-        rows[0].images = JSON.parse(rows[0].images);
-      } catch {}
+    if (fullPost.images && typeof fullPost.images === 'string') {
+      try { fullPost.images = JSON.parse(fullPost.images); } catch {}
     }
-
-    res.status(201).json(rows[0]);
+    res.status(201).json(fullPost);
   } catch (err) {
     console.error('Post creation error:', err);
     res.status(500).json({ error: 'Đăng bài thất bại', detail: err.message });
@@ -170,6 +177,95 @@ router.get('/:id', async (req, res) => {
     res.json(post);
   } catch (err) {
     console.error('Error fetching post:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+const { isAuthenticated } = require('../middlewares/auth.middleware');
+
+router.get('/user/:userId', isAuthenticated, async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const { offset = 0, limit = 10, filter } = req.query;
+    const authenticatedUserId = req.user?.id;
+
+    // Nếu là chủ tài khoản thì xem được tất cả bài, còn lại chỉ xem bài đã duyệt
+    let whereClause = 'p.user_id = $1';
+    let values = [userId];
+    if (authenticatedUserId !== userId) {
+      whereClause += ' AND p.is_approved = true';
+    }
+    if (filter === 'media') {
+      whereClause += " AND p.images IS NOT NULL AND p.images != '[]'";
+    }
+
+    const query = `
+      SELECT 
+        p.*,
+        u.first_name,
+        u.last_name,
+        u.avatar_url,
+        COUNT(DISTINCT c.id) as comment_count,
+        COUNT(DISTINCT pl.id) as like_count,
+        EXISTS(
+          SELECT 1 FROM post_likes 
+          WHERE post_id = p.id AND user_id = $2
+        ) as is_liked
+      FROM posts p
+      LEFT JOIN users u ON p.user_id = u.id
+      LEFT JOIN comments c ON c.post_id = p.id
+      LEFT JOIN post_likes pl ON pl.post_id = p.id
+      WHERE ${whereClause}
+      GROUP BY p.id, u.first_name, u.last_name, u.avatar_url
+      ORDER BY p.created_at DESC
+      OFFSET $3 LIMIT $4
+    `;
+    // $1: userId, $2: authenticatedUserId, $3: offset, $4: limit
+    values = [userId, authenticatedUserId || '', offset, limit];
+
+    const { rows } = await pool.query(query, values);
+    const posts = rows.map(post => ({
+      ...post,
+      images: post.images ? JSON.parse(post.images) : [],
+      feeling: post.feeling ? JSON.parse(post.feeling) : null,
+      shares: 0
+    }));
+    res.json(posts);
+  } catch (error) {
+    console.error('Error fetching user posts:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+router.get('/user/:userId/count', isAuthenticated, async (req, res) => {
+  try {
+    const { userId } = req.params;
+
+    // Query để lấy tổng số bài viết và ảnh/video
+    const query = `
+      SELECT 
+        COUNT(DISTINCT p.id) as total_posts,
+        COUNT(DISTINCT CASE WHEN p.images IS NOT NULL AND p.images != '[]' THEN p.id END) as posts_with_media,
+        SUM(
+          CASE 
+            WHEN p.images IS NOT NULL AND p.images != '[]' 
+            THEN JSONB_ARRAY_LENGTH(CAST(p.images AS JSONB))
+            ELSE 0 
+          END
+        ) as total_media
+      FROM posts p
+      WHERE p.user_id = $1
+        AND (p.is_approved = true OR p.user_id = $2)  -- Show unapproved posts to their owners
+    `;
+
+    const { rows } = await pool.query(query, [userId, req.user?.id || '']);
+    
+    res.json({
+      totalPosts: parseInt(rows[0].total_posts) || 0,
+      totalMedia: parseInt(rows[0].total_media) || 0
+    });
+  } catch (error) {
+    console.error('Error fetching user post counts:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 });

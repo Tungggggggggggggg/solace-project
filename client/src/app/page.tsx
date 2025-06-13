@@ -11,9 +11,22 @@ import RightSidebar from "@/components/RightSidebar";
 import AuthModal from "@/components/AuthModal";
 import PostDetailPopup from "@/components/PostDetailPopup";
 import { useUser } from "@/contexts/UserContext";
-import CreatePost from "@/components/CreatePost";
 import CreatePostModal from "@/components/CreatePostModal";
 import axios from "axios";
+import type { PostType } from '@/types/Post';
+
+interface OpenPostType {
+  id: string;
+  name: string;
+  date: string;
+  content: string;
+  likes: number;
+  comments: number;
+  shares: number;
+  images?: string[];
+  feeling?: { icon: string; label: string };
+  location?: string;
+}
 
 // Component Home: Trang chính của ứng dụng mạng xã hội Solace
 export default function Home() {
@@ -25,20 +38,9 @@ export default function Home() {
   // State xác định tab hiện tại của giao diện chính (0: Inspiring, 1: Reflective)
   const [activeTab, setActiveTab] = useState(0);
   // State lưu thông tin bài viết đang được xem chi tiết (nếu có)
-  const [openPost, setOpenPost] = useState<null | {
-    id: string;
-    name: string;
-    date: string;
-    content: string;
-    likes: number;
-    comments: number;
-    shares: number;
-    images: string[];
-    feeling: string;
-    location: string;
-  }>(null);
+  const [openPost, setOpenPost] = useState<OpenPostType | null>(null);
   const [showCreatePost, setShowCreatePost] = useState(false);
-  const [posts, setPosts] = useState<any[]>([]); // State lưu danh sách bài viết
+  const [posts, setPosts] = useState<PostType[]>([]); // State lưu danh sách bài viết
   const [visibleCount, setVisibleCount] = useState(3); // Số post hiển thị ban đầu
 
   // Mở modal xác thực với tab tương ứng (login/signup), chỉ khi chưa đăng nhập
@@ -60,23 +62,30 @@ export default function Home() {
   // Xác định class màu nền dựa trên tab hiện tại
   const bgClass =
     activeTab === 0
-      ? "bg-gradient-to-br from-[#E1ECF7] to-[#AECBEB]"
-      : "bg-[#E9ECF1]";
+      ? "bg-slate-50"
+      : "bg-[#F8F9FA]";
 
   // Callback khi đăng bài thành công
-  const handlePostCreated = (newPost: any) => {
-    setPosts(prev => [newPost, ...prev]);
+  const handlePostCreated = (newPost: PostType) => {
+    // Bổ sung tên và avatar nếu thiếu (thường xảy ra với post mới tạo)
+    const completedPost = {
+      ...newPost,
+      first_name: newPost.first_name || user?.first_name || '',
+      last_name: newPost.last_name || user?.last_name || '',
+      avatar_url: newPost.avatar_url || user?.avatar_url || '',
+    };
+    setPosts(prev => [completedPost, ...prev]);
   };
 
   useEffect(() => {
     const fetchPosts = async () => {
       try {
-        const res = await axios.get('/api/posts', {
+        const res = await axios.get<PostType[]>('/api/posts', {
           baseURL: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000',
         });
         setPosts(res.data);
-      } catch (err) {
-        // Có thể xử lý lỗi ở đây nếu muốn
+      } catch (error) {
+        console.error('Error fetching posts:', error);
       }
     };
     fetchPosts();
@@ -104,74 +113,84 @@ export default function Home() {
   }, [activeTab, posts]);
 
   return (
-    // Container chính với hiệu ứng nền phù hợp theme
     <div className={`min-h-screen w-full ${bgClass}`}>
       {/* Header: Thanh điều hướng trên cùng, cho phép mở modal xác thực */}
-      <div style={{ position: 'fixed', top: 0, left: 0, width: '100%', zIndex: 50 }}>
+      <div className="fixed top-0 left-0 w-full z-50">
         <Header onOpenAuth={handleOpenAuth} theme={theme} />
       </div>
-      {/* Modal xác thực (đăng nhập/đăng ký), chỉ hiển thị khi chưa đăng nhập */}
+
+      {/* Modal xác thực */}
       {showAuth && !user && (
         <AuthModal 
           onClose={() => setShowAuth(false)} 
           defaultTab={authTab} 
-          onSuccess={handleAuthSuccess} // Đóng modal khi xác thực thành công
+          onSuccess={handleAuthSuccess}
         />
       )}
-      <div style={{ marginTop: 80 }}>
-        {/* Layout chính gồm sidebar trái, nội dung trung tâm và sidebar phải */}
-        <div className="flex w-full mt-4">
+
+      {/* Main Content */}
+      <div className="pt-20">
+        <div className="flex w-full">
           {/* Sidebar trái */}
-          <div style={{ position: 'fixed', top: 200, left: 0, zIndex: 20 }}>
+          <div className="fixed top-[5.5rem] left-0 z-20">
             <LeftSidebar theme={theme} />
           </div>
-          {/* Nội dung trung tâm, thêm margin-left để không bị che */}
-          <div className="flex-1 flex flex-col items-center" style={{ marginLeft: 120, marginRight: 120 }}>
-            {/* Tabs: Chuyển đổi giữa các loại bài đăng (Inspiring/Reflective) */}
-            <div style={{ marginTop: 32 }} />
-            <Tabs onTabChange={setActiveTab} />
-            {/* Thay InputSection bằng CreatePost */}
-            <div style={{ width: 'calc(100% - 60px)', maxWidth: '836px', margin: '16px auto 0 auto' }}>
+
+          {/* Nội dung trung tâm */}
+          <div className="flex-1 flex flex-col items-center mx-auto px-4" style={{ maxWidth: '1000px', marginLeft: 'auto', marginRight: 'auto' }}>
+            {/* Tabs */}
+            <div className="w-full max-w-3xl mt-8">
+              <Tabs onTabChange={setActiveTab} />
+            </div>
+
+            {/* Create Post Section */}
+            <div className="w-full max-w-3xl mt-6">
               <InputSection onOpenModal={() => setShowCreatePost(true)} theme={theme} />
             </div>
-            {/* Hiển thị danh sách bài viết mới nhất */}
-            {filteredPosts.slice(0, visibleCount).map(post => (
-              <Post
-                key={post.id}
-                theme={theme}
-                id={post.id}
-                name={post.first_name && post.last_name ? `${post.first_name} ${post.last_name}` : ''}
-                date={post.created_at || ""}
-                content={post.content}
-                likes={post.likes || 0}
-                comments={post.comments || 0}
-                shares={post.shares || 0}
-                images={post.images}
-                avatar={post.avatar_url || undefined}
-                feeling={post.feeling}
-                location={post.location}
-                onOpenDetail={() => setOpenPost({
-                  id: post.id,
-                  name: post.first_name && post.last_name ? `${post.first_name} ${post.last_name}` : '',
-                  date: post.created_at || "",
-                  content: post.content,
-                  likes: post.likes || 0,
-                  comments: post.comments || 0,
-                  shares: post.shares || 0,
-                  images: post.images,
-                  feeling: post.feeling,
-                  location: post.location,
-                })}
-              />
-            ))}
+
+            {/* Posts List */}
+            <div className="w-full max-w-3xl pt-6 pb-20">
+              {filteredPosts.slice(0, visibleCount).map(post => (
+                <Post
+                  key={post.id}
+                  theme={theme}
+                  id={post.id}
+                  userId={post.user_id}
+                  name={post.first_name && post.last_name ? `${post.first_name} ${post.last_name}` : ''}
+                  date={post.created_at || ""}
+                  content={post.content}
+                  likes={post.likes || 0}
+                  comments={post.comments || 0}
+                  shares={post.shares || 0}
+                  images={post.images}
+                  avatar={post.avatar_url || undefined}
+                  feeling={post.feeling}
+                  location={post.location}
+                  onOpenDetail={() => setOpenPost({
+                    id: post.id,
+                    name: post.first_name && post.last_name ? `${post.first_name} ${post.last_name}` : '',
+                    date: post.created_at || "",
+                    content: post.content,
+                    likes: post.likes || 0,
+                    comments: post.comments || 0,
+                    shares: post.shares || 0,
+                    images: post.images,
+                    feeling: post.feeling,
+                    location: post.location,
+                  })}
+                />
+              ))}
+            </div>
           </div>
+
           {/* Sidebar phải */}
-          <div style={{ position: 'fixed', top: 200, right: 0, zIndex: 20 }}>
+          <div className="fixed top-[5.5rem] right-0 z-20">
             <RightSidebar theme={theme} />
           </div>
         </div>
       </div>
-      {/* Popup chi tiết bài viết, hiển thị khi người dùng chọn xem chi tiết */}
+
+      {/* Popups & Modals */}
       {openPost && (
         <PostDetailPopup post={openPost} onClose={() => setOpenPost(null)} />
       )}

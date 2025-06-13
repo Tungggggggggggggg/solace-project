@@ -136,6 +136,7 @@ export default function SearchPage() {
                     <Post
                       key={item.id}
                       id={item.id}
+                      userId={item.user_id}
                       name={`${item.first_name || ''} ${item.last_name || ''}`.trim() || "Người dùng ẩn danh"}
                       date={item.created_at || ''}
                       content={item.content}
@@ -213,6 +214,7 @@ export default function SearchPage() {
                     <Post
                       key={item.id}
                       id={item.id}
+                      userId={item.user_id}
                       name={`${item.first_name || ''} ${item.last_name || ''}`.trim() || "Người dùng ẩn danh"}
                       date={item.created_at || ''}
                       content={item.content}
@@ -317,4 +319,4 @@ export default function SearchPage() {
       `}</style>
     </div>
   );
-} 
+}

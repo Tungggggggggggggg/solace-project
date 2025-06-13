@@ -44,7 +44,9 @@ pool.query("SELECT NOW()", (err, res) => {
   if (err) {
     console.error("Kết nối PostgreSQL thất bại:", err.message);
   } else {
-    console.log("Kết nối PostgreSQL thành công:", res.rows[0]);
+    if (process.env.NODE_ENV !== 'production') {
+      console.log("Kết nối PostgreSQL thành công:", res.rows[0]);
+    }
   }
 });
 
@@ -68,6 +70,10 @@ app.use('/api/visits', visitsRoutes);
 
 // Khởi động server
 const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => console.log(`Server chạy trên http://localhost:${PORT}`));
+app.listen(PORT, () => {
+  if (process.env.NODE_ENV !== 'production') {
+    console.log(`Server chạy trên http://localhost:${PORT}`);
+  }
+});
 
 module.exports = app;

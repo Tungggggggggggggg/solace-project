@@ -7,6 +7,7 @@ import { useUser } from '../contexts/UserContext';
 import gsap from 'gsap';
 import { fetchForbiddenWords, filterForbiddenWords } from '../lib/forbiddenWords';
 import Toast from './Toast';
+import type { PostType } from '../types/Post';
 
 type PrivacyOption = 'public' | 'friends' | 'onlyme';
 
@@ -51,7 +52,7 @@ const POPULAR_LOCATIONS = [
   'Bắc Ninh',
 ];
 
-export default function CreatePostModal({ onClose, onPostCreated, theme, defaultTypePost }: { onClose?: () => void, onPostCreated?: (post: any) => void, theme?: string, defaultTypePost?: 'positive' | 'negative' }) {
+export default function CreatePostModal({ onClose, onPostCreated, theme, defaultTypePost }: { onClose?: () => void, onPostCreated?: (post: PostType) => void, theme?: string, defaultTypePost?: 'positive' | 'negative' }) {
   const [content, setContent] = useState('');
   const [images, setImages] = useState<string[]>([]);
   const [privacy, setPrivacy] = useState<PrivacyOption>('public');
@@ -63,19 +64,41 @@ export default function CreatePostModal({ onClose, onPostCreated, theme, default
   const [showFeelingModal, setShowFeelingModal] = useState(false);
   const [selectedLocation, setSelectedLocation] = useState<string | null>(null);
   const [showLocationModal, setShowLocationModal] = useState(false);
-  const [locationInput, setLocationInput] = useState('');
-  const [isGettingLocation, setIsGettingLocation] = useState(false);
   const feelingModalRef = useRef<HTMLDivElement>(null);
   const locationModalRef = useRef<HTMLDivElement>(null);
   const statusRef = useRef<HTMLDivElement>(null);
   const [typePost, setTypePost] = useState<'positive' | 'negative'>(defaultTypePost || 'positive');
   const [forbiddenWords, setForbiddenWords] = useState<string[]>([]);
   const [toast, setToast] = useState<{message: string, type: 'success' | 'error' | 'info' | 'warning'}|null>(null);
+  const modalRef = useRef<HTMLDivElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const [isGettingLocation, setIsGettingLocation] = useState(false);
 
   useEffect(() => {
     if (defaultTypePost) setTypePost(defaultTypePost);
     fetchForbiddenWords().then(setForbiddenWords);
   }, [defaultTypePost]);
+
+  useEffect(() => {
+    if (modalRef.current) {
+      gsap.fromTo(
+        modalRef.current,
+        { y: 60, opacity: 0, scale: 0.96 },
+        { y: 0, opacity: 1, scale: 1, duration: 0.5, ease: 'power3.out' }
+      );
+    }
+  }, []);
+
+  const handleTextareaFocus = () => {
+    if (textareaRef.current) {
+      gsap.to(textareaRef.current, { boxShadow: '0 4px 24px 0 rgba(140,169,213,0.18)', scale: 1.03, duration: 0.3, ease: 'power2.out' });
+    }
+  };
+  const handleTextareaBlur = () => {
+    if (textareaRef.current) {
+      gsap.to(textareaRef.current, { boxShadow: 'none', scale: 1, duration: 0.22, ease: 'power2.inOut' });
+    }
+  };
 
   const handleAddImage = async (e: ChangeEvent<HTMLInputElement>) => {
     if (!e.target.files) return;
@@ -96,7 +119,7 @@ export default function CreatePostModal({ onClose, onPostCreated, theme, default
       });
       setImages(prev => [...prev, ...res.data.images]);
       console.log('Uploaded images:', res.data.images);
-    } catch (err) {
+    } catch {
       setToast({ message: 'Upload ảnh thất bại', type: 'error' });
     }
     setUploading(false);
@@ -139,8 +162,16 @@ export default function CreatePostModal({ onClose, onPostCreated, theme, default
       setSelectedFeeling(null);
       setSelectedLocation(null);
       if (onClose) onClose();
-      if (onPostCreated) onPostCreated(res.data);
-    } catch (err) {
+      if (onPostCreated) {
+        const completedPost = {
+          ...res.data,
+          first_name: res.data.first_name || user?.first_name || '',
+          last_name: res.data.last_name || user?.last_name || '',
+          avatar_url: res.data.avatar_url || user?.avatar_url || '',
+        };
+        onPostCreated(completedPost);
+      }
+    } catch {
       setToast({ message: 'Đăng bài thất bại', type: 'error' });
     }
     setUploading(false);
@@ -187,46 +218,52 @@ export default function CreatePostModal({ onClose, onPostCreated, theme, default
       onClick={onClose}
     >
       <div
-        className="bg-white w-full max-w-xl rounded-[20px] overflow-hidden shadow-lg animate-[modalFadeIn_0.4s_ease-out]"
+        ref={modalRef}
+        className="bg-white w-full max-w-md rounded-2xl overflow-hidden shadow-2xl animate-[modalFadeIn_0.4s_ease-out] border border-indigo-100 flex flex-col"
         onClick={e => e.stopPropagation()}
+        style={{ boxShadow: '0 8px 40px 0 rgba(80,80,120,0.12)' }}
       >
         {/* Toast notification */}
         {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
-        <div className="flex justify-between items-center px-8 py-6 border-b bg-gradient-to-r from-white to-[#f8f9fd]">
-          <h3 className="text-[22px] font-bold text-[#1c1e21] tracking-tight">Tạo bài viết</h3>
+        {/* Header */}
+        <div className="flex items-center justify-between px-5 py-3 border-b bg-gradient-to-r from-white to-[#f8f9fd]">
+          <h3 className="text-lg font-bold text-[#1c1e21] tracking-tight">Tạo bài viết</h3>
           <button
-            className="text-[#606770] text-2xl hover:text-[--primary] hover:scale-110 hover:rotate-90 transition"
+            className="text-[#606770] text-xl hover:text-indigo-500 hover:scale-110 hover:rotate-90 transition"
             onClick={onClose ? onClose : () => alert('Modal sẽ đóng trong ứng dụng thực tế')}
+            aria-label="Đóng modal"
           >
-            ×
+            <span className="material-symbols-outlined">close</span>
           </button>
         </div>
-
-        <div className="px-8 py-8 bg-white">
-          <div className="flex items-center mb-6">
-            <img
-              src={user?.avatar_url || '/images/default-avatar.png'}
-              className="w-12 h-12 rounded-full border-2 border-[--primary-light] object-cover mr-4"
-              alt="avatar"
-            />
-            <div>
-              <div className="font-semibold">
-                {user?.first_name && user?.last_name
-                  ? `${user.first_name} ${user.last_name}`
-                  : 'Ẩn danh'}
-              </div>
-
-              <div
-                onClick={() => setShowPrivacyModal(true)}
-                className="flex items-center bg-[--primary-light] px-3 py-1 rounded-full text-sm cursor-pointer hover:bg-purple-100 transition mt-1"
-              >
-                <MaterialIcon icon={privacyOptions[privacy].icon} className="text-[--primary] text-base mr-1" />
-                <span className="font-medium text-[#1c1e21]">{privacyOptions[privacy].text}</span>
-                <MaterialIcon icon="arrow_drop_down" className="text-[#606770] ml-1" />
-              </div>
+        {/* Main content */}
+        <div className="px-5 py-4 flex flex-col gap-5 bg-white">
+          {/* User info */}
+          <div className="flex items-center gap-3 mb-1">
+            <div className="w-11 h-11 rounded-full bg-gradient-to-tr from-indigo-200 via-blue-100 to-pink-100 flex items-center justify-center overflow-hidden border-2 border-indigo-200 shadow">
+              {user?.avatar_url ? (
+                <img src={user.avatar_url} alt="avatar" className="w-full h-full object-cover" />
+              ) : (
+                <span className="material-symbols-outlined text-black text-2xl">person</span>
+              )}
+            </div>
+            <div className="flex flex-col">
+              <span className="font-semibold text-slate-900 text-sm leading-tight">{user ? `${user.first_name} ${user.last_name}` : 'Bạn'}</span>
+              <span className="text-xs text-slate-500">{user?.email}</span>
             </div>
           </div>
-
+          {/* Content textarea */}
+          <textarea
+            ref={textareaRef}
+            className="w-full min-h-[70px] max-h-40 px-4 py-2 rounded-xl border border-black/10 bg-[#f8f9fd] text-base font-normal placeholder:text-gray-400 focus:outline-none text-black shadow-sm transition-all duration-200 resize-none"
+            placeholder="Chia sẻ cảm xúc, câu chuyện hoặc khoảnh khắc của bạn..."
+            value={content}
+            onChange={handleContentChange}
+            onFocus={handleTextareaFocus}
+            onBlur={handleTextareaBlur}
+            maxLength={1000}
+            disabled={uploading}
+          />
           {/* Hiển thị cảm xúc và vị trí đã chọn */}
           {((selectedFeeling && selectedLocation) || (!selectedFeeling && selectedLocation)) && (
             <div ref={statusRef} className="mb-3 flex flex-wrap items-center gap-2 text-lg font-medium">
@@ -251,13 +288,6 @@ export default function CreatePostModal({ onClose, onPostCreated, theme, default
               <button className="ml-2 text-gray-400 hover:text-red-500 text-xl" onClick={() => setSelectedFeeling(null)} title="Xóa cảm xúc">×</button>
             </div>
           )}
-
-          <textarea
-            placeholder="Bạn đang nghĩ gì?"
-            className="w-full min-h-[160px] border border-black/10 bg-[#f0f2f5] p-4 rounded-xl text-base resize-none focus:outline-none focus:ring-2 focus:ring-[--primary-light] mb-6 text-[#1c1e21]"
-            value={content}
-            onChange={handleContentChange}
-          />
 
           {images.length > 0 && (
             <div className="grid grid-cols-3 gap-3 mb-6">
@@ -440,7 +470,7 @@ export default function CreatePostModal({ onClose, onPostCreated, theme, default
                     setShowLocationModal(false);
                   }
                   setIsGettingLocation(false);
-                }, (err) => {
+                }, () => {
                   alert('Không lấy được vị trí!');
                   setIsGettingLocation(false);
                 });

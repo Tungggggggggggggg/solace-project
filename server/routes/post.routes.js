@@ -1,6 +1,13 @@
 const express = require('express');
 const router = express.Router(); 
 const pool = require('../db');
+const { getUserPosts, getUserPostStats } = require('../controllers/post.controller');
+
+// GET /api/posts/user/:id - Get user posts with access control
+router.get('/user/:id', getUserPosts);
+
+// GET /api/posts/user/:id/stats - Get user post statistics
+router.get('/user/:id/post-stats', getUserPostStats);
 
 // GET /api/posts?type=positive&status=approved&search=keyword
 router.get('/', async (req, res) => {
