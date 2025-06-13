@@ -6,6 +6,7 @@ import AdminLayout from '@/components/AdminLayout';
 import { toast, ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import { FiSearch, FiEye, FiTrash2 } from 'react-icons/fi';
+import FilteredInput from '@/components/FilteredInput';
 
 type ForbiddenWord = {
   id: string;
@@ -81,7 +82,7 @@ export default function SettingPage(): ReactElement {
               style={{ zIndex: 2 }}
               title="Tìm kiếm"
             />
-            <input
+            <FilteredInput
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && fetchWords()}
@@ -187,7 +188,7 @@ export default function SettingPage(): ReactElement {
             onClick={e => e.stopPropagation()}
           >
             <h2 className="text-xl font-bold mb-4">Thêm từ cấm mới</h2>
-            <input
+            <FilteredInput
               className="w-full p-3 border rounded-lg mb-4"
               placeholder="Nhập từ cấm..."
               value={newWord}

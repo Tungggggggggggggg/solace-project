@@ -7,6 +7,8 @@ import { FiSearch, FiChevronDown, FiEdit2, FiLock, FiUnlock } from 'react-icons/
 import AdminLayout from '@/components/AdminLayout';
 import { ToastContainer, toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
+import FilteredInput from '@/components/FilteredInput';
+
 
 
 type User = {
@@ -115,7 +117,7 @@ export default function UserManagementPage(): ReactElement {
               <div className="w-10 h-10 bg-[#F0F2F5] flex items-center justify-center rounded-l-xl">
                 <FiSearch className="w-5 h-5 text-[#3D4D5C]" />
               </div>
-              <input
+              <FilteredInput
                 type="text"
                 value={searchText}
                 onChange={(e) => setSearchText(e.target.value)}
@@ -255,7 +257,7 @@ export default function UserManagementPage(): ReactElement {
             <div className="space-y-4">
             <div>
               <label className="block text-sm font-medium text-gray-700">First_name</label>
-                <input
+                <FilteredInput
                   type="text"
                   className="w-full px-4 py-2 text-gray-800 border rounded-xl mt-1"
                   value={editingUser.first_name}
@@ -266,7 +268,7 @@ export default function UserManagementPage(): ReactElement {
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700">Last_name</label>
-                <input
+                <FilteredInput
                   type="text"
                   className="w-full px-4 py-2 text-gray-800 border rounded-xl mt-1"
                   value={editingUser.last_name}
@@ -277,7 +279,7 @@ export default function UserManagementPage(): ReactElement {
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700">Email</label>
-                <input
+                <FilteredInput
                   type="email"
                   className="w-full px-4 py-2 text-gray-800 border rounded-xl mt-1"
                   value={editingUser.email}

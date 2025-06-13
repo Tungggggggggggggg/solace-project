@@ -2,6 +2,8 @@ import React, { useEffect, useRef, useState, useCallback } from 'react';
 import axios from 'axios';
 import gsap from 'gsap';
 import Toast from './Toast';
+import FilteredInput from './FilteredInput';
+
 
 interface Comment {
   id: string;
@@ -118,7 +120,7 @@ export default function CommentsSection({ postId, currentUser }: { postId: strin
           padding: 4,
         }}
       >
-        <input
+        <FilteredInput
           ref={inputRef}
           value={newComment}
           onChange={e => setNewComment(e.target.value)}

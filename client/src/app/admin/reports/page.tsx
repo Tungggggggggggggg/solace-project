@@ -2,11 +2,12 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import type { ReactElement } from 'react';
-import { FiSearch, FiChevronDown, FiTrash2, FiEye, FiCheck } from 'react-icons/fi';
+import { FiSearch, FiChevronDown, FiTrash2, FiEye, FiCheck, FiMail } from 'react-icons/fi';
 import AdminLayout from '@/components/AdminLayout';
 import { toast, ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
-
+import Image from 'next/image';
+import FilteredInput from '@/components/FilteredInput';
 type Report = {
   report_id: string;
   date_reported: string;
@@ -14,6 +15,18 @@ type Report = {
   reported_account: string;
   content: string;
   status: string;
+  reporter_id: string;         // Thêm dòng này
+  reported_user_id: string;    // Thêm dòng này
+};
+
+type ReportedPost = {
+  id: string;
+  first_name?: string;
+  last_name?: string;
+  avatar_url?: string;
+  created_at?: string;
+  content?: string;
+  images?: string;
 };
 
 export default function ReportsPage(): ReactElement {
@@ -24,6 +37,14 @@ export default function ReportsPage(): ReactElement {
   const dropdownRef = useRef<HTMLButtonElement>(null);
   const [dropdownPos, setDropdownPos] = useState({ top: 0, left: 0 });
   const [selectedReport, setSelectedReport] = useState<Report | null>(null);
+  const [reportedPost, setReportedPost] = useState<ReportedPost | null>(null);
+  const [showMailDialog, setShowMailDialog] = useState(false);
+  const [mailTarget, setMailTarget] = useState<'reporter' | 'reported'>('reporter');
+  const [mailTitle, setMailTitle] = useState('');
+  const [mailContent, setMailContent] = useState('');
+  const [mailType, setMailType] = useState('system');
+  const [mailUserId, setMailUserId] = useState<string | null>(null);
+
 
   const fetchReports = async () => {
     const params = new URLSearchParams();
@@ -59,6 +80,38 @@ export default function ReportsPage(): ReactElement {
     }
   };
 
+
+ const handleViewReport = async (report: Report) => {
+    const res = await fetch(`/api/reports/${report.report_id}`);
+    const result = await res.json();
+    if (result.success) {
+      setSelectedReport(result.report);
+      setReportedPost(result.post);
+    } else {
+      toast.error(result.error || 'Không lấy được chi tiết báo cáo');
+    }
+  };
+
+  // Khi bấm icon thư, mở dialog và chọn mặc định là người báo cáo
+  const handleOpenMailDialog = (report: Report, target: 'reporter' | 'reported') => {
+    setMailTarget(target);
+    setShowMailDialog(true);
+    setMailTitle('');
+    setMailContent('');
+    setMailType('system');
+    setMailUserId(target === 'reporter' ? report.reporter_id : report.reported_user_id);
+  };
+
+  // Gửi notification (chỉ FE, bạn cần làm API/backend sau)
+  const handleSendNotification = async () => {
+    if (!mailTitle.trim() || !mailContent.trim()) {
+      toast.error('Vui lòng nhập tiêu đề và nội dung!');
+      return;
+    }
+    // Gửi lên API backend ở đây (chưa làm backend)
+    toast.success('Đã tạo thông báo (FE demo)');
+    setShowMailDialog(false);
+  };
   return (
     <AdminLayout onOpenAuth={() => {}}>
       <main className="p-6">
@@ -71,7 +124,7 @@ export default function ReportsPage(): ReactElement {
               onClick={fetchReports}
               title="Tìm kiếm"
             />
-            <input
+            <FilteredInput
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && fetchReports()}
@@ -158,7 +211,7 @@ export default function ReportsPage(): ReactElement {
                         )}
                       </td>
                       <td className="p-4 flex gap-2">
-                        <button className="text-blue-500 hover:underline" onClick={() => setSelectedReport(report)}>
+                        <button className="text-blue-500 hover:underline" onClick={() => handleViewReport(report)}>
                           <FiEye />
                         </button>
                         {report.status !== 'Đã xử lý' && (
@@ -168,6 +221,14 @@ export default function ReportsPage(): ReactElement {
                         )}
                         <button onClick={() => handleDelete(report.report_id)} className="text-red-500 hover:underline">
                           <FiTrash2 />
+                        </button>
+                         {/* Icon gửi thư */}
+                        <button
+                          className="text-orange-500 hover:underline"
+                          title="Gửi thông báo"
+                          onClick={() => handleOpenMailDialog(report, 'reporter')}
+                        >
+                          <FiMail />
                         </button>
                       </td>
                     </tr>
@@ -179,16 +240,90 @@ export default function ReportsPage(): ReactElement {
         </div>
       </main>
       <ToastContainer position="top-right" autoClose={3000} aria-label="Thông báo hệ thống" />
+      
+         {/* Dialog gửi thông báo */}
+      {showMailDialog && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-[9999]" onClick={() => setShowMailDialog(false)}>
+          <div
+            className="bg-white rounded-2xl shadow-xl p-6 w-full max-w-md animate-fadeIn"
+            onClick={e => e.stopPropagation()}
+          >
+            <h2 className="text-xl font-bold mb-4">Gửi thông báo</h2>
+            <div className="mb-3">
+              <label className="block font-medium mb-1">Gửi cho:</label>
+              <select
+                className="w-full p-2 border rounded mb-2"
+                value={mailTarget}
+                onChange={e => {
+                  setMailTarget(e.target.value as 'reporter' | 'reported');
+                  if (selectedReport) {
+                    setMailUserId(
+                      e.target.value === 'reporter'
+                        ? selectedReport.reporter_id
+                        : selectedReport.reported_user_id
+                    );
+                  }
+                }}
+              >
+                <option value="reporter">Người báo cáo</option>
+                <option value="reported">Người bị báo cáo</option>
+              </select>
+            </div>
+            <div className="mb-3">
+              <label className="block font-medium mb-1">Tiêu đề</label>
+              <FilteredInput
+                className="w-full p-2 border rounded"
+                value={mailTitle}
+                onChange={e => setMailTitle(e.target.value)}
+                placeholder="Nhập tiêu đề..."
+              />
+            </div>
+            <div className="mb-3">
+              <label className="block font-medium mb-1">Nội dung</label>
+              <textarea
+                className="w-full p-2 border rounded"
+                value={mailContent}
+                onChange={e => setMailContent(e.target.value)}
+                placeholder="Nhập nội dung..."
+                rows={4}
+              />
+            </div>
+            <div className="mb-3">
+              <label className="block font-medium mb-1">Loại thông báo</label>
+              <FilteredInput
+                className="w-full p-2 border rounded"
+                value={mailType}
+                onChange={e => setMailType(e.target.value)}
+                placeholder="Loại (ví dụ: system)"
+              />
+            </div>
+            <div className="flex justify-end gap-2">
+              <button
+                className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600"
+                onClick={handleSendNotification}
+              >
+                Gửi
+              </button>
+              <button
+                className="px-4 py-2 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300"
+                onClick={() => setShowMailDialog(false)}
+              >
+                Hủy
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
       {selectedReport && (
         <div
           className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-[9999]"
-          onClick={() => setSelectedReport(null)}
+          onClick={() => { setSelectedReport(null); setReportedPost(null); }}
         >
           <div
             className="bg-white rounded-2xl shadow-xl p-6 max-w-2xl w-full max-h-[90vh] overflow-y-auto animate-fadeIn"
             onClick={(e) => e.stopPropagation()}
           >
-            {/* Header */}
+            {/* Thông tin báo cáo */}
             <div className="mb-4">
               <h3 className="text-lg font-semibold text-gray-800 mb-2">
                 Báo cáo #{selectedReport.report_id}
@@ -206,6 +341,57 @@ export default function ReportsPage(): ReactElement {
                 Trạng thái: {selectedReport.status}
               </p>
             </div>
+              {/* Thông tin bài đăng bị báo cáo */}
+            {reportedPost && (
+              <div className="mb-4">
+                <h4 className="font-semibold text-gray-700 mb-2">Bài đăng bị báo cáo</h4>
+                <div className="bg-white rounded-xl shadow border p-4 flex flex-col gap-4">
+                  <div className="flex items-center gap-3">
+                    {reportedPost.avatar_url && (
+                      <Image
+                        src={reportedPost.avatar_url}
+                        alt="avatar"
+                        width={40}
+                        height={40}
+                        className="w-10 h-10 rounded-full object-cover border"
+                      />
+                    )}
+                    <div>
+                      <div className="font-semibold text-gray-900">
+                        {(reportedPost.first_name || '') + ' ' + (reportedPost.last_name || '')}
+                      </div>
+                      <div className="text-xs text-gray-500">
+                        {reportedPost.created_at
+                          ? new Date(reportedPost.created_at).toLocaleString('vi-VN')
+                          : ''}
+                      </div>
+                    </div>
+                  </div>
+                  <div className="text-gray-800 whitespace-pre-line">{reportedPost.content}</div>
+                  {reportedPost.images && (() => {
+                    let imgs: string[] = [];
+                    try {
+                      imgs = JSON.parse(reportedPost.images);
+                    } catch {}
+                    return Array.isArray(imgs) && imgs.length > 0 ? (
+                      <div className="flex flex-wrap gap-2 mt-2">
+                        {imgs.map((img, idx) => (
+                          <Image
+                            key={idx}
+                            src={img}
+                            alt={`Ảnh ${idx + 1}`}
+                            width={128}
+                            height={128}
+                            className="w-32 h-32 object-cover rounded border"
+                            unoptimized // Nếu ảnh là link ngoài, có thể bỏ dòng này nếu đã cấu hình domains cho next/image
+                          />
+                        ))}
+                      </div>
+                    ) : null;
+                  })()}
+                </div>
+              </div>
+            )}
             <div className="mb-4">
               <h4 className="font-semibold text-gray-700 mb-2">Nội dung báo cáo</h4>
               <div className="bg-gray-100 rounded-lg p-4 text-gray-800">

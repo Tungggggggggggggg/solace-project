@@ -1,5 +1,7 @@
 import React from 'react';
 import { useUser } from '../contexts/UserContext';
+import FilteredInput from './FilteredInput'; 
+
 
 // Component để tạo bài viết mới
 const CreatePost: React.FC<{ onOpenModal: () => void }> = ({ onOpenModal }) => {
@@ -16,7 +18,7 @@ const CreatePost: React.FC<{ onOpenModal: () => void }> = ({ onOpenModal }) => {
           className="w-12 h-12 rounded-full object-cover mr-4 border-2 border-violet-500 hover:scale-105 transition-transform"
         />
         {/* Input nhập nội dung bài viết */}
-        <input
+        <FilteredInput
           type="text"
           placeholder={`Bạn đang nghĩ gì, ${user?.displayName || 'bạn'}?`}
           className="flex-1 px-4 py-3 rounded-full bg-gray-100 dark:bg-gray-700 border-none focus:ring-2 focus:ring-violet-300 focus:outline-none"

@@ -125,5 +125,57 @@ router.delete('/:id', async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 });
+// Lấy chi tiết một báo cáo
+router.get('/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    // Lấy thông tin báo cáo
+    const reportQuery = `
+      SELECT 
+        r.id,
+        r.post_id,
+        r.created_at,
+        r.reason,
+        r.description,
+        r.status,
+        u1.first_name AS reporter_first_name,
+        u1.last_name AS reporter_last_name,
+        u2.first_name AS reported_first_name,
+        u2.last_name AS reported_last_name
+      FROM reports r
+      LEFT JOIN users u1 ON r.reporter_id = u1.id
+      LEFT JOIN users u2 ON r.reported_user_id = u2.id
+      WHERE r.id = $1
+    `;
+    const reportRes = await pool.query(reportQuery, [id]);
+    if (reportRes.rows.length === 0) {
+      return res.status(404).json({ error: 'Không tìm thấy báo cáo' });
+    }
+    const report = reportRes.rows[0];
 
+    // Lấy thông tin bài đăng bị báo cáo
+    const postRes = await pool.query(
+      `SELECT p.*, u.first_name, u.last_name, u.avatar_url
+       FROM posts p
+       JOIN users u ON p.user_id = u.id
+       WHERE p.id = $1`, [report.post_id]
+    );
+    const post = postRes.rows[0] || null;
+
+    res.json({
+      success: true,
+      report: {
+        ...report,
+        reported_by: ((report.reporter_first_name || '') + ' ' + (report.reporter_last_name || '')).trim() || 'Không xác định',
+        reported_account: ((report.reported_first_name || '') + ' ' + (report.reported_last_name || '')).trim() || 'Không xác định',
+        status: report.status === 'pending' ? 'Chưa xử lý' : 'Đã xử lý',
+        date_reported: new Date(report.created_at).toLocaleDateString('en-US'),
+        content: report.reason + (report.description ? `: ${report.description}` : ''),
+      },
+      post,
+    });
+  } catch (err) {
+    res.status(500).json({ error: 'Lỗi server', detail: err.message });
+  }
+});
 module.exports = router;

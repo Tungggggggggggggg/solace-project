@@ -2,6 +2,8 @@
 import { useUser } from '@/contexts/UserContext';
 import { useRef } from 'react';
 import gsap from 'gsap';
+import FilteredInput from './FilteredInput'; 
+
 
 const InputSection = ({ onOpenModal, theme }: { onOpenModal?: () => void, theme?: string }) => {
   const { user } = useUser();
@@ -34,7 +36,7 @@ const InputSection = ({ onOpenModal, theme }: { onOpenModal?: () => void, theme?
         </div>
         <div className="flex flex-col flex-1">
           <span className="font-semibold text-slate-900 text-base leading-tight">{user ? `${user.first_name} ${user.last_name}` : 'Bạn'}</span>
-          <input
+          <FilteredInput
             ref={inputRef}
             type="text"
             placeholder="Bạn đang nghĩ gì hôm nay?..."

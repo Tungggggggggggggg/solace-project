@@ -5,6 +5,8 @@ import { FiSearch, FiChevronDown, FiTrash2, FiEye, FiCheck } from 'react-icons/f
 import AdminLayout from '@/components/AdminLayout';
 import { toast, ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
+import FilteredInput from '@/components/FilteredInput';
+
 
 
 type Post = {
@@ -82,7 +84,7 @@ export default function PostManagementPage() {
         <div className="flex gap-4 mb-6">
           <div className="relative flex-1">
             <FiSearch className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500" />
-            <input
+            <FilteredInput
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && fetchPosts()}

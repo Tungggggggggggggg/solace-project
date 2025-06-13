@@ -7,6 +7,8 @@ import { useUser } from "@/contexts/UserContext";
 import Toast, { ToastProps } from "./Toast";
 import Link from "next/link";
 import gsap from "gsap";
+import FilteredInput from "@/components/FilteredInput";
+
 
 // Định nghĩa kiểu props cho Header
 interface HeaderProps {
@@ -194,7 +196,7 @@ const Header = memo<HeaderProps>(({
         </Link>
         <div className="flex-1 max-w-xl mx-8 relative">
           <div className="flex w-full rounded-full border border-black bg-white overflow-hidden" ref={inputRef}>
-            <input
+            <FilteredInput
               type="text"
               value={value}
               onChange={memoizedHandleChange}
