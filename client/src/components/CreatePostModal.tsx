@@ -293,7 +293,7 @@ export default function CreatePostModal({ onClose, onPostCreated, theme, default
             <div className="grid grid-cols-3 gap-3 mb-6">
               {images.map((img, i) => (
                 <div key={i} className="relative rounded-xl aspect-square overflow-hidden shadow group">
-                  <img src={img} className="w-full h-full object-cover group-hover:scale-105 transition" />
+                  <img src={img} alt="post-img" className="w-full h-full object-cover group-hover:scale-105 transition" />
                   <button
                     onClick={() => removeImage(i)}
                     className="absolute top-2 right-2 w-7 h-7 text-white bg-black/60 rounded-full flex items-center justify-center hover:bg-[--accent] transition"

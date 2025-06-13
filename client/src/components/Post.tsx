@@ -8,6 +8,8 @@ import { fetchForbiddenWords, filterForbiddenWords } from '../lib/forbiddenWords
 import { formatDate } from '../lib/dateUtils';
 import Image from 'next/image';
 import Link from 'next/link';
+import SharePostModal from './SharePostModal';
+import SkeletonPost from './SkeletonPost';
 
 interface Author {
   name: string;
@@ -29,7 +31,7 @@ interface PostProps {
   avatar?: string;
   feeling?: { icon: string; label: string } | null;
   location?: string | null;
-  onOpenDetail?: () => void;
+  onOpenDetail?: (postObj: any) => void;
   theme?: string;
   hideActions?: boolean;
   author?: Author;
@@ -79,9 +81,12 @@ const Post = ({
   shares, 
   images, 
   avatar, 
+  feeling, 
+  location, 
   onOpenDetail, 
-  hideActions 
-}: PostProps) => {
+  hideActions, 
+  shared_post_id 
+}: PostProps & { shared_post_id?: string }) => {
   const [showReport, setShowReport] = useState(false);
   const { user: currentUser } = useUser();
   const reporterId = currentUser?.id || '';
@@ -92,6 +97,9 @@ const Post = ({
   const [likeList, setLikeList] = useState<string[]>([]);
   const [commentCount, setCommentCount] = useState(comments);
   const [filteredContent, setFilteredContent] = useState(content);
+  const [showShareModal, setShowShareModal] = useState(false);
+  const [shareCount, setShareCount] = useState(shares);
+  const [sharedPost, setSharedPost] = useState<any>(null);
 
   useEffect(() => {
     // Kiểm tra user đã like chưa
@@ -122,8 +130,15 @@ const Post = ({
       }
     }
     filterContent();
+
+    if (shared_post_id) {
+      axios.get(`/api/posts/${shared_post_id}`)
+        .then(res => setSharedPost(res.data))
+        .catch(() => setSharedPost(null));
+    }
+
     return () => { ignore = true; };
-  }, [id, currentUser, content, comments]);
+  }, [id, currentUser, content, comments, shared_post_id]);
 
   const handleLike = async () => {
     if (!currentUser?.id || !id) return;
@@ -168,104 +183,282 @@ const Post = ({
   const imagesArray: string[] = Array.isArray(images) ? images :
     typeof images === 'string' ? JSON.parse(images) : [];
 
+  // Hàm mở detail bài gốc (fetch lại từ API)
+  const handleOpenDetailRootPost = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!onOpenDetail || !sharedPost?.id) return;
+    try {
+      const res = await axios.get(`/api/posts/${sharedPost.id}`, {
+        baseURL: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000',
+      });
+      if (res.data && res.data.id) {
+        onOpenDetail({
+          id: res.data.id,
+          name: `${res.data.first_name || ''} ${res.data.last_name || ''}`.trim(),
+          date: res.data.created_at || res.data.date || '',
+          content: res.data.content,
+          likes: res.data.likes,
+          comments: res.data.comments,
+          shares: res.data.shares,
+          images: res.data.images,
+          feeling: res.data.feeling,
+          location: res.data.location,
+          avatar_url: res.data.avatar_url
+        });
+      }
+    } catch (err) {
+      if (sharedPost.id) {
+        onOpenDetail({
+          id: sharedPost.id,
+          name: `${sharedPost.first_name || ''} ${sharedPost.last_name || ''}`.trim(),
+          date: sharedPost.created_at || sharedPost.date || '',
+          content: sharedPost.content,
+          likes: sharedPost.likes,
+          comments: sharedPost.comments,
+          shares: sharedPost.shares,
+          images: sharedPost.images,
+          feeling: sharedPost.feeling,
+          location: sharedPost.location,
+          avatar_url: sharedPost.avatar_url
+        });
+      }
+    }
+  };
+
   return (
     <div className="bg-white rounded-2xl p-6 shadow-sm w-full max-w-3xl my-6 transform transition-all duration-200 hover:shadow-md">
-      {/* Post Header */}
-      <div className="flex items-center gap-3 mb-4">
-        <Link 
-          href={userId === currentUser?.id ? '/profile' : `/profile/${userId}`}
-          className="w-12 h-12 rounded-full bg-slate-100 flex items-center justify-center overflow-hidden group hover:ring-2 hover:ring-indigo-600 hover:ring-offset-2 transition-all"
-        >
-          {avatar ? (
-            <Image
-              src={optimizeCloudinaryUrl(avatar)}
-              alt={name}
-              width={48}
-              height={48}
-              className="object-cover rounded-full transition-transform group-hover:scale-110"
-              placeholder="blur"
-              blurDataURL={`data:image/svg+xml;base64,${toBase64(shimmer(48, 48))}`}
-            />
-          ) : (
-            <span className="material-symbols-outlined text-slate-400">person</span>
-          )}
-        </Link>
-        <div className="flex-grow">
-          <Link 
-            href={userId === currentUser?.id ? '/profile' : `/profile/${userId}`}
-            className="font-medium text-slate-900 hover:text-indigo-600 transition-colors"
-          >
-            {name}
-          </Link>
-          <p className="text-sm text-slate-500">{formatDate(date)}</p>
-        </div>
-        <button
-          className="p-2 hover:bg-slate-50 rounded-full transition-colors"
-          onClick={() => setShowReport(true)}
-        >
-          <span className="material-symbols-outlined text-slate-400">more_horiz</span>
-        </button>
-      </div>
-
-      {/* Post Content */}
-      <div className="space-y-4">
-        <p className="text-slate-900 whitespace-pre-wrap">{filteredContent}</p>
-
-        {/* Post Images */}
-        {imagesArray.length > 0 && (
-          <div className={`grid ${imagesArray.length > 1 ? 'grid-cols-2' : 'grid-cols-1'} gap-2`}>
-            {imagesArray.map((img: string, index: number) => (
-              <div key={index} className="aspect-video bg-slate-100 rounded-xl flex items-center justify-center group cursor-pointer hover:bg-slate-200 transition-all duration-200 overflow-hidden">
-                {img.startsWith('http') ? (
-                  <Image
-                    src={optimizeCloudinaryUrl(img)}
-                    alt={`Post image ${index + 1}`}
-                    width={500}
-                    height={300}
-                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200"
-                    placeholder="blur"
-                    blurDataURL={`data:image/svg+xml;base64,${toBase64(shimmer(500, 300))}`}
-                    priority={index === 0} // Load first image with priority
-                    sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
-                  />
-                ) : (
-                  <span className="material-symbols-outlined text-4xl text-slate-400 group-hover:scale-110 transition-transform">
-                    {img}
-                  </span>
-                )}
-              </div>
-            ))}
-          </div>
-        )}
-
-        {/* Post Actions */}
-        {!hideActions && (
-          <div className="flex items-center justify-between text-sm border-t border-slate-100 pt-4 mt-4">
-            <button
-              ref={likeBtnRef}
-              onClick={handleLike}
-              className="flex-1 flex items-center justify-center gap-1 py-2 text-slate-600 hover:text-rose-500 transition-all duration-200 rounded-lg hover:bg-slate-50"
-            >
-              <span className="material-symbols-outlined" style={{ color: liked ? '#f43f5e' : 'currentColor' }}>
-                favorite
+      {shared_post_id && sharedPost === null ? (
+        <SkeletonPost />
+      ) : sharedPost ? (
+        <div onClick={() => {
+          if (onOpenDetail && id) {
+            onOpenDetail({
+              id,
+              name,
+              date,
+              content,
+              likes: likeCount,
+              comments: commentCount,
+              shares: shareCount,
+              images,
+              feeling: sharedPost.feeling,
+              location: sharedPost.location,
+              avatar_url: avatar
+            });
+          }
+        }} style={{ cursor: 'pointer' }}>
+          {/* Người share */}
+          <div className="flex items-center gap-3 mb-2">
+            <div className="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center overflow-hidden">
+              {avatar ? (
+                <img src={avatar} alt={name} width={40} height={40} className="object-cover w-10 h-10" />
+              ) : (
+                <span className="material-symbols-outlined text-slate-400">person</span>
+              )}
+            </div>
+            <div>
+              <span className="font-medium text-slate-900">{name}</span>
+              <span className="text-gray-500 text-sm ml-2">
+                đã chia sẻ bài viết của <span className="font-semibold">{sharedPost.first_name} {sharedPost.last_name}</span>
               </span>
-              <span>{likeCount}</span>
-            </button>
-            <button
-              onClick={onOpenDetail}
-              className="flex-1 flex items-center justify-center gap-1 py-2 text-slate-600 hover:text-indigo-500 transition-all duration-200 rounded-lg hover:bg-slate-50"
+            </div>
+            <span className="text-sm text-slate-500 ml-auto">{formatDate(date)}</span>
+          </div>
+          {/* Nội dung shareText nếu có */}
+          {content && <div className="mb-2 text-slate-900">{content}</div>}
+          {/* Bài viết gốc */}
+          <div
+            className="bg-gray-50 border rounded-lg p-4 cursor-pointer hover:bg-gray-100 transition"
+            onClick={handleOpenDetailRootPost}
+          >
+            <div className="flex items-center gap-2 mb-2">
+              <img src={sharedPost.avatar_url || '/images/default-avatar.png'} alt={sharedPost.first_name ? `${sharedPost.first_name} ${sharedPost.last_name}` : 'avatar'} className="w-8 h-8 rounded-full object-cover" />
+              <span className="font-semibold">{sharedPost.first_name} {sharedPost.last_name}</span>
+              <span className="text-gray-500 text-xs">{formatDate(sharedPost.created_at)}</span>
+            </div>
+            <div className="mb-2 text-slate-900 whitespace-pre-wrap">{sharedPost.content}</div>
+            {sharedPost.images && sharedPost.images.length > 0 && (
+              <div className={`grid ${sharedPost.images.length > 1 ? 'grid-cols-2' : 'grid-cols-1'} gap-2 mb-2`}>
+                {sharedPost.images.map((img: string, idx: number) => (
+                  <div key={idx} className="aspect-video bg-slate-100 rounded-xl flex items-center justify-center">
+                    <img src={img} alt={`post-img-${idx}`} className="object-cover w-full h-full rounded-xl" />
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+          {/* Post Actions */}
+          {!hideActions && (
+            <div className="flex items-center justify-between text-sm border-t border-slate-100 pt-4 mt-4">
+              <button
+                ref={likeBtnRef}
+                onClick={e => { e.stopPropagation(); handleLike(); }}
+                className="flex-1 flex items-center justify-center gap-1 py-2 text-slate-600 hover:text-rose-500 transition-all duration-200 rounded-lg hover:bg-slate-50"
+              >
+                <span className="material-symbols-outlined" style={{ color: liked ? '#f43f5e' : 'currentColor' }}>
+                  favorite
+                </span>
+                <span
+                  className="cursor-pointer hover:underline"
+                  onClick={e => { e.stopPropagation(); setShowLikeList(true); }}
+                >
+                  {likeCount}
+                </span>
+              </button>
+              <button
+                onClick={e => {
+                  e.stopPropagation();
+                  if (onOpenDetail && id) {
+                    onOpenDetail({
+                      id,
+                      name,
+                      date,
+                      content,
+                      likes: likeCount,
+                      comments: commentCount,
+                      shares: shareCount,
+                      images,
+                      feeling: sharedPost.feeling,
+                      location: sharedPost.location,
+                      avatar_url: avatar
+                    });
+                  }
+                }}
+                className="flex-1 flex items-center justify-center gap-1 py-2 text-slate-600 hover:text-indigo-500 transition-all duration-200 rounded-lg hover:bg-slate-50"
+              >
+                <span className="material-symbols-outlined">chat_bubble</span>
+                <span>{commentCount}</span>
+              </button>
+              <button
+                className="flex-1 flex items-center justify-center gap-1 py-2 text-slate-600 hover:text-emerald-500 transition-all duration-200 rounded-lg hover:bg-slate-50"
+                onClick={e => { e.stopPropagation(); setShowShareModal(true); }}
+              >
+                <span className="material-symbols-outlined">share</span>
+                <span>{shareCount}</span>
+              </button>
+            </div>
+          )}
+        </div>
+      ) : (
+        <>
+          {/* Post Header */}
+          <div className="flex items-center gap-3 mb-4">
+            <Link 
+              href={userId === currentUser?.id ? '/profile' : `/profile/${userId}`}
+              className="w-12 h-12 rounded-full bg-slate-100 flex items-center justify-center overflow-hidden group hover:ring-2 hover:ring-indigo-600 hover:ring-offset-2 transition-all"
             >
-              <span className="material-symbols-outlined">chat_bubble</span>
-              <span>{commentCount}</span>
-            </button>
-            <button className="flex-1 flex items-center justify-center gap-1 py-2 text-slate-600 hover:text-emerald-500 transition-all duration-200 rounded-lg hover:bg-slate-50">
-              <span className="material-symbols-outlined">share</span>
-              <span>{shares}</span>
+              {avatar ? (
+                <Image
+                  src={optimizeCloudinaryUrl(avatar)}
+                  alt={name}
+                  width={48}
+                  height={48}
+                  className="object-cover rounded-full transition-transform group-hover:scale-110"
+                  placeholder="blur"
+                  blurDataURL={`data:image/svg+xml;base64,${toBase64(shimmer(48, 48))}`} />
+              ) : (
+                <span className="material-symbols-outlined text-slate-400">person</span>
+              )}
+            </Link>
+            <div className="flex-grow">
+              <Link 
+                href={userId === currentUser?.id ? '/profile' : `/profile/${userId}`}
+                className="font-medium text-slate-900 hover:text-indigo-600 transition-colors"
+              >
+                {name}
+              </Link>
+              <p className="text-sm text-slate-500">{formatDate(date)}</p>
+            </div>
+            <button
+              className="p-2 hover:bg-slate-50 rounded-full transition-colors"
+              onClick={() => setShowReport(true)}
+            >
+              <span className="material-symbols-outlined text-slate-400">more_horiz</span>
             </button>
           </div>
-        )}
-      </div>
-
+          {/* Post Content */}
+          <div className="space-y-4">
+            <p className="text-slate-900 whitespace-pre-wrap">{filteredContent}</p>
+            {/* Post Images */}
+            {imagesArray.length > 0 && (
+              <div className={`grid ${imagesArray.length > 1 ? 'grid-cols-2' : 'grid-cols-1'} gap-2`}>
+                {imagesArray.map((img: string, index: number) => (
+                  <div key={index} className="aspect-video bg-slate-100 rounded-xl flex items-center justify-center group cursor-pointer hover:bg-slate-200 transition-all duration-200 overflow-hidden">
+                    {img.startsWith('http') ? (
+                      <Image
+                        src={optimizeCloudinaryUrl(img)}
+                        alt={`Post image ${index + 1}`}
+                        width={500}
+                        height={300}
+                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200"
+                        placeholder="blur"
+                        blurDataURL={`data:image/svg+xml;base64,${toBase64(shimmer(500, 300))}`} 
+                        priority={index === 0}
+                        sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+                      />
+                    ) : (
+                      <span className="material-symbols-outlined text-4xl text-slate-400 group-hover:scale-110 transition-transform">
+                        {img}
+                      </span>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+            {/* Post Actions */}
+            {!hideActions && (
+              <div className="flex items-center justify-between text-sm border-t border-slate-100 pt-4 mt-4">
+                <button
+                  ref={likeBtnRef}
+                  onClick={handleLike}
+                  className="flex-1 flex items-center justify-center gap-1 py-2 text-slate-600 hover:text-rose-500 transition-all duration-200 rounded-lg hover:bg-slate-50"
+                >
+                  <span className="material-symbols-outlined" style={{ color: liked ? '#f43f5e' : 'currentColor' }}>
+                    favorite
+                  </span>
+                  <span
+                    className="cursor-pointer hover:underline"
+                    onClick={e => { e.stopPropagation(); setShowLikeList(true); }}
+                  >
+                    {likeCount}
+                  </span>
+                </button>
+                <button
+                  onClick={e => {
+                    e.stopPropagation();
+                    if (onOpenDetail && id) {
+                      onOpenDetail({
+                        id,
+                        name,
+                        date,
+                        content,
+                        likes: likeCount,
+                        comments: commentCount,
+                        shares: shareCount,
+                        images,
+                        feeling: feeling,
+                        location: location,
+                        avatar_url: avatar
+                      });
+                    }
+                  }}
+                  className="flex-1 flex items-center justify-center gap-1 py-2 text-slate-600 hover:text-indigo-500 transition-all duration-200 rounded-lg hover:bg-slate-50"
+                >
+                  <span className="material-symbols-outlined">chat_bubble</span>
+                  <span>{commentCount}</span>
+                </button>
+                <button
+                  className="flex-1 flex items-center justify-center gap-1 py-2 text-slate-600 hover:text-emerald-500 transition-all duration-200 rounded-lg hover:bg-slate-50"
+                  onClick={() => setShowShareModal(true)}
+                >
+                  <span className="material-symbols-outlined">share</span>
+                  <span>{shareCount}</span>
+                </button>
+              </div>
+            )}
+          </div>
+        </>
+      )}
       {/* Modals */}
       {showReport && (
         <ReportPostModal
@@ -274,11 +467,21 @@ const Post = ({
           onClose={() => setShowReport(false)}
         />
       )}
-
-      {showLikeList && likeList.length > 0 && (
+      {showLikeList && (
         <LikeListModal
           postId={id}
           onClose={() => setShowLikeList(false)}
+        />
+      )}
+      {showShareModal && (
+        <SharePostModal
+          isOpen={showShareModal}
+          onClose={() => setShowShareModal(false)}
+          post={{ id, name, content, images }}
+          onShared={() => {
+            setShowShareModal(false);
+            setShareCount(shareCount + 1);
+          }}
         />
       )}
     </div>

@@ -1,5 +1,7 @@
 export function formatDate(dateString: string | Date): string {
+  if (!dateString) return '';
   const date = typeof dateString === 'string' ? new Date(dateString) : dateString;
+  if (!date || isNaN(date.getTime())) return '';
   
   // Chuyển đổi sang múi giờ Việt Nam (UTC+7)
   const vietnamTime = new Date(date.getTime() + (7 * 60 * 60 * 1000));

@@ -14,6 +14,7 @@ import { useUser } from "@/contexts/UserContext";
 import CreatePostModal from "@/components/CreatePostModal";
 import axios from "axios";
 import type { PostType } from '@/types/Post';
+import SkeletonPost from "@/components/SkeletonPost";
 
 interface OpenPostType {
   id: string;
@@ -24,8 +25,10 @@ interface OpenPostType {
   comments: number;
   shares: number;
   images?: string[];
+  avatar_url?: string;
   feeling?: { icon: string; label: string };
   location?: string;
+  shared_post?: any;
 }
 
 // Component Home: Trang chính của ứng dụng mạng xã hội Solace
@@ -166,17 +169,20 @@ export default function Home() {
                   avatar={post.avatar_url || undefined}
                   feeling={post.feeling}
                   location={post.location}
-                  onOpenDetail={() => setOpenPost({
-                    id: post.id,
-                    name: post.first_name && post.last_name ? `${post.first_name} ${post.last_name}` : '',
-                    date: post.created_at || "",
-                    content: post.content,
-                    likes: post.likes || 0,
-                    comments: post.comments || 0,
-                    shares: post.shares || 0,
-                    images: post.images,
-                    feeling: post.feeling,
-                    location: post.location,
+                  shared_post_id={post.shared_post_id}
+                  onOpenDetail={postObj => setOpenPost({
+                    id: postObj.id,
+                    name: postObj.name || `${postObj.first_name || ''} ${postObj.last_name || ''}`.trim(),
+                    date: postObj.date || postObj.created_at || '',
+                    content: postObj.content,
+                    likes: postObj.likes,
+                    comments: postObj.comments,
+                    shares: postObj.shares,
+                    images: postObj.images,
+                    avatar_url: postObj.avatar_url || postObj.avatar,
+                    feeling: postObj.feeling,
+                    location: postObj.location,
+                    shared_post: postObj.shared_post, 
                   })}
                 />
               ))}

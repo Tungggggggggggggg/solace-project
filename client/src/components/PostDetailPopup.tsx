@@ -2,6 +2,9 @@ import React, { useState, useRef, useLayoutEffect } from "react";
 import CommentsSection from './CommentsSection';
 import { useUser } from '../contexts/UserContext';
 import gsap from 'gsap';
+import Image from 'next/image';
+import { formatDate } from '../lib/dateUtils';
+import SkeletonPost from './SkeletonPost';
 
 interface PostDetailPopupProps {
   post: {
@@ -13,6 +16,21 @@ interface PostDetailPopupProps {
     comments: number;
     shares: number;
     images?: string[];
+    avatar_url?: string;
+    shared_name?: string;
+    shared_avatar_url?: string;
+    shared_date?: string;
+    shared_post?: {
+      id: string;
+      name: string;
+      date: string;
+      content: string;
+      likes: number;
+      comments: number;
+      shares: number;
+      images?: string[];
+      avatar_url?: string;
+    };
   };
   onClose: () => void;
   theme?: 'inspiring' | 'reflective';
@@ -73,12 +91,24 @@ const PostDetailPopup = ({ post, onClose, theme = 'inspiring' }: PostDetailPopup
         </button>
         {/* Header */}
         <div className="flex items-center mb-4">
-          <div className="w-12 h-12 rounded-full bg-gray-300 flex items-center justify-center mr-4">
-            <span className="material-symbols-outlined text-gray-500 text-3xl">person</span>
+          <div className="w-12 h-12 rounded-full bg-gray-300 flex items-center justify-center mr-4 overflow-hidden">
+            {post.shared_post ? (
+              post.avatar_url ? (
+                <Image src={post.avatar_url} alt={post.name || 'avatar'} width={48} height={48} className="object-cover w-12 h-12" />
+              ) : (
+                <span className="material-symbols-outlined text-gray-500 text-3xl">person</span>
+              )
+            ) : (
+              post.avatar_url ? (
+                <Image src={post.avatar_url} alt={post.name || 'avatar'} width={48} height={48} className="object-cover w-12 h-12" />
+              ) : (
+                <span className="material-symbols-outlined text-gray-500 text-3xl">person</span>
+              )
+            )}
           </div>
           <div>
             <h3 className="text-black font-bold text-lg font-[Inter]">{post.name}</h3>
-            <p className="text-gray-500 text-sm font-[Inter]">{post.date}</p>
+            <p className="text-gray-500 text-sm font-[Inter]">{formatDate(post.date)}</p>
           </div>
         </div>
         {/* Nội dung & ảnh */}
@@ -101,6 +131,32 @@ const PostDetailPopup = ({ post, onClose, theme = 'inspiring' }: PostDetailPopup
                     className={`w-16 h-16 object-cover rounded-lg border-2 cursor-pointer ${selectedImg === idx ? 'border-blue-500' : 'border-transparent'}`}
                     onClick={() => setSelectedImg(idx)}
                   />
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+        {/* Nếu là post share, hiển thị div bài gốc bên trong detail */}
+        {typeof post.shared_post !== 'undefined' && post.shared_post === null ? (
+          <SkeletonPost />
+        ) : post.shared_post && (
+          <div className="shared-root-post bg-gray-50 border rounded-lg p-4 mb-4">
+            <div className="flex items-center gap-2 mb-2">
+              {post.shared_post.avatar_url ? (
+                <Image src={post.shared_post.avatar_url} alt={post.shared_post.name || 'avatar'} width={32} height={32} className="w-8 h-8 rounded-full object-cover" />
+              ) : (
+                <span className="material-symbols-outlined text-slate-400">person</span>
+              )}
+              <span className="font-semibold">{post.shared_post.name}</span>
+              <span className="text-gray-500 text-xs">{formatDate(post.shared_post.date)}</span>
+            </div>
+            <div className="mb-2 text-slate-900 whitespace-pre-wrap">{post.shared_post.content}</div>
+            {post.shared_post.images && post.shared_post.images.length > 0 && (
+              <div className={`grid ${post.shared_post.images.length > 1 ? 'grid-cols-2' : 'grid-cols-1'} gap-2 mb-2`}>
+                {post.shared_post.images.map((img, idx) => (
+                  <div key={idx} className="aspect-video bg-slate-100 rounded-xl flex items-center justify-center">
+                    <Image src={img} alt={`post-img-${idx}`} width={500} height={300} className="object-cover w-full h-full rounded-xl" />
+                  </div>
                 ))}
               </div>
             )}

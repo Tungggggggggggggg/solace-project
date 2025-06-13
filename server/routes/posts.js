@@ -47,7 +47,7 @@ router.post('/', async (req, res) => {
       return res.status(400).json({ error: 'Missing or invalid request body' });
     }
     console.log('Creating post:', req.body);
-    const { content, privacy, user_id, images = [], feeling, location, type_post } = req.body;
+    const { content, privacy, user_id, images = [], feeling, location, type_post, shared_post_id } = req.body;
     if (!content || !privacy || !user_id) {
       return res.status(400).json({ error: 'Thiếu trường bắt buộc: content, privacy, user_id' });
     }
@@ -78,21 +78,41 @@ router.post('/', async (req, res) => {
     const allowedTypes = ['positive', 'negative'];
     const safeTypePost = allowedTypes.includes(type_post) ? type_post : 'positive';
 
-    const insertQuery = `
-      INSERT INTO posts (user_id, content, images, access_modifier, type_post, created_at, feeling, location)
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-      RETURNING *;
-    `;
-    const values = [
-      user_id,
-      content,
-      imagesStr,
-      privacy,
-      safeTypePost,
-      new Date().toISOString(),
-      feelingStr,
-      location || null
-    ];
+    let insertQuery, values;
+    if (shared_post_id) {
+      insertQuery = `
+        INSERT INTO posts (user_id, content, images, access_modifier, type_post, created_at, feeling, location, shared_post_id)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+        RETURNING *;
+      `;
+      values = [
+        user_id,
+        content,
+        imagesStr,
+        privacy,
+        safeTypePost,
+        new Date().toISOString(),
+        feelingStr,
+        location || null,
+        shared_post_id
+      ];
+    } else {
+      insertQuery = `
+        INSERT INTO posts (user_id, content, images, access_modifier, type_post, created_at, feeling, location)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+        RETURNING *;
+      `;
+      values = [
+        user_id,
+        content,
+        imagesStr,
+        privacy,
+        safeTypePost,
+        new Date().toISOString(),
+        feelingStr,
+        location || null
+      ];
+    }
     const { rows } = await pool.query(insertQuery, values);
     const post = rows[0];
 
@@ -186,7 +206,9 @@ const { isAuthenticated } = require('../middlewares/auth.middleware');
 router.get('/user/:userId', isAuthenticated, async (req, res) => {
   try {
     const { userId } = req.params;
-    const { offset = 0, limit = 10, filter } = req.query;
+    const offset = parseInt(req.query.offset, 10) || 0;
+    const limit = parseInt(req.query.limit, 10) || 10;
+    const { filter } = req.query;
     const authenticatedUserId = req.user?.id;
 
     // Nếu là chủ tài khoản thì xem được tất cả bài, còn lại chỉ xem bài đã duyệt
