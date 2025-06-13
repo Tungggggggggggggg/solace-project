@@ -85,8 +85,10 @@ const Post = ({
   location, 
   onOpenDetail, 
   hideActions, 
-  shared_post_id 
-}: PostProps & { shared_post_id?: string }) => {
+  shared_post_id,
+  onPostCreated,
+  theme
+}: PostProps & { shared_post_id?: string, onPostCreated?: (post: any) => void }) => {
   const [showReport, setShowReport] = useState(false);
   const { user: currentUser } = useUser();
   const reporterId = currentUser?.id || '';
@@ -478,10 +480,12 @@ const Post = ({
           isOpen={showShareModal}
           onClose={() => setShowShareModal(false)}
           post={{ id, name, content, images }}
-          onShared={() => {
+          onShared={(newPost) => {
             setShowShareModal(false);
             setShareCount(shareCount + 1);
+            if (onPostCreated) onPostCreated(newPost);
           }}
+          typePost={theme === 'reflective' ? 'negative' : 'positive'}
         />
       )}
     </div>

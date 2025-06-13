@@ -292,6 +292,23 @@ router.get('/user/:userId/count', isAuthenticated, async (req, res) => {
   }
 });
 
+router.post('/increment-shares', async (req, res) => {
+  const { postId } = req.body;
+  if (!postId) {
+    return res.status(400).json({ error: 'Thiếu postId' });
+  }
+  try {
+    await pool.query(
+      'UPDATE posts SET shares = COALESCE(shares, 0) + 1 WHERE id = $1',
+      [postId]
+    );
+    res.json({ success: true });
+  } catch (err) {
+    console.error('Error incrementing shares:', err);
+    res.status(500).json({ error: 'Không tăng được số lượt chia sẻ' });
+  }
+});
+
 module.exports = router;
 
 // Ví dụ trong CreatePostModal hoặc nơi gọi API đăng bài

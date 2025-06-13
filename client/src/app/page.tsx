@@ -184,6 +184,7 @@ export default function Home() {
                     location: postObj.location,
                     shared_post: postObj.shared_post, 
                   })}
+                  onPostCreated={handlePostCreated}
                 />
               ))}
             </div>

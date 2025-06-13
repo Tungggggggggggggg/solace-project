@@ -17,10 +17,11 @@ interface SharePostModalProps {
   isOpen: boolean;
   onClose: () => void;
   post: PostContent;
-  onShared: () => void;
+  onShared: (newPost: any) => void;
+  typePost: 'positive' | 'negative';
 }
 
-const SharePostModal: React.FC<SharePostModalProps> = ({ isOpen, onClose, post, onShared }) => {
+const SharePostModal: React.FC<SharePostModalProps> = ({ isOpen, onClose, post, onShared, typePost }) => {
   const [shareText, setShareText] = useState('');
   const { user } = useContext(UserContext);
 
@@ -33,12 +34,12 @@ const SharePostModal: React.FC<SharePostModalProps> = ({ isOpen, onClose, post, 
     }
 
     try {
-      await axios.post('/api/posts', {
+      const res = await axios.post('/api/posts', {
         user_id: user.id,
         content: shareText || `Đã chia sẻ một bài viết từ ${post.name}`,
         shared_post_id: post.id,
         privacy: 'public',
-        type_post: 'positive',
+        type_post: typePost,
         images: null,
         feeling: null,
         location: null,
@@ -53,7 +54,7 @@ const SharePostModal: React.FC<SharePostModalProps> = ({ isOpen, onClose, post, 
       });
 
       toast.success('Bài viết đã được chia sẻ thành công!');
-      onShared();
+      onShared(res.data);
     } catch (error) {
       console.error('Lỗi khi chia sẻ bài viết:', error);
       toast.error('Có lỗi xảy ra khi chia sẻ bài viết. Vui lòng thử lại!');
