@@ -38,6 +38,7 @@ export default function ReportsPage(): ReactElement {
   const [dropdownPos, setDropdownPos] = useState({ top: 0, left: 0 });
   const [selectedReport, setSelectedReport] = useState<Report | null>(null);
   const [reportedPost, setReportedPost] = useState<ReportedPost | null>(null);
+  const [sharedPost, setSharedPost] = useState<ReportedPost | null>(null);
   const [showMailDialog, setShowMailDialog] = useState(false);
   const [mailTarget, setMailTarget] = useState<'reporter' | 'reported'>('reporter');
   const [mailTitle, setMailTitle] = useState('');
@@ -45,6 +46,7 @@ export default function ReportsPage(): ReactElement {
   const [mailType, setMailType] = useState('system');
   const [mailUserId, setMailUserId] = useState<string | null>(null);
   const [mailReport, setMailReport] = useState<Report | null>(null);
+  const [deleteReportId, setDeleteReportId] = useState<string | null>(null);
 
 
   // Lấy danh sách báo cáo từ API dựa vào trạng thái và từ khóa tìm kiếm
@@ -78,10 +80,15 @@ export default function ReportsPage(): ReactElement {
   };
 
   // Xóa báo cáo
-  const handleDelete = async (id: string) => {
-    if (window.confirm('Bạn có chắc chắn muốn xóa báo cáo này?')) {
-      await fetch(`/api/reports/${id}`, { method: 'DELETE' });
+  const handleDelete = (id: string) => {
+    setDeleteReportId(id); // Mở modal xác nhận
+  };
+
+  const confirmDelete = async () => {
+    if (deleteReportId) {
+      await fetch(`/api/reports/${deleteReportId}`, { method: 'DELETE' });
       toast.success('Đã xóa báo cáo!');
+      setDeleteReportId(null);
       fetchReports();
     }
   };
@@ -93,6 +100,7 @@ export default function ReportsPage(): ReactElement {
     if (result.success) {
       setSelectedReport(result.report);
       setReportedPost(result.post);
+      setSharedPost(result.shared_post || null); // <-- thêm dòng này
     } else {
       toast.error(result.error || 'Không lấy được chi tiết báo cáo');
     }
@@ -377,7 +385,8 @@ export default function ReportsPage(): ReactElement {
             {reportedPost && (
               <div className="mb-4">
                 <h4 className="font-semibold text-gray-700 mb-2">Bài đăng bị báo cáo</h4>
-                <div className="bg-white rounded-xl shadow border p-4 flex flex-col gap-4">
+                <div className="bg-white rounded-xl shadow border p-4 flex flex-col gap-2">
+                  {/* Header: Avatar, tên, trạng thái share, thời gian */}
                   <div className="flex items-center gap-3">
                     {reportedPost.avatar_url && (
                       <Image
@@ -392,6 +401,12 @@ export default function ReportsPage(): ReactElement {
                       <div className="font-semibold text-gray-900">
                         {(reportedPost.first_name || '') + ' ' + (reportedPost.last_name || '')}
                       </div>
+                      {/* Nếu là bài share thì hiển thị trạng thái chia sẻ */}
+                      {sharedPost && (
+                        <div className="text-xs text-gray-500">
+                          đã chia sẻ bài viết của {(sharedPost.first_name || '') + ' ' + (sharedPost.last_name || '')}
+                        </div>
+                      )}
                       <div className="text-xs text-gray-500">
                         {reportedPost.created_at
                           ? new Date(reportedPost.created_at).toLocaleString('vi-VN')
@@ -399,7 +414,9 @@ export default function ReportsPage(): ReactElement {
                       </div>
                     </div>
                   </div>
+                  {/* Nội dung bài chia sẻ */}
                   <div className="text-gray-800 whitespace-pre-line">{reportedPost.content}</div>
+                  {/* Ảnh bài chia sẻ nếu có */}
                   {reportedPost.images && (() => {
                     let imgs: string[] = [];
                     try {
@@ -415,15 +432,64 @@ export default function ReportsPage(): ReactElement {
                             width={128}
                             height={128}
                             className="w-32 h-32 object-cover rounded border"
-                            unoptimized // Nếu ảnh là link ngoài, có thể bỏ dòng này nếu đã cấu hình domains cho next/image
+                            unoptimized
                           />
                         ))}
                       </div>
                     ) : null;
                   })()}
+                  {/* Nếu là bài share thì hiển thị bài gốc trong khung bo viền */}
+                  {sharedPost && (
+                    <div className="border rounded-lg bg-gray-50 p-3 mt-2">
+                      <div className="flex items-center gap-3 mb-1">
+                        {sharedPost.avatar_url && (
+                          <Image
+                            src={sharedPost.avatar_url}
+                            alt="avatar"
+                            width={32}
+                            height={32}
+                            className="w-8 h-8 rounded-full object-cover border"
+                          />
+                        )}
+                        <div>
+                          <div className="font-semibold text-gray-900 text-sm">
+                            {(sharedPost.first_name || '') + ' ' + (sharedPost.last_name || '')}
+                          </div>
+                          <div className="text-xs text-gray-500">
+                            {sharedPost.created_at
+                              ? new Date(sharedPost.created_at).toLocaleString('vi-VN')
+                              : ''}
+                          </div>
+                        </div>
+                      </div>
+                      <div className="text-gray-800 text-sm whitespace-pre-line">{sharedPost.content}</div>
+                      {sharedPost.images && (() => {
+                        let imgs: string[] = [];
+                        try {
+                          imgs = JSON.parse(sharedPost.images);
+                        } catch {}
+                        return Array.isArray(imgs) && imgs.length > 0 ? (
+                          <div className="flex flex-wrap gap-2 mt-2">
+                            {imgs.map((img, idx) => (
+                              <Image
+                                key={idx}
+                                src={img}
+                                alt={`Ảnh ${idx + 1}`}
+                                width={96}
+                                height={96}
+                                className="w-24 h-24 object-cover rounded border"
+                                unoptimized
+                              />
+                            ))}
+                          </div>
+                        ) : null;
+                      })()}
+                    </div>
+                  )}
                 </div>
               </div>
             )}
+            
             <div className="mb-4">
               <h4 className="font-semibold text-gray-700 mb-2">Nội dung báo cáo</h4>
               <div className="bg-gray-100 rounded-lg p-4 text-gray-800">
@@ -444,6 +510,28 @@ export default function ReportsPage(): ReactElement {
                 onClick={() => setSelectedReport(null)}
               >
                 Đóng
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {deleteReportId && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-[9999]" onClick={() => setDeleteReportId(null)}>
+          <div className="bg-white rounded-2xl shadow-xl p-6 max-w-sm w-full" onClick={e => e.stopPropagation()}>
+            <h2 className="text-lg font-bold mb-4 text-center">Xác nhận xóa</h2>
+            <p className="mb-6 text-center">Bạn có chắc chắn muốn xóa báo cáo này?</p>
+            <div className="flex justify-end gap-2">
+              <button
+                className="px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600"
+                onClick={confirmDelete}
+              >
+                Xóa
+              </button>
+              <button
+                className="px-4 py-2 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300"
+                onClick={() => setDeleteReportId(null)}
+              >
+                Hủy
               </button>
             </div>
           </div>

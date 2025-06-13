@@ -142,8 +142,8 @@ router.get('/:id', async (req, res) => {
         r.reason,
         r.description,
         r.status,
-        r.reporter_id,         -- Thêm dòng này
-        r.reported_user_id,    -- Thêm dòng này
+        r.reporter_id,
+        r.reported_user_id,
         u1.first_name AS reporter_first_name,
         u1.last_name AS reporter_last_name,
         u2.first_name AS reported_first_name,
@@ -168,6 +168,18 @@ router.get('/:id', async (req, res) => {
     );
     const post = postRes.rows[0] || null;
 
+    // Nếu là bài share, lấy thêm bài gốc
+    let shared_post = null;
+    if (post && post.shared_post_id) {
+      const sharedRes = await pool.query(
+        `SELECT p.*, u.first_name, u.last_name, u.avatar_url
+         FROM posts p
+         JOIN users u ON p.user_id = u.id
+         WHERE p.id = $1`, [post.shared_post_id]
+      );
+      shared_post = sharedRes.rows[0] || null;
+    }
+
     res.json({
       success: true,
       report: {
@@ -179,6 +191,7 @@ router.get('/:id', async (req, res) => {
         content: report.reason + (report.description ? `: ${report.description}` : ''),
       },
       post,
+      shared_post, // <-- trả về bài gốc nếu có
     });
   } catch (err) {
     res.status(500).json({ error: 'Lỗi server', detail: err.message });

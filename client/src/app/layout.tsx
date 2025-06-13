@@ -4,7 +4,6 @@ import { Be_Vietnam_Pro } from "next/font/google";
 import "./globals.css";
 import { UserContextProvider } from "@/contexts/UserContext";
 import VisitTracker from '@/components/VisitTracker'; 
-import { ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import { ForbiddenWordsProvider } from "@/contexts/ForbiddenWordsContext";
 

@@ -64,12 +64,15 @@ export default function UserManagementPage(): ReactElement {
 
   useEffect(() => {
     fetchUsers();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedStatus]);
 
   useEffect(() => {
     if (searchText.trim() === '') {
       fetchUsers();
+      
     }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchText]);
   
 

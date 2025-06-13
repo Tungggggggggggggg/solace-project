@@ -21,6 +21,7 @@ export default function SettingPage(): ReactElement {
   const [showAddModal, setShowAddModal] = useState(false);
   const [newWord, setNewWord] = useState('');
   const [adding, setAdding] = useState(false);
+  const [deleteWordId, setDeleteWordId] = useState<string | null>(null);
 
   const fetchWords = async () => {
     const params = new URLSearchParams();
@@ -42,9 +43,14 @@ export default function SettingPage(): ReactElement {
   }, [search]);
 
   const handleDelete = async (id: string) => {
-    if (window.confirm('Bạn có chắc chắn muốn xóa từ cấm này?')) {
-      await fetch(`/api/forbidden_words/${id}`, { method: 'DELETE' });
+    setDeleteWordId(id); // Mở modal xác nhận
+  };
+
+  const confirmDelete = async () => {
+    if (deleteWordId) {
+      await fetch(`/api/forbidden_words/${deleteWordId}`, { method: 'DELETE' });
       toast.success('Đã xóa từ cấm!');
+      setDeleteWordId(null);
       fetchWords();
     }
   };
@@ -207,6 +213,30 @@ export default function SettingPage(): ReactElement {
                 className="px-4 py-2 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300"
                 onClick={() => setShowAddModal(false)}
                 disabled={adding}
+              >
+                Hủy
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal xác nhận xóa */}
+      {deleteWordId && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-[9999]" onClick={() => setDeleteWordId(null)}>
+          <div className="bg-white rounded-2xl shadow-xl p-6 max-w-sm w-full" onClick={e => e.stopPropagation()}>
+            <h2 className="text-lg font-bold mb-4 text-center">Xác nhận xóa</h2>
+            <p className="mb-6 text-center">Bạn có chắc chắn muốn xóa từ cấm này?</p>
+            <div className="flex justify-end gap-2">
+              <button
+                className="px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600"
+                onClick={confirmDelete}
+              >
+                Xóa
+              </button>
+              <button
+                className="px-4 py-2 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300"
+                onClick={() => setDeleteWordId(null)}
               >
                 Hủy
               </button>

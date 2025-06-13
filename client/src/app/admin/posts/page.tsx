@@ -45,10 +45,12 @@ export default function PostManagementPage() {
 
   useEffect(() => {
     fetchPosts();
+      // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [type, status]);
 
   useEffect(() => {
     if (search.trim() === '') fetchPosts();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [search]);
 
   const handleApprove = async (id: string) => {
