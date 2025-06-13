@@ -297,17 +297,27 @@ const Post = ({
         }} style={{ cursor: 'pointer' }}>
           {/* Người share */}
           <div className="flex items-start gap-3 mb-2 relative">
-            <div className="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center overflow-hidden">
+            <Link
+              href={userId === currentUser?.id ? '/profile' : `/profile/${userId}`}
+              className="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center overflow-hidden group hover:ring-2 hover:ring-indigo-600 hover:ring-offset-2 transition-all"
+              onClick={e => e.stopPropagation()}
+            >
               {avatar ? (
                 <img src={avatar} alt={name} width={40} height={40} className="object-cover w-10 h-10" />
               ) : (
                 <span className="material-symbols-outlined text-slate-400">person</span>
               )}
-            </div>
+            </Link>
             <div className="flex-grow">
-              <span className="font-medium text-slate-900 block">{name}</span>
+              <Link
+                href={userId === currentUser?.id ? '/profile' : `/profile/${userId}`}
+                className="font-medium text-slate-900 block hover:text-indigo-600 transition-colors"
+                onClick={e => e.stopPropagation()}
+              >
+                {name}
+              </Link>
               <span className="text-gray-500 text-sm block">
-                đã chia sẻ bài viết của <span className="font-semibold">{sharedPost.first_name} {sharedPost.last_name}</span>
+                đã chia sẻ bài viết của <Link href={sharedPost.user_id === currentUser?.id ? '/profile' : `/profile/${sharedPost.user_id}`} className="font-semibold hover:text-indigo-600 transition-colors" onClick={e => e.stopPropagation()}>{sharedPost.first_name} {sharedPost.last_name}</Link>
               </span>
               <span className="text-sm text-slate-500 block">{formatDate(date)}</span>
             </div>
@@ -326,8 +336,12 @@ const Post = ({
             onClick={handleOpenDetailRootPost}
           >
             <div className="flex items-center gap-2 mb-2">
-              <img src={sharedPost.avatar_url || '/images/default-avatar.png'} alt={sharedPost.first_name ? `${sharedPost.first_name} ${sharedPost.last_name}` : 'avatar'} className="w-8 h-8 rounded-full object-cover" />
-              <span className="font-semibold">{sharedPost.first_name} {sharedPost.last_name}</span>
+              <Link href={sharedPost.user_id === currentUser?.id ? '/profile' : `/profile/${sharedPost.user_id}`} className="w-8 h-8 rounded-full overflow-hidden flex items-center justify-center hover:ring-2 hover:ring-indigo-600 transition-all" onClick={e => e.stopPropagation()}>
+                <img src={sharedPost.avatar_url || '/images/default-avatar.png'} alt={sharedPost.first_name ? `${sharedPost.first_name} ${sharedPost.last_name}` : 'avatar'} className="w-8 h-8 rounded-full object-cover" />
+              </Link>
+              <Link href={sharedPost.user_id === currentUser?.id ? '/profile' : `/profile/${sharedPost.user_id}`} className="font-semibold hover:text-indigo-600 transition-colors" onClick={e => e.stopPropagation()}>
+                {sharedPost.first_name} {sharedPost.last_name}
+              </Link>
               <span className="text-gray-500 text-xs">{formatDate(sharedPost.created_at)}</span>
             </div>
             <div className="mb-2 text-slate-900 whitespace-pre-wrap">{sharedPost.content}</div>

@@ -8,6 +8,7 @@ import gsap from 'gsap';
 import Post from '@/components/Post';
 import axios from 'axios';
 import FollowListModal from '@/components/FollowListModal';
+import { useClickAway } from 'react-use';
 
 interface Tab {
   id: string;
@@ -84,7 +85,7 @@ const useAPI = () => {
 export default function UserProfilePage({ params }: { params: Promise<{ id: string }> }) {
   const unwrappedParams = useUnwrap(params);
   const { apiCall } = useAPI();
-  const { user: currentUser } = useContext(UserContext);
+  const { user: currentUser, accessToken } = useContext(UserContext);
   const [activeTab, setActiveTab] = useState<string>('posts');
   const [userPosts, setUserPosts] = useState<PostType[]>([]);
   const [loading, setLoading] = useState(true);
@@ -99,20 +100,26 @@ export default function UserProfilePage({ params }: { params: Promise<{ id: stri
   const [showFollowList, setShowFollowList] = useState<'followers' | 'following' | null>(null);
   const [isFollowing, setIsFollowing] = useState(false);
   const [totalPosts, setTotalPosts] = useState<number | null>(null);
+  const [openFollowMenu, setOpenFollowMenu] = useState(false);
+  const [confirmUnfollow, setConfirmUnfollow] = useState(false);
 
   const profileRef = useRef<HTMLDivElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
+  const followMenuRef = useRef<HTMLDivElement>(null);
+  useClickAway(followMenuRef, () => setOpenFollowMenu(false));
 
   // Fetch user profile
   useEffect(() => {
     const fetchUser = async () => {
       try {
         setLoading(true);
+        // Gọi API lấy profile user và follow-stats, truyền accessToken để backend xác thực user hiện tại
         const [userResponse, followStats] = await Promise.all([
           apiCall(`/api/users/${unwrappedParams.id}`),
-          apiCall(`/api/users/${unwrappedParams.id}/follow-stats`)
+          apiCall(`/api/users/${unwrappedParams.id}/follow-stats`, {
+            headers: { Authorization: `Bearer ${accessToken || ''}` }
+          })
         ]);
-
         setProfileUser(userResponse);
         setFollowersCount(followStats.followers_count);
         setFollowingCount(followStats.following_count);
@@ -135,11 +142,10 @@ export default function UserProfilePage({ params }: { params: Promise<{ id: stri
         setLoading(false);
       }
     };
-
-    if (unwrappedParams.id) {
+    if (unwrappedParams.id && accessToken) {
       fetchUser();
     }
-  }, [unwrappedParams.id]);
+  }, [unwrappedParams.id, accessToken]);
 
   // Tính toán tổng số media từ tất cả bài viết
   useEffect(() => {
@@ -310,17 +316,36 @@ export default function UserProfilePage({ params }: { params: Promise<{ id: stri
   }, [activeTab, unwrappedParams.id]);
 
   // Hàm xử lý follow/unfollow
-  const handleFollowToggle = async () => {
-    if (!profileUser) return;
+  const handleFollow = async () => {
+    if (!profileUser || !accessToken) return;
     setLoading(true);
     try {
-      const endpoint = `/api/users/${profileUser.id}/follow`;
-      const method = isFollowing ? 'DELETE' : 'POST';
-      await apiCall(endpoint, { method });
-      setIsFollowing((prev) => !prev);
-      setFollowersCount((prev) => prev + (isFollowing ? -1 : 1));
+      await apiCall(`/api/users/${profileUser.id}/follow`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${accessToken}` }
+      });
+      setIsFollowing(true);
+      setFollowersCount((prev) => prev + 1);
     } catch (error) {
-      console.error('Error toggling follow:', error);
+      console.error('Error following:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleUnfollow = async () => {
+    if (!profileUser || !accessToken) return;
+    setLoading(true);
+    setConfirmUnfollow(false);
+    try {
+      await apiCall(`/api/users/${profileUser.id}/follow`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${accessToken}` }
+      });
+      setIsFollowing(false);
+      setFollowersCount((prev) => prev - 1);
+    } catch (error) {
+      console.error('Error unfollowing:', error);
     } finally {
       setLoading(false);
     }
@@ -388,30 +413,64 @@ export default function UserProfilePage({ params }: { params: Promise<{ id: stri
                 </div>
                 {/* Nút Follow/Unfollow */}
                 {currentUser?.id !== unwrappedParams.id && (
-                  <button
-                    className={`px-4 py-2 rounded-full font-medium flex items-center gap-2 text-sm shadow transition-all duration-200
-                      ${isFollowing ? 'bg-gradient-to-r from-green-400 to-blue-500 text-white' : 'bg-indigo-50 text-indigo-600 hover:bg-indigo-100'}
-                    `}
-                    onClick={async () => {
-                      await handleFollowToggle();
-                    }}
-                    disabled={loading}
-                    onMouseEnter={e => {
-                      if (isFollowing) {
-                        gsap.to(e.currentTarget, { scale: 1.05, background: 'linear-gradient(90deg,#f43f5e,#6366f1)', duration: 0.2 });
-                      } else {
-                        gsap.to(e.currentTarget, { scale: 1.05, background: '#e0e7ff', duration: 0.2 });
-                      }
-                    }}
-                    onMouseLeave={e => {
-                      gsap.to(e.currentTarget, { scale: 1, background: isFollowing ? 'linear-gradient(90deg,#34d399,#3b82f6)' : '#f1f5f9', duration: 0.2 });
-                    }}
-                  >
-                    <span className="material-symbols-outlined text-[20px]">
-                      {isFollowing ? 'check' : 'person_add'}
-                    </span>
-                    {isFollowing ? 'Đang theo dõi' : 'Theo dõi'}
-                  </button>
+                  isFollowing ? (
+                    <div className="relative" ref={followMenuRef}>
+                      <button
+                        className="px-4 py-2 rounded-full font-medium flex items-center gap-2 text-sm shadow transition-all duration-200 bg-gradient-to-r from-green-400 to-blue-500 text-white"
+                        onClick={() => setOpenFollowMenu((v) => !v)}
+                        disabled={loading}
+                        aria-label="Đang theo dõi, mở menu"
+                      >
+                        <span className="material-symbols-outlined text-[20px]">check</span>
+                        Đang theo dõi
+                        <span className="material-symbols-outlined text-[18px] ml-1">expand_more</span>
+                      </button>
+                      {openFollowMenu && (
+                        <div className="absolute right-0 top-12 z-10 bg-white border rounded-xl shadow-lg min-w-[180px] animate-fadeIn">
+                          <button
+                            className="w-full text-left px-4 py-2 text-red-600 hover:bg-red-50 rounded-t-xl flex items-center gap-2"
+                            onClick={() => { setConfirmUnfollow(true); setOpenFollowMenu(false); }}
+                          >
+                            <span className="material-symbols-outlined text-base">person_remove</span>
+                            Hủy theo dõi
+                          </button>
+                        </div>
+                      )}
+                      {/* Modal xác nhận hủy theo dõi */}
+                      {confirmUnfollow && (
+                        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30" onClick={() => setConfirmUnfollow(false)}>
+                          <div className="bg-white rounded-xl shadow-xl p-6 w-full max-w-xs text-center animate-fadeIn" onClick={e => e.stopPropagation()}>
+                            <div className="mb-4">
+                              <span className="material-symbols-outlined text-4xl text-red-500 mb-2">person_remove</span>
+                              <h4 className="font-semibold text-lg mb-2">Hủy theo dõi {profileUser.first_name} {profileUser.last_name}?</h4>
+                              <p className="text-slate-500 text-sm">Bạn sẽ không nhận được cập nhật từ người này nữa.</p>
+                            </div>
+                            <div className="flex gap-2 mt-4">
+                              <button
+                                className="flex-1 px-4 py-2 rounded-full bg-slate-100 text-slate-600 hover:bg-slate-200"
+                                onClick={() => setConfirmUnfollow(false)}
+                              >Hủy</button>
+                              <button
+                                className="flex-1 px-4 py-2 rounded-full bg-red-500 text-white hover:bg-red-600"
+                                onClick={handleUnfollow}
+                                disabled={loading}
+                              >{loading ? 'Đang xử lý...' : 'Xác nhận'}</button>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    <button
+                      className="px-4 py-2 rounded-full font-medium flex items-center gap-2 text-sm shadow transition-all duration-200 bg-indigo-50 text-indigo-600 hover:bg-indigo-100"
+                      onClick={handleFollow}
+                      disabled={loading}
+                      aria-label="Theo dõi"
+                    >
+                      <span className="material-symbols-outlined text-[20px]">person_add</span>
+                      {loading ? 'Đang xử lý...' : 'Theo dõi'}
+                    </button>
+                  )
                 )}
               </div>
               <div className="mt-6">

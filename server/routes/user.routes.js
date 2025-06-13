@@ -86,7 +86,7 @@ router.put('/:id', async (req, res) => {
 });
 
 // Lấy thông tin follow của user
-router.get('/:id/follow-stats', async (req, res) => {
+router.get('/:id/follow-stats', isAuthenticated, async (req, res) => {
   const { id } = req.params;
   try {
     const result = await pool.query(`
@@ -112,7 +112,7 @@ router.get('/:id/follow-stats', async (req, res) => {
 });
 
 // Lấy danh sách người theo dõi
-router.get('/:id/followers', async (req, res) => {
+router.get('/:id/followers', isAuthenticated, async (req, res) => {
   const { id } = req.params;
   try {
     const result = await pool.query(`
@@ -136,7 +136,7 @@ router.get('/:id/followers', async (req, res) => {
 });
 
 // Lấy danh sách đang theo dõi
-router.get('/:id/following', async (req, res) => {
+router.get('/:id/following', isAuthenticated, async (req, res) => {
   const { id } = req.params;
   try {
     const result = await pool.query(`

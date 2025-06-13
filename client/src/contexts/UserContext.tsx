@@ -91,45 +91,49 @@ export function UserContextProvider({ children }: { children: ReactNode }) {
   };
 
   const setCurrentConversationId = (id: string | null) => {
-  setCurrentConversationIdState(id);
-  if (id) {
-    sessionStorage.setItem('currentConversationId', id);
-  } else {
-    sessionStorage.removeItem('currentConversationId');
-  }
-};
+    setCurrentConversationIdState(id);
+    if (id) {
+      sessionStorage.setItem('currentConversationId', id);
+    } else {
+      sessionStorage.removeItem('currentConversationId');
+    }
+  };
 
   useEffect(() => {
     const initialize = async () => {
       let storedToken = sessionStorage.getItem("accessToken");
-      let storedCurrentConversationId = sessionStorage.getItem("currentConversationId")
+      let storedUser = sessionStorage.getItem("user");
+      let storedCurrentConversationId = sessionStorage.getItem("currentConversationId");
+      if (storedUser) {
+        try {
+          const parsedUser = JSON.parse(storedUser);
+          setUser(parsedUser);
+        } catch {}
+      }
       if (storedToken) {
+        setAccessToken(storedToken);
         try {
           const decoded: { exp: number } = jwtDecode(storedToken);
           const now = Date.now() / 1000;
           if (decoded.exp > now) {
-            setAccessToken(storedToken);
-            // KHI CÓ TOKEN HỢP LỆ, LẤY THÔNG TIN USER NGAY LẬP TỨC
-            await fetchUser(storedToken);
+            // Nếu đã có user từ storage thì xác thực lại ở background
+            fetchUser(storedToken).then(() => setLoading(false));
+            return;
           } else {
             // Token hết hạn, thử refresh
-            console.log("AccessToken hết hạn, đang thử làm mới...");
             await refreshAccessToken();
           }
         } catch (err) {
-          console.warn("AccessToken không hợp lệ trong sessionStorage, đang thử làm mới hoặc yêu cầu đăng nhập.");
           await refreshAccessToken(); // auto-refresh
         }
       } else {
         await refreshAccessToken();
       }
-
-      if(storedCurrentConversationId) {
+      if (storedCurrentConversationId) {
         setCurrentConversationId(storedCurrentConversationId);
       }
       setLoading(false); // Đặt loading thành false sau khi hoàn tất kiểm tra và fetch
     };
-
     initialize();
   }, []); // Chỉ chạy một lần khi component mount
 
@@ -212,6 +216,7 @@ export function UserContextProvider({ children }: { children: ReactNode }) {
     setUser(userData);
     setAccessToken(token);
     sessionStorage.setItem("accessToken", token);
+    sessionStorage.setItem("user", JSON.stringify(userData));
   };
 
   const logout = async (reason?: string) => {
@@ -226,12 +231,11 @@ export function UserContextProvider({ children }: { children: ReactNode }) {
     setUser(null);
     setAccessToken(null);
     sessionStorage.removeItem("accessToken");
+    sessionStorage.removeItem("user");
     socket.disconnect();
-
     if (reason) {
       alert(reason); // Hoặc thay bằng modal
     }
-
     router.push('/');
   };
 

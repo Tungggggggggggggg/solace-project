@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useContext, useEffect, useRef, useState, useCallback } from 'react';
+import { useContext, useEffect, useRef, useState, useCallback } from 'react';
 import MainLayout from '@/components/MainLayout';
 import Image from 'next/image';
 import { UserContext } from '@/contexts/UserContext';
@@ -8,6 +8,7 @@ import gsap from 'gsap';
 import InputSection from '@/components/InputSection';
 import Post from '@/components/Post';
 import axios from 'axios';
+import FollowListModal from '@/components/FollowListModal';
 
 interface Tab {
   id: string;
@@ -43,148 +44,153 @@ const tabs: Tab[] = [
 
 const POSTS_PER_PAGE = 5;
 
+// Loading skeleton component
+const ProfileSkeleton = () => (
+  <div className="animate-pulse">
+    <div className="w-full h-48 bg-gray-200 dark:bg-gray-700 rounded-lg mb-4"></div>
+    <div className="flex flex-col items-center -mt-20">
+      <div className="w-32 h-32 bg-gray-200 dark:bg-gray-700 rounded-full mb-4"></div>
+      <div className="w-48 h-6 bg-gray-200 dark:bg-gray-700 rounded mb-2"></div>
+      <div className="w-32 h-4 bg-gray-200 dark:bg-gray-700 rounded mb-4"></div>
+      <div className="flex gap-4 mb-4">
+        <div className="w-20 h-8 bg-gray-200 dark:bg-gray-700 rounded"></div>
+        <div className="w-20 h-8 bg-gray-200 dark:bg-gray-700 rounded"></div>
+        <div className="w-20 h-8 bg-gray-200 dark:bg-gray-700 rounded"></div>
+      </div>
+    </div>
+  </div>
+);
+
 export default function ProfilePage() {
-  const { user, accessToken } = useContext(UserContext);
+  const { user, accessToken, loading: userLoading } = useContext(UserContext);
   const [activeTab, setActiveTab] = useState<string>('posts');
-  const [userPosts, setUserPosts] = useState<PostType[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [postsData, setPostsData] = useState<PostType[] | null>(null);
+  const [mediaData, setMediaData] = useState<string[] | null>(null);
+  const [tabFetched, setTabFetched] = useState<{ [key: string]: boolean }>({ posts: false, media: false, about: false });
   const [error, setError] = useState<string | null>(null);
-  const [page, setPage] = useState(0);
-  const [hasMore, setHasMore] = useState(true);
-  const [loadingMore, setLoadingMore] = useState(false);
-  const [userMedia, setUserMedia] = useState<string[]>([]);
   const [totalPosts, setTotalPosts] = useState(0);
   const [totalMedia, setTotalMedia] = useState(0);
+  const [followersCount, setFollowersCount] = useState(0);
+  const [followingCount, setFollowingCount] = useState(0);
+  const [showFollowList, setShowFollowList] = useState<'followers' | 'following' | null>(null);
+  const [followStatsLoading, setFollowStatsLoading] = useState(false);
+  const [isInitialLoad, setIsInitialLoad] = useState(true);
+  const [initialLoading, setInitialLoading] = useState(true);
   const profileRef = useRef<HTMLDivElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
 
-  // Tính toán tổng số media từ tất cả bài viết
-  useEffect(() => {
-    setUserMedia(userPosts.reduce((acc, post) => {
-      if (Array.isArray(post.images)) {
-        return acc.concat(post.images);
-      }
-      return acc;
-    }, [] as string[]));
-  }, [userPosts]);
-
-  // Memoize fetchUserPosts to prevent unnecessary re-renders
-  const fetchUserPosts = useCallback(async (pageIndex: number = 0) => {
-    if (!user?.id) return;
-    
+  // Fetch user posts
+  const fetchUserTabData = useCallback(async (tabId: string, isFirstLoad = false) => {
+    if (!user?.id || !accessToken) return;
     try {
-      const offset = pageIndex * POSTS_PER_PAGE;
-      if (pageIndex > 0) {
-        setLoadingMore(true);
-      } else {
-        setLoading(true);
-      }      const [postsResponse, countResponse] = await Promise.all([
-        axios.get<PostType[]>(`/api/posts/user/${user.id}`, {
-          baseURL: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000',
-          params: {
-            limit: POSTS_PER_PAGE,
-            offset,
-            filter: activeTab === 'media' ? 'media' : undefined
-          },
-          headers: {
-            Authorization: `Bearer ${accessToken}`
-          }
-        }),
-        pageIndex === 0 ? axios.get<{totalPosts: number, totalMedia: number}>(`/api/posts/user/${user.id}/count`, {
-          baseURL: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000',
-          headers: {
-            Authorization: `Bearer ${accessToken}`
-          }
-        }) : Promise.resolve(null)
-      ]);
-
-      const newPosts = postsResponse.data;
-      if (pageIndex === 0) {
-        setUserPosts(newPosts);
-        if (countResponse) {
-          setTotalPosts(countResponse.data.totalPosts);
-          setTotalMedia(countResponse.data.totalMedia);
-        }
-      } else {
-        setUserPosts(prev => [...prev, ...newPosts]);
+      const offset = 0;
+      if (isFirstLoad) setInitialLoading(true);
+      if (tabId === 'posts') {
+        const [postsResponse, countResponse] = await Promise.all([
+          axios.get<PostType[]>(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/posts/user/${user.id}`, {
+            params: { limit: POSTS_PER_PAGE, offset },
+            headers: { Authorization: `Bearer ${accessToken}` }
+          }),
+          axios.get<{totalPosts: number, totalMedia: number}>(
+            `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/posts/user/${user.id}/count`,
+            { headers: { Authorization: `Bearer ${accessToken}` } }
+          )
+        ]);
+        setPostsData(postsResponse.data);
+        setTotalPosts(countResponse.data.totalPosts);
+        setTotalMedia(countResponse.data.totalMedia);
+        setTabFetched(prev => ({ ...prev, posts: true }));
+      } else if (tabId === 'media') {
+        const postsResponse = await axios.get<PostType[]>(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/posts/user/${user.id}`, {
+          params: { limit: 100, offset: 0, filter: 'media' },
+          headers: { Authorization: `Bearer ${accessToken}` }
+        });
+        // Lấy tất cả media từ các post
+        const allMedia = postsResponse.data.reduce((acc, post) => {
+          if (Array.isArray(post.images)) return acc.concat(post.images);
+          return acc;
+        }, [] as string[]);
+        setMediaData(allMedia);
+        setTabFetched(prev => ({ ...prev, media: true }));
       }
-      
-      setHasMore(newPosts.length === POSTS_PER_PAGE);
-      setError(null);
-    } catch (err) {
-      console.error('Error fetching user posts:', err);
-      setError('Could not load posts');
+    } catch {
+      setError('Could not load data');
     } finally {
-      setLoading(false);
-      setLoadingMore(false);
+      setInitialLoading(false);
+      if (isInitialLoad) setIsInitialLoad(false);
     }
-  }, [user?.id, accessToken, activeTab]);
+  }, [user?.id, accessToken, isInitialLoad]);
 
   // Load initial posts
   useEffect(() => {
-    fetchUserPosts(0);
-  }, [fetchUserPosts]);
-
-  // Handle infinite scroll
-  const handleScroll = useCallback(() => {
-    if (
-      window.innerHeight + window.scrollY >= document.documentElement.scrollHeight - 1000 &&
-      !loadingMore &&
-      hasMore &&
-      !loading &&
-      !error
-    ) {
-      setPage(prev => prev + 1);
+    if (!userLoading && user?.id && accessToken) {
+      fetchUserTabData('posts', true);
     }
-  }, [loadingMore, hasMore, loading, error]);
+  }, [fetchUserTabData, user?.id, userLoading, accessToken]);
 
-  useEffect(() => {
-    window.addEventListener('scroll', handleScroll);
-    return () => window.removeEventListener('scroll', handleScroll);
-  }, [handleScroll]);
-
-  // Load more posts when page changes
-  useEffect(() => {
-    if (page > 0) {
-      fetchUserPosts(page);
+  // Fetch follow stats
+  const fetchFollowStats = useCallback(async () => {
+    if (!user?.id || !accessToken) return;
+    
+    setFollowStatsLoading(true);
+    try {
+      const response = await axios.get(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/users/${user.id}/follow-stats`, {
+        headers: { Authorization: `Bearer ${accessToken}` }
+      });
+      setFollowersCount(response.data.followers_count || 0);
+      setFollowingCount(response.data.following_count || 0);
+    } catch (err) {
+      console.error('Error fetching follow stats:', err);
+      setFollowersCount(0);
+      setFollowingCount(0);
+    } finally {
+      setFollowStatsLoading(false);
     }
-  }, [page, fetchUserPosts]);
+  }, [user?.id, accessToken]);
 
-  // Animation effects
   useEffect(() => {
+    if (!userLoading && user?.id && accessToken) {
+      fetchFollowStats();
+    }
+  }, [fetchFollowStats, user?.id, userLoading, accessToken]);
+
+  // Animation effects with conditions
+  useEffect(() => {
+    if (isInitialLoad) return;
+
     const tl = gsap.timeline({
       defaults: { ease: "power3.out" }
     });
 
     if (profileRef.current) {
       tl.from(profileRef.current, {
-        y: 30,
+        y: 20,
         opacity: 0,
-        duration: 0.8
+        duration: 0.5
       });
     }
 
     const statElements = document.querySelectorAll(".stat-item");
     if (statElements.length) {
       tl.from(statElements, {
-        y: 20,
+        y: 10,
         opacity: 0,
-        stagger: 0.1,
-        duration: 0.5
-      }, "-=0.4");
+        stagger: 0.05,
+        duration: 0.3
+      }, "-=0.2");
     }
 
     if (contentRef.current?.children) {
       tl.from(contentRef.current.children, {
-        y: 20,
+        y: 10,
         opacity: 0,
-        stagger: 0.1,
-        duration: 0.5
-      }, "-=0.2");
+        stagger: 0.05,
+        duration: 0.3
+      }, "-=0.1");
     }
-  }, []);
+  }, [isInitialLoad]);
 
-  // Tab change animation
+  // Tab change effect
   useEffect(() => {
     if (contentRef.current?.children) {
       gsap.from(contentRef.current.children, {
@@ -197,14 +203,25 @@ export default function ProfilePage() {
     }
   }, [activeTab]);
 
-  // Reset pagination and fetch posts when tab changes
+  // useEffect khi chuyển tab
   useEffect(() => {
-    setPage(0);
-    setHasMore(true);
-    setUserPosts([]);
-    fetchUserPosts(0);
-  }, [activeTab, fetchUserPosts]);
-  
+    if (!userLoading && user?.id) {
+      if (!tabFetched[activeTab]) {
+        fetchUserTabData(activeTab, false);
+      }
+    }
+  }, [activeTab, fetchUserTabData, user?.id, userLoading, tabFetched]);
+
+  if (initialLoading) {
+    return (
+      <MainLayout>
+        <div className="max-w-4xl mx-auto px-4 py-8">
+          <ProfileSkeleton />
+        </div>
+      </MainLayout>
+    );
+  }
+
   return (
     <MainLayout>
       <div className="min-h-screen bg-slate-50">
@@ -220,7 +237,7 @@ export default function ProfilePage() {
             <div className="px-6 pb-6">
               <div className="flex justify-between items-end -mt-16">
                 <div className="relative">
-                  <div className="w-32 h-32 rounded-full border-4 border-white shadow-lg overflow-hidden bg-white">
+                  <div className="w-32 h-32 rounded-full border-4 border-white shadow-lg overflow-hidden bg-white flex items-center justify-center">
                     {user?.avatar_url ? (
                       <Image
                         src={user.avatar_url}
@@ -253,15 +270,26 @@ export default function ProfilePage() {
 
               {/* Stats Grid */}
               <div className="mt-6 grid grid-cols-4 gap-4">
-                <div className="stat-item rounded-xl bg-slate-50 p-4 text-center">                  <div className="text-2xl font-semibold text-slate-900">{totalPosts || 0}</div>
+                <div className="stat-item rounded-xl bg-slate-50 p-4 text-center">
+                  <div className="text-2xl font-semibold text-slate-900">{totalPosts || 0}</div>
                   <div className="text-sm text-slate-500">Bài viết</div>
                 </div>
-                <div className="stat-item rounded-xl bg-slate-50 p-4 text-center">
-                  <div className="text-2xl font-semibold text-slate-900">0</div>
+                <div
+                  className="stat-item rounded-xl bg-slate-50 p-4 text-center cursor-pointer hover:bg-indigo-100 transition-colors"
+                  onClick={() => setShowFollowList('followers')}
+                >
+                  <div className="text-2xl font-semibold text-slate-900">
+                    {followStatsLoading ? '...' : followersCount}
+                  </div>
                   <div className="text-sm text-slate-500">Người theo dõi</div>
                 </div>
-                <div className="stat-item rounded-xl bg-slate-50 p-4 text-center">
-                  <div className="text-2xl font-semibold text-slate-900">0</div>
+                <div
+                  className="stat-item rounded-xl bg-slate-50 p-4 text-center cursor-pointer hover:bg-indigo-100 transition-colors"
+                  onClick={() => setShowFollowList('following')}
+                >
+                  <div className="text-2xl font-semibold text-slate-900">
+                    {followStatsLoading ? '...' : followingCount}
+                  </div>
                   <div className="text-sm text-slate-500">Đang theo dõi</div>
                 </div>
                 <div className="stat-item rounded-xl bg-slate-50 p-4 text-center">
@@ -301,42 +329,25 @@ export default function ProfilePage() {
           <div className="mt-6" ref={contentRef}>
             {activeTab === 'posts' && (
               <div className="space-y-6">
-                {loading ? (
-                  // Loading skeleton
-                  Array.from({ length: 3 }).map((_, i) => (
-                    <div key={i} className="bg-white rounded-2xl p-6 shadow-sm animate-pulse">
-                      <div className="flex items-center gap-3 mb-4">
-                        <div className="w-12 h-12 rounded-full bg-slate-200" />
-                        <div className="flex-1">
-                          <div className="h-4 w-24 bg-slate-200 rounded mb-2" />
-                          <div className="h-3 w-16 bg-slate-200 rounded" />
-                        </div>
-                      </div>
-                      <div className="h-20 bg-slate-200 rounded mb-4" />
-                      <div className="flex gap-4">
-                        <div className="h-4 w-12 bg-slate-200 rounded" />
-                        <div className="h-4 w-12 bg-slate-200 rounded" />
-                        <div className="h-4 w-12 bg-slate-200 rounded" />
-                      </div>
-                    </div>
-                  ))
-                ) : error ? (
+                {error ? (
                   <div className="text-center py-8">
                     <p className="text-red-500">{error}</p>
                     <button 
-                      onClick={() => fetchUserPosts(0)}
+                      onClick={() => fetchUserTabData('posts', false)}
                       className="mt-4 px-4 py-2 bg-indigo-50 text-indigo-600 rounded-lg hover:bg-indigo-100"
                     >
                       Thử lại
                     </button>
                   </div>
-                ) : userPosts.length === 0 ? (
+                ) : !tabFetched.posts ? (
+                  <div className="text-center py-8 text-slate-400">Đang tải...</div>
+                ) : postsData && postsData.length === 0 ? (
                   <div className="text-center py-8">
                     <p className="text-slate-500">Chưa có bài viết nào</p>
                   </div>
                 ) : (
                   <>
-                    {userPosts.map(post => (
+                    {postsData && postsData.map(post => (
                       <Post
                         key={post.id}
                         id={post.id}
@@ -353,25 +364,23 @@ export default function ProfilePage() {
                         location={post.location}
                       />
                     ))}
-                    {loadingMore && (
-                      <div className="py-4 text-center">
-                        <div className="inline-block h-8 w-8 animate-spin rounded-full border-4 border-solid border-indigo-600 border-r-transparent"></div>
-                      </div>
-                    )}
                   </>
                 )}
               </div>
             )}
+
             {activeTab === 'media' && (
               <div className="bg-white rounded-xl p-6 shadow-sm">
                 <div className="grid grid-cols-3 gap-4">
-                  {userMedia.length === 0 ? (
+                  {!tabFetched.media ? (
+                    <div className="col-span-3 text-center py-8 text-slate-400">Đang tải...</div>
+                  ) : mediaData && mediaData.length === 0 ? (
                     <div className="col-span-3 text-center py-8">
                       <span className="flex items-center justify-center h-full material-symbols-outlined text-slate-400 text-3xl">photo_library</span>
                       <p className="text-slate-500">Chưa có ảnh hoặc video nào</p>
                     </div>
                   ) : (
-                    userMedia.map((url, index) => (
+                    mediaData && mediaData.map((url, index) => (
                       <div key={index} className="aspect-square bg-slate-100 rounded-lg overflow-hidden relative group">
                         <Image
                           src={url}
@@ -386,23 +395,20 @@ export default function ProfilePage() {
                 </div>
               </div>
             )}
+
             {activeTab === 'about' && (
               <div className="bg-white rounded-xl p-6 shadow-sm">
                 <div className="space-y-6">
                   <div>
-                    <h3 className="text-lg font-medium text-slate-900 mb-4">Thông tin cơ bản</h3>
-                    <div className="space-y-3">
-                      <div className="flex items-center gap-3 text-slate-600">
+                    <h3 className="text-lg font-semibold text-slate-900 mb-2">Thông tin cá nhân</h3>
+                    <div className="space-y-4">
+                      <div className="flex items-center gap-3">
                         <span className="material-symbols-outlined text-slate-400">mail</span>
-                        <span>{user?.email || 'Chưa cập nhật email'}</span>
+                        <span className="text-slate-600">{user?.email}</span>
                       </div>
-                      <div className="flex items-center gap-3 text-slate-600">
-                        <span className="material-symbols-outlined text-slate-400">cake</span>
-                        <span>Chưa cập nhật ngày sinh</span>
-                      </div>
-                      <div className="flex items-center gap-3 text-slate-600">
-                        <span className="material-symbols-outlined text-slate-400">location_on</span>
-                        <span>Chưa cập nhật địa chỉ</span>
+                      <div className="flex items-center gap-3">
+                        <span className="material-symbols-outlined text-slate-400">calendar_today</span>
+                        <span className="text-slate-600">Tham gia từ {new Date().toLocaleDateString()}</span>
                       </div>
                     </div>
                   </div>
@@ -412,6 +418,15 @@ export default function ProfilePage() {
           </div>
         </div>
       </div>
+
+      {showFollowList && (
+        <FollowListModal
+          type={showFollowList}
+          userId={user?.id || ''}
+          onClose={() => setShowFollowList(null)}
+          isOpen={true}
+        />
+      )}
     </MainLayout>
   );
 }

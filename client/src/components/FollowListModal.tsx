@@ -28,6 +28,8 @@ export default function FollowListModal({ userId, type, isOpen, onClose }: Follo
   const modalRef = useRef<HTMLDivElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
   const { user: currentUser, accessToken } = useUser();
+  const [openMenuUserId, setOpenMenuUserId] = useState<string | null>(null);
+  const [confirmUnfollowId, setConfirmUnfollowId] = useState<string | null>(null);
 
   useEffect(() => {
     if (isOpen) {
@@ -82,6 +84,25 @@ export default function FollowListModal({ userId, type, isOpen, onClose }: Follo
       ));
     } catch (error) {
       console.error('Error following/unfollowing user:', error);
+    }
+  };
+
+  const handleUnfollow = async (targetUserId: string) => {
+    setConfirmUnfollowId(null);
+    try {
+      await axios({
+        method: 'DELETE',
+        url: `/api/users/${targetUserId}/follow`,
+        baseURL: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000',
+        headers: { Authorization: `Bearer ${accessToken}` }
+      });
+      setUsers(prevUsers => prevUsers.map(user =>
+        user.id === targetUserId
+          ? { ...user, is_following: false }
+          : user
+      ));
+    } catch (error) {
+      console.error('Error unfollowing user:', error);
     }
   };
 
@@ -146,7 +167,7 @@ export default function FollowListModal({ userId, type, isOpen, onClose }: Follo
           ) : (
             <div className="space-y-6">
               {users.map(user => (
-                <div key={user.id} className="flex items-center gap-4">
+                <div key={user.id} className="flex items-center gap-4 relative group">
                   <Link 
                     href={user.id === currentUser?.id ? '/profile' : `/profile/${user.id}`}
                     className="flex items-center gap-4 flex-1 group"
@@ -172,19 +193,61 @@ export default function FollowListModal({ userId, type, isOpen, onClose }: Follo
                       <p className="text-sm text-slate-500">@{user.email.split('@')[0]}</p>
                     </div>
                   </Link>
-                  {currentUser?.id !== user.id && (
-                    <button
-                      onClick={() => handleFollow(user.id)}
-                      className={`
-                        px-4 py-2 rounded-full text-sm font-medium transition-all
-                        ${user.is_following
-                          ? 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-                          : 'bg-indigo-50 text-indigo-600 hover:bg-indigo-100'
-                        }
-                      `}
-                    >
-                      {user.is_following ? 'Đang theo dõi' : 'Theo dõi'}
-                    </button>
+                  {user.id !== currentUser?.id && (
+                    user.is_following ? (
+                      <>
+                        <button
+                          aria-label="Mở menu hủy theo dõi"
+                          onClick={() => setOpenMenuUserId(openMenuUserId === user.id ? null : user.id)}
+                          className="px-4 py-2 rounded-full text-sm font-medium transition-all bg-slate-100 text-slate-600 hover:bg-slate-200 flex items-center gap-1 relative"
+                        >
+                          <span className="material-symbols-outlined text-base">check</span>
+                          Đang theo dõi
+                          <span className="material-symbols-outlined text-base ml-1">expand_more</span>
+                        </button>
+                        {openMenuUserId === user.id && (
+                          <div className="absolute right-0 top-12 z-10 bg-white border rounded-xl shadow-lg min-w-[160px] animate-fadeIn">
+                            <button
+                              className="w-full text-left px-4 py-2 text-red-600 hover:bg-red-50 rounded-t-xl flex items-center gap-2"
+                              onClick={() => { setConfirmUnfollowId(user.id); setOpenMenuUserId(null); }}
+                            >
+                              <span className="material-symbols-outlined text-base">person_remove</span>
+                              Hủy theo dõi
+                            </button>
+                          </div>
+                        )}
+                        {/* Xác nhận hủy theo dõi */}
+                        {confirmUnfollowId === user.id && (
+                          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30" onClick={() => setConfirmUnfollowId(null)}>
+                            <div className="bg-white rounded-xl shadow-xl p-6 w-full max-w-xs text-center animate-fadeIn" onClick={e => e.stopPropagation()}>
+                              <div className="mb-4">
+                                <span className="material-symbols-outlined text-4xl text-red-500 mb-2">person_remove</span>
+                                <h4 className="font-semibold text-lg mb-2">Hủy theo dõi {user.first_name} {user.last_name}?</h4>
+                                <p className="text-slate-500 text-sm">Bạn sẽ không nhận được cập nhật từ người này nữa.</p>
+                              </div>
+                              <div className="flex gap-2 mt-4">
+                                <button
+                                  className="flex-1 px-4 py-2 rounded-full bg-slate-100 text-slate-600 hover:bg-slate-200"
+                                  onClick={() => setConfirmUnfollowId(null)}
+                                >Hủy</button>
+                                <button
+                                  className="flex-1 px-4 py-2 rounded-full bg-red-500 text-white hover:bg-red-600"
+                                  onClick={() => handleUnfollow(user.id)}
+                                >Xác nhận</button>
+                              </div>
+                            </div>
+                          </div>
+                        )}
+                      </>
+                    ) : (
+                      <button
+                        onClick={() => handleFollow(user.id)}
+                        className="px-4 py-2 rounded-full text-sm font-medium transition-all bg-indigo-50 text-indigo-600 hover:bg-indigo-100"
+                      >
+                        <span className="material-symbols-outlined text-base">person_add</span>
+                        Theo dõi
+                      </button>
+                    )
                   )}
                 </div>
               ))}
