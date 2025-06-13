@@ -4,23 +4,32 @@ import Image from "next/image";
 import Header from "@/components/Header";
 import Sidebar from "@/components/LeftSidebar";
 import RightSidebar from "@/components/RightSidebar";
-import { useState, KeyboardEvent, ChangeEvent, useEffect } from "react";
+import { useState, KeyboardEvent, ChangeEvent, useEffect, useRef } from "react";
 import Post from '@/components/Post';
 import PostDetailPopup from '@/components/PostDetailPopup';
 import gsap from "gsap";
+import SkeletonPost from '@/components/SkeletonPost';
 
 export default function SearchPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const query = searchParams.get("query") || "";
   const [search, setSearch] = useState(query);
-  const [tab, setTab] = useState<"all" | "post" | "friend">("all");
+  const [tab, setTab] = useState<"all" | "post" | "user">("all");
   const [results, setResults] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [selectedPost, setSelectedPost] = useState<any | null>(null);
   const [friendRequests, setFriendRequests] = useState<{ [userId: string]: boolean }>({});
   // Lấy trạng thái tab/theme từ localStorage (đồng bộ với trang chủ)
   const [theme, setTheme] = useState<'inspiring' | 'reflective'>('inspiring');
+  // State cho lazy load
+  const [postLimit, setPostLimit] = useState(3);
+  const [userLimit, setUserLimit] = useState(5);
+  const [postTabLimit, setPostTabLimit] = useState(3);
+  const [userTabLimit, setUserTabLimit] = useState(6);
+  const [combinedLimit, setCombinedLimit] = useState(5);
+  const loaderRef = useRef<HTMLDivElement>(null);
+
   useEffect(() => {
     function syncTheme() {
       const tab = localStorage.getItem('activeTab');
@@ -66,8 +75,41 @@ export default function SearchPage() {
   };
 
   // Lọc kết quả liên quan
-  const posts = results.filter(item => item.type === "post");
-  const users = results.filter(item => item.type === "user");
+  const allPosts = results.filter(item => item.type === "post");
+  const allUsers = results.filter(item => item.type === "user");
+  const postsTab = allPosts.slice(0, postTabLimit);
+  const usersTab = allUsers.slice(0, userTabLimit);
+
+  // Lazy load cho các tab
+  useEffect(() => {
+    const currentLoaderRef = loaderRef.current;
+    if (!currentLoaderRef) return;
+
+    const observer = new window.IntersectionObserver(entries => {
+      if (entries[0].isIntersecting) {
+        if (tab === 'post') {
+          setPostTabLimit(limit => Math.min(limit + 3, allPosts.length));
+        } else if (tab === 'user') {
+          setUserTabLimit(limit => Math.min(limit + 6, allUsers.length));
+        } else if (tab === 'all') {
+          setCombinedLimit(limit => Math.min(limit + 10, results.length));
+        }
+      }
+    });
+
+    observer.observe(currentLoaderRef);
+
+    return () => {
+      if (currentLoaderRef) observer.unobserve(currentLoaderRef);
+    };
+  }, [tab, postTabLimit, userTabLimit, combinedLimit, allPosts.length, allUsers.length, results.length]);
+
+  // Reset giới hạn khi thay đổi tab hoặc query
+  useEffect(() => {
+    setPostTabLimit(3);
+    setUserTabLimit(6);
+    setCombinedLimit(10);
+  }, [tab, query]);
 
   return (
     <div className={`min-h-screen flex flex-col ${bgClass}`} style={{ fontFamily: "Inter, sans-serif" }}>
@@ -125,92 +167,98 @@ export default function SearchPage() {
           {/* Nội dung theo tab với hiệu ứng fade-in */}
           <div className="w-full max-w-3xl flex flex-col gap-6 animate-fadein">
             {loading ? (
-              <div className="text-gray-400 text-lg py-8 bg-white rounded-[32px] shadow border-2 border-[#E3E3E3] text-center">Đang tìm kiếm...</div>
+              <>
+                <SkeletonPost />
+                <SkeletonPost />
+                <SkeletonPost />
+              </>
             ) : tab === "all" ? (
               <>
-                <div className="font-bold text-blue-700 mb-2">Bài viết</div>
-                {posts.length === 0 ? (
-                  <div className="text-gray-400 text-lg py-8 bg-white rounded-[32px] shadow border-2 border-[#E3E3E3] text-center">Không có bài viết phù hợp.</div>
+                {results.length === 0 ? (
+                  <div className="text-gray-400 text-lg py-8 bg-white rounded-[32px] shadow border-2 border-[#E3E3E3] text-center">Không có kết quả phù hợp.</div>
                 ) : (
-                  posts.map((item) => (
-                    <Post
-                      key={item.id}
-                      id={item.id}
-                      userId={item.user_id}
-                      name={`${item.first_name || ''} ${item.last_name || ''}`.trim() || "Người dùng ẩn danh"}
-                      date={item.created_at || ''}
-                      content={item.content}
-                      likes={item.like_count || 0}
-                      comments={item.comment_count || 0}
-                      shares={item.shares || 0}
-                      images={item.images || []}
-                      avatar={item.avatar_url}
-                      feeling={item.feeling}
-                      location={item.location}
-                      onOpenDetail={() => setSelectedPost(item)}
-                      theme={theme}
-                    />
-                  ))
-                )}
-                <div className="font-bold text-blue-700 mt-6 mb-2">Người dùng</div>
-                {users.length === 0 ? (
-                  <div className="text-gray-400 text-lg py-8 bg-white rounded-[32px] shadow border-2 border-[#E3E3E3] text-center">Không có người dùng phù hợp.</div>
-                ) : (
-                  users.map((item) => {
-                    function stringToColor(str: string) {
-                      let hash = 0;
-                      for (let i = 0; i < str.length; i++) hash = str.charCodeAt(i) + ((hash << 5) - hash);
-                      const c = (hash & 0x00FFFFFF).toString(16).toUpperCase();
-                      return '#' + '00000'.substring(0, 6 - c.length) + c;
-                    }
-                    const isAnonymous = !item.name || item.name.toLowerCase().includes('ẩn danh');
-                    const avatarBg = isAnonymous ? '#E5E7EB' : stringToColor(item.id || item.name || 'user');
-                    const initials = item.name ? item.name.split(' ').map((w: string) => w[0]).join('').toUpperCase().slice(0,2) : 'U';
-                    return (
-                      <div
-                        key={item.id}
-                        className={`flex items-center gap-5 rounded-[32px] shadow px-8 py-4 border-2 border-[#E3E3E3] search-card mb-4 ${theme === 'reflective' ? 'bg-[#E9ECF1]' : 'bg-white'} ${theme === 'reflective' ? 'hover:bg-[#e3e3e3]' : 'hover:bg-blue-50'}`}
-                      >
-                        <div className="w-14 h-14 rounded-full flex items-center justify-center border" style={{ background: avatarBg }}>
-                          {item.avatar ? (
-                            <Image src={item.avatar} alt={item.name} width={40} height={40} className="rounded-full" />
-                          ) : isAnonymous ? (
-                            <span className="material-symbols-outlined text-gray-400 text-3xl">person</span>
+                  results.slice(0, combinedLimit).map((item) => {
+                    if (item.type === 'post') {
+                      return (
+                        <Post
+                          key={item.id}
+                          id={item.id}
+                          userId={item.user_id}
+                          name={`${item.first_name || ''} ${item.last_name || ''}`.trim() || "Người dùng ẩn danh"}
+                          date={item.created_at || ''}
+                          content={item.content}
+                          likes={item.like_count || 0}
+                          comments={item.comment_count || 0}
+                          shares={item.shares || 0}
+                          images={item.images || []}
+                          avatar={item.avatar_url}
+                          feeling={item.feeling}
+                          location={item.location}
+                          onOpenDetail={() => setSelectedPost(item)}
+                          theme={theme}
+                        />
+                      );
+                    } else if (item.type === 'user') {
+                      function stringToColor(str: string) {
+                        let hash = 0;
+                        for (let i = 0; i < str.length; i++) hash = str.charCodeAt(i) + ((hash << 5) - hash);
+                        const c = (hash & 0x00FFFFFF).toString(16).toUpperCase();
+                        return '#' + '00000'.substring(0, 6 - c.length) + c;
+                      }
+                      const isAnonymous = !item.name || item.name.toLowerCase().includes('ẩn danh');
+                      const avatarBg = isAnonymous ? '#E5E7EB' : stringToColor(item.id || item.name || 'user');
+                      const initials = item.name ? item.name.split(' ').map((w: string) => w[0]).join('').toUpperCase().slice(0,2) : 'U';
+                      return (
+                        <div
+                          key={item.id}
+                          className={`flex items-center gap-5 rounded-[32px] shadow px-8 py-4 border-2 border-[#E3E3E3] search-card mb-4 ${theme === 'reflective' ? 'bg-[#E9ECF1]' : 'bg-white'} ${theme === 'reflective' ? 'hover:bg-[#e3e3e3]' : 'hover:bg-blue-50'}`}
+                        >
+                          <div className="w-14 h-14 rounded-full flex items-center justify-center border" style={{ background: avatarBg }}>
+                            {item.avatar ? (
+                              <Image src={item.avatar} alt={item.name} width={40} height={40} className="rounded-full" />
+                            ) : isAnonymous ? (
+                              <span className="material-symbols-outlined text-gray-400 text-3xl">person</span>
+                            ) : (
+                              <span className="text-white font-bold text-xl">{initials}</span>
+                            )}
+                          </div>
+                          <span className={`font-semibold text-lg flex-1 ${isAnonymous ? 'text-gray-600' : ''}`}>{item.name || 'Người dùng'}</span>
+                          {friendRequests[item.id] ? (
+                            <button
+                              className="friend-btn px-5 py-2 rounded-full bg-gray-400 text-white font-semibold shadow cursor-not-allowed"
+                              disabled
+                            >
+                              Đã theo dõi
+                            </button>
                           ) : (
-                            <span className="text-white font-bold text-xl">{initials}</span>
+                            <button
+                              className="friend-btn px-5 py-2 rounded-full bg-blue-500 text-white font-semibold shadow transition-all hover:bg-blue-600 hover:scale-105"
+                              onClick={() => {
+                                setFriendRequests(prev => ({ ...prev, [item.id]: true }));
+                                // TODO: Gửi request follow lên server ở đây nếu muốn
+                              }}
+                            >
+                              Follow
+                            </button>
                           )}
                         </div>
-                        <span className={`font-semibold text-lg flex-1 ${isAnonymous ? 'text-gray-600' : ''}`}>{item.name || 'Người dùng'}</span>
-                        {friendRequests[item.id] ? (
-                          <button
-                            className="friend-btn px-5 py-2 rounded-full bg-gray-400 text-white font-semibold shadow cursor-not-allowed"
-                            disabled
-                          >
-                            Đã theo dõi
-                          </button>
-                        ) : (
-                          <button
-                            className="friend-btn px-5 py-2 rounded-full bg-blue-500 text-white font-semibold shadow transition-all hover:bg-blue-600 hover:scale-105"
-                            onClick={() => {
-                              setFriendRequests(prev => ({ ...prev, [item.id]: true }));
-                              // TODO: Gửi request follow lên server ở đây nếu muốn
-                            }}
-                          >
-                            Follow
-                          </button>
-                        )}
-                      </div>
-                    );
+                      );
+                    }
+                    return null;
                   })
+                )}
+                {(tab === 'all' && combinedLimit < results.length) && (
+                  <div ref={loaderRef} className="w-full flex justify-center py-4">
+                    <span className="text-gray-400">Đang tải thêm...</span>
+                  </div>
                 )}
               </>
             ) : tab === "post" ? (
               <>
-                <div className="font-bold text-blue-700 mb-2">Bài viết</div>
-                {posts.length === 0 ? (
+                {postsTab.length === 0 ? (
                   <div className="text-gray-400 text-lg py-8 bg-white rounded-[32px] shadow border-2 border-[#E3E3E3] text-center">Không có bài viết phù hợp.</div>
                 ) : (
-                  posts.map((item) => (
+                  postsTab.map((item) => (
                     <Post
                       key={item.id}
                       id={item.id}
@@ -230,14 +278,18 @@ export default function SearchPage() {
                     />
                   ))
                 )}
+                {postsTab.length < allPosts.length && (
+                  <div ref={loaderRef} className="w-full flex justify-center py-4">
+                    <span className="text-gray-400">Đang tải thêm...</span>
+                  </div>
+                )}
               </>
-            ) : (
+            ) : tab === "user" ? (
               <>
-                <div className="font-bold text-blue-700 mb-2">Người dùng</div>
-                {users.length === 0 ? (
+                {usersTab.length === 0 ? (
                   <div className="text-gray-400 text-lg py-8 bg-white rounded-[32px] shadow border-2 border-[#E3E3E3] text-center">Không có người dùng phù hợp.</div>
                 ) : (
-                  users.map((item) => {
+                  usersTab.map((item) => {
                     function stringToColor(str: string) {
                       let hash = 0;
                       for (let i = 0; i < str.length; i++) hash = str.charCodeAt(i) + ((hash << 5) - hash);
@@ -284,8 +336,13 @@ export default function SearchPage() {
                     );
                   })
                 )}
+                {usersTab.length < allUsers.length && (
+                  <div ref={loaderRef} className="w-full flex justify-center py-4">
+                    <span className="text-gray-400">Đang tải thêm...</span>
+                  </div>
+                )}
               </>
-            )}
+            ) : null}
             {selectedPost && (
               <PostDetailPopup post={selectedPost} onClose={() => setSelectedPost(null)} theme={theme} />
             )}

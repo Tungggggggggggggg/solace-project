@@ -13,4 +13,5 @@ export interface PostType {
   feeling?: { icon: string; label: string };
   location?: string;
   type_post: 'positive' | 'negative';
+  shared_post_id?: string;
 } 
