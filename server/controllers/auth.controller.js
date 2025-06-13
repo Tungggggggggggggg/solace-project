@@ -3,6 +3,8 @@ const { transaction } = require("../db");
 const { createTokens, createAccessToken } = require("../utils/jwt");
 const jwt = require("jsonwebtoken");
 const bcrypt = require("bcrypt");
+const crypto = require('crypto');
+const nodemailer = require('nodemailer');
 
 const admin = require("../config/firebaseAdmin");
 
@@ -412,3 +414,116 @@ exports.getProfile = async (req, res) => {
     res.status(500).json({ error: "Lỗi server" });
   }
 };
+
+// Gửi email reset password
+exports.forgotPassword = async (req, res) => {
+  const { email } = req.body;
+
+  try {
+    // Kiểm tra xem email có tồn tại trong hệ thống không
+    const result = await pool.query("SELECT * FROM users WHERE email = $1", [email]);
+    const user = result.rows[0];
+
+    // Nếu không tìm thấy hoặc chưa có mật khẩu, vẫn trả về thông báo chung (để tránh lộ thông tin)
+    if (!user || !user.password) {
+      return res.json({
+        message: "Nếu email hợp lệ và đã thiết lập mật khẩu, chúng tôi đã gửi hướng dẫn khôi phục.",
+      });
+    }
+
+    // Tạo token khôi phục
+    const token = crypto.randomBytes(32).toString("hex");
+    const expires = (Date.now() + 15 * 60 * 1000) / 1000; // 15 phút
+
+    console.log("Ghi password_resets:", { email, token, expires });
+
+    // Lưu token vào bảng
+    await pool.query(
+      `INSERT INTO password_resets (email, token, expires_at)
+       VALUES ($1, $2, to_timestamp($3))`,
+      [email, token, expires]
+    );
+
+    const resetLink = `http://localhost:3000/reset-password?token=${token}`;
+
+    try {
+      await sendResetEmail(email, resetLink);
+    } catch (emailErr) {
+      console.error("Lỗi gửi email:", emailErr.message);
+      return res.status(400).json({
+        error: "Không thể gửi email. Có thể địa chỉ email không tồn tại thật.",
+      });
+    }
+
+    // Trả về thông báo chung
+    return res.json({
+      message: "Nếu email hợp lệ và đã thiết lập mật khẩu, chúng tôi đã gửi hướng dẫn khôi phục.",
+    });
+  } catch (err) {
+    console.error("LỖI trong forgotPassword:", err);
+    res.status(500).json({ error: "Lỗi server", detail: err.message });
+  }
+};
+
+// Đặt lại mật khẩu
+exports.resetPassword = async (req, res) => {
+  const { token, newPassword } = req.body;
+
+  try {
+    // Kiểm tra token còn hiệu lực không
+    const result = await pool.query(`
+      SELECT * FROM password_resets
+      WHERE token = $1 AND expires_at > NOW()
+    `, [token]);
+
+    const record = result.rows[0];
+    if (!record) return res.status(400).json({ error: "Token không hợp lệ hoặc đã hết hạn." });
+
+    // Mã hóa mật khẩu mới
+    const hashedPassword = await bcrypt.hash(newPassword, 10);
+
+    // Cập nhật mật khẩu người dùng
+    await pool.query("UPDATE users SET password = $1 WHERE email = $2", [hashedPassword, record.email]);
+    // Xóa token sau khi dùng
+    await pool.query("DELETE FROM password_resets WHERE email = $1", [record.email]);
+
+    res.json({ message: "Đặt lại mật khẩu thành công." });
+  } catch (err) {
+    console.error("resetPassword error:", err);
+    res.status(500).json({ error: "Lỗi server" });
+  }
+};
+
+
+// Hàm gửi email chứa link reset
+async function sendResetEmail(email, link) {
+  const transporter = nodemailer.createTransport({
+    service: "gmail",
+    auth: {
+      user: process.env.EMAIL_USER,
+      pass: process.env.EMAIL_PASS,
+    },
+  });
+
+  await transporter.sendMail({
+    from: `"Solace Support" <${process.env.EMAIL_USER}>`,
+    to: email,
+    subject: "Yêu cầu khôi phục mật khẩu",
+    html: `
+      <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
+        <h2>Yêu cầu khôi phục mật khẩu</h2>
+        <p>Xin chào,</p>
+        <p>Chúng tôi đã nhận được yêu cầu khôi phục mật khẩu cho tài khoản liên kết với địa chỉ email này.</p>
+        <p>Vui lòng nhấn vào nút bên dưới để đặt lại mật khẩu của bạn. Liên kết sẽ hết hạn sau 15 phút.</p>
+        <p style="text-align: center; margin: 20px 0;">
+          <a href="${link}" style="background-color: #007bff; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">
+            Đặt lại mật khẩu
+          </a>
+        </p>
+        <p>Nếu bạn không yêu cầu hành động này, vui lòng bỏ qua email này.</p>
+        <p>Trân trọng,<br/>Đội ngũ hỗ trợ Solace</p>
+      </div>
+    `,
+  });
+  
+}

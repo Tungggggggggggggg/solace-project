@@ -116,6 +116,12 @@ const LoginForm = ({ onSuccess }: LoginFormProps) => {
             onChange={handleChange}
             autoComplete="current-password"
           />
+            <div className="flex justify-end">
+            <p className="text-sm text-blue-600 hover:underline cursor-pointer mt-2" onClick={() => window.location.href = "/forgot-password"}>
+              Quên mật khẩu?
+            </p>
+
+          </div>
         </div>
         {/* Nút submit đăng nhập */}
         <button

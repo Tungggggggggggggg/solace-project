@@ -3,6 +3,8 @@ import type { Metadata } from "next";
 import { Be_Vietnam_Pro } from "next/font/google";
 import "./globals.css";
 import { UserContextProvider } from "@/contexts/UserContext";
+import { ToastContainer } from 'react-toastify';
+import 'react-toastify/dist/ReactToastify.css';
 import VisitTracker from '@/components/VisitTracker'; 
 
 
@@ -43,6 +45,7 @@ export default function RootLayout({
       >
         <VisitTracker /> {/*  Gọi API visits khi user mở web */}
         <UserContextProvider>{children}</UserContextProvider>
+        <ToastContainer />
       </body>
     </html>
   );
