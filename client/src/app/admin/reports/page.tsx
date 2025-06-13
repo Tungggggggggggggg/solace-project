@@ -15,8 +15,8 @@ type Report = {
   reported_account: string;
   content: string;
   status: string;
-  reporter_id: string;         // Thêm dòng này
-  reported_user_id: string;    // Thêm dòng này
+  reporter_id: string;
+  reported_user_id: string;
 };
 
 type ReportedPost = {
@@ -44,8 +44,10 @@ export default function ReportsPage(): ReactElement {
   const [mailContent, setMailContent] = useState('');
   const [mailType, setMailType] = useState('system');
   const [mailUserId, setMailUserId] = useState<string | null>(null);
+  const [mailReport, setMailReport] = useState<Report | null>(null);
 
 
+  // Lấy danh sách báo cáo từ API dựa vào trạng thái và từ khóa tìm kiếm
   const fetchReports = async () => {
     const params = new URLSearchParams();
     if (status !== 'all') params.set('status', status);
@@ -56,22 +58,26 @@ export default function ReportsPage(): ReactElement {
     else setReports([]);
   };
 
+  // Khi thay đổi trạng thái lọc, tự động lấy lại danh sách báo cáo
   useEffect(() => {
     fetchReports();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [status]);
 
+  // Khi xóa hết từ khóa tìm kiếm, tự động lấy lại danh sách báo cáo
   useEffect(() => {
     if (search.trim() === '') fetchReports();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [search]);
 
+  // Đánh dấu báo cáo đã xử lý
   const handleProcess = async (id: string) => {
     await fetch(`/api/reports/${id}/process`, { method: 'PUT' });
     toast.success('Đã xử lý báo cáo!');
     fetchReports();
   };
 
+  // Xóa báo cáo
   const handleDelete = async (id: string) => {
     if (window.confirm('Bạn có chắc chắn muốn xóa báo cáo này?')) {
       await fetch(`/api/reports/${id}`, { method: 'DELETE' });
@@ -80,8 +86,8 @@ export default function ReportsPage(): ReactElement {
     }
   };
 
-
- const handleViewReport = async (report: Report) => {
+  // Xem chi tiết báo cáo (và bài đăng bị báo cáo)
+  const handleViewReport = async (report: Report) => {
     const res = await fetch(`/api/reports/${report.report_id}`);
     const result = await res.json();
     if (result.success) {
@@ -92,25 +98,48 @@ export default function ReportsPage(): ReactElement {
     }
   };
 
-  // Khi bấm icon thư, mở dialog và chọn mặc định là người báo cáo
+  // Khi bấm icon thư, mở dialog gửi thông báo và chọn mặc định người nhận
   const handleOpenMailDialog = (report: Report, target: 'reporter' | 'reported') => {
+    setMailReport(report); // Lưu report cho dialog gửi thư
     setMailTarget(target);
     setShowMailDialog(true);
     setMailTitle('');
     setMailContent('');
     setMailType('system');
-    setMailUserId(target === 'reporter' ? report.reporter_id : report.reported_user_id);
+    const userId = target === 'reporter' ? report.reporter_id : report.reported_user_id;
+    setMailUserId(userId);
+
+    setSelectedReport(null); // Đóng dialog xem chi tiết nếu đang mở
+    setReportedPost(null);
   };
 
-  // Gửi notification (chỉ FE, bạn cần làm API/backend sau)
+  // Gửi thông báo (notification) đến user đã chọn
   const handleSendNotification = async () => {
     if (!mailTitle.trim() || !mailContent.trim()) {
       toast.error('Vui lòng nhập tiêu đề và nội dung!');
       return;
     }
-    // Gửi lên API backend ở đây (chưa làm backend)
-    toast.success('Đã tạo thông báo (FE demo)');
-    setShowMailDialog(false);
+    if (!mailUserId) {
+      toast.error('Không xác định được người nhận!');
+      return;
+    }
+    const res = await fetch('/api/reports/send-notification', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        user_id: mailUserId,
+        title: mailTitle,
+        content: mailContent,
+        type: 'system',
+      }),
+    });
+    const result = await res.json();
+    if (result.success) {
+      toast.success('Đã gửi thông báo!');
+      setShowMailDialog(false);
+    } else {
+      toast.error(result.message || 'Gửi thông báo thất bại!');
+    }
   };
   return (
     <AdminLayout onOpenAuth={() => {}}>
@@ -226,7 +255,11 @@ export default function ReportsPage(): ReactElement {
                         <button
                           className="text-orange-500 hover:underline"
                           title="Gửi thông báo"
-                          onClick={() => handleOpenMailDialog(report, 'reporter')}
+                          onClick={() => {
+                            setSelectedReport(null); // Đóng dialog xem chi tiết nếu đang mở
+                            setReportedPost(null);
+                            handleOpenMailDialog(report, 'reporter');
+                          }}
                         >
                           <FiMail />
                         </button>
@@ -256,12 +289,12 @@ export default function ReportsPage(): ReactElement {
                 value={mailTarget}
                 onChange={e => {
                   setMailTarget(e.target.value as 'reporter' | 'reported');
-                  if (selectedReport) {
-                    setMailUserId(
+                  if (mailReport) {
+                    const userId =
                       e.target.value === 'reporter'
-                        ? selectedReport.reporter_id
-                        : selectedReport.reported_user_id
-                    );
+                        ? mailReport.reporter_id
+                        : mailReport.reported_user_id;
+                    setMailUserId(userId);
                   }
                 }}
               >
@@ -293,8 +326,7 @@ export default function ReportsPage(): ReactElement {
               <FilteredInput
                 className="w-full p-2 border rounded"
                 value={mailType}
-                onChange={e => setMailType(e.target.value)}
-                placeholder="Loại (ví dụ: system)"
+                disabled 
               />
             </div>
             <div className="flex justify-end gap-2">

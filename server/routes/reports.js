@@ -14,6 +14,8 @@ router.get('/', async (req, res) => {
         r.reason,
         r.description,
         r.status,
+        r.reporter_id,         -- Thêm dòng này
+        r.reported_user_id,    -- Thêm dòng này
         u1.first_name AS reporter_first_name,
         u1.last_name AS reporter_last_name,
         u2.first_name AS reported_first_name,
@@ -46,6 +48,8 @@ router.get('/', async (req, res) => {
     const reports = rows.map((report, index) => ({
       stt: index + 1,
       report_id: report.id,
+      reporter_id: report.reporter_id,           // Thêm dòng này
+      reported_user_id: report.reported_user_id, // Thêm dòng này
       date_reported: new Date(report.created_at).toLocaleDateString('en-US'),
       reported_by: ((report.reporter_first_name || '') + ' ' + (report.reporter_last_name || '')).trim() || 'Không xác định',
       reported_account: ((report.reported_first_name || '') + ' ' + (report.reported_last_name || '')).trim() || 'Không xác định',
@@ -138,6 +142,8 @@ router.get('/:id', async (req, res) => {
         r.reason,
         r.description,
         r.status,
+        r.reporter_id,         -- Thêm dòng này
+        r.reported_user_id,    -- Thêm dòng này
         u1.first_name AS reporter_first_name,
         u1.last_name AS reporter_last_name,
         u2.first_name AS reported_first_name,
@@ -178,4 +184,23 @@ router.get('/:id', async (req, res) => {
     res.status(500).json({ error: 'Lỗi server', detail: err.message });
   }
 });
+
+// Gửi thông báo từ trang báo cáo
+router.post('/send-notification', async (req, res) => {
+  try {
+    const { user_id, title, content, type } = req.body;
+    if (!user_id || !title || !content) {
+      return res.status(400).json({ success: false, message: 'Thiếu thông tin bắt buộc' });
+    }
+    await pool.query(
+      'INSERT INTO notifications (user_id, title, content, type) VALUES ($1, $2, $3, $4)',
+      [user_id, title, content, type || null]
+    );
+    res.json({ success: true, message: 'Đã gửi thông báo và lưu vào database!' });
+  } catch (err) {
+    console.error('Send notification error:', err);
+    res.status(500).json({ success: false, message: 'Lỗi server', detail: err.message });
+  }
+});
+
 module.exports = router;

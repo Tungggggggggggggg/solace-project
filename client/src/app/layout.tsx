@@ -46,7 +46,6 @@ export default function RootLayout({
         <VisitTracker /> {/*  Gọi API visits khi user mở web */}
         <ForbiddenWordsProvider>
           <UserContextProvider>{children}</UserContextProvider>
-          <ToastContainer />
         </ForbiddenWordsProvider>
       </body>
     </html>
