@@ -278,25 +278,9 @@ const Post = ({
       {shared_post_id && sharedPost === null ? (
         <SkeletonPost />
       ) : sharedPost ? (
-        <div onClick={() => {
-          if (onOpenDetail && id) {
-            onOpenDetail({
-              id,
-              name,
-              date,
-              content,
-              likes: likeCount,
-              comments: commentCount,
-              shares: shareCount,
-              images,
-              feeling: sharedPost.feeling,
-              location: sharedPost.location,
-              avatar_url: avatar
-            });
-          }
-        }} style={{ cursor: 'pointer' }}>
+        <div>
           {/* Người share */}
-          <div className="flex items-start gap-3 mb-2 relative">
+          <div className="flex items-center gap-3 mb-4 relative">
             <Link
               href={userId === currentUser?.id ? '/profile' : `/profile/${userId}`}
               className="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center overflow-hidden group hover:ring-2 hover:ring-indigo-600 hover:ring-offset-2 transition-all"
@@ -321,15 +305,9 @@ const Post = ({
               </span>
               <span className="text-sm text-slate-500 block">{formatDate(date)}</span>
             </div>
-            <button
-              className="absolute top-0 right-0 p-2 hover:bg-slate-50 rounded-full transition-colors"
-              onClick={handleReportClick}
-            >
-              <span className="material-symbols-outlined text-slate-400">more_horiz</span>
-            </button>
           </div>
           {/* Nội dung shareText nếu có */}
-          {content && <div className="mb-2 text-slate-900">{content}</div>}
+          {content && <div className="mb-2 text-slate-900 whitespace-pre-wrap">{content}</div>}
           {/* Bài viết gốc */}
           <div
             className="bg-gray-50 border rounded-lg p-4 cursor-pointer hover:bg-gray-100 transition"
@@ -355,7 +333,7 @@ const Post = ({
               </div>
             )}
           </div>
-          {/* Post Actions */}
+          {/* Nút like/share/comment giống post thường */}
           {!hideActions && (
             <div className="flex items-center justify-between text-sm border-t border-slate-100 pt-4 mt-4">
               <button

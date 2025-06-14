@@ -25,6 +25,8 @@ interface SharePostModalProps {
 const SharePostModal: React.FC<SharePostModalProps> = ({ isOpen, onClose, post, onShared, typePost }) => {
   const [shareText, setShareText] = useState('');
   const { user } = useContext(UserContext);
+  const [liked, setLiked] = useState(false);
+  const [likeCount, setLikeCount] = useState(0);
 
   if (!isOpen) return null;
 
@@ -71,14 +73,54 @@ const SharePostModal: React.FC<SharePostModalProps> = ({ isOpen, onClose, post, 
     toast.info('Chức năng report sẽ được cập nhật!');
   };
 
+  const handleLike = async () => {
+    if (!user?.id || !post.id) {
+      toast.info('Bạn cần đăng nhập để thực hiện chức năng này!');
+      return;
+    }
+    const endpoint = liked ? '/api/likes/unlike' : '/api/likes/like';
+    try {
+      const response = await axios.post(endpoint, 
+        { post_id: post.id, user_id: user.id },
+        { baseURL: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000' }
+      );
+      setLiked(!liked);
+      setLikeCount(response.data.likeCount);
+    } catch (error) {
+      console.error('Error handling like:', error);
+    }
+  };
+
+  React.useEffect(() => {
+    if (user?.id && post.id) {
+      axios.get('/api/likes/is-liked', {
+        params: { post_id: post.id, user_id: user.id },
+        baseURL: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000',
+      }).then(res => {
+        setLiked(res.data.liked);
+        setLikeCount(res.data.likeCount);
+      });
+    }
+  }, [user?.id, post.id]);
+
+  const handleBackdropClick = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (e.target === e.currentTarget) {
+      onClose();
+    }
+  };
+
   const modalContent = (
-    <div className="fixed inset-0 bg-black/40 flex justify-center items-center z-50" style={{ backdropFilter: 'blur(5px)' }}>
+    <div className="fixed inset-0 bg-black/40 flex justify-center items-center z-50" style={{ backdropFilter: 'blur(5px)' }} onClick={handleBackdropClick}>
       <motion.div
         initial={{ opacity: 0, y: -50 }}
         animate={{ opacity: 1, y: 0 }}
         exit={{ opacity: 0, y: -50 }}
         className="bg-white p-6 rounded-lg shadow-xl w-full max-w-md mx-4 relative"
+        onClick={e => e.stopPropagation()}
       >
+        <button onClick={onClose} className="absolute top-3 right-3 p-2 rounded-full hover:bg-gray-100 transition-colors">
+          <span className="material-symbols-outlined text-2xl text-gray-500">close</span>
+        </button>
         <div className="flex items-center gap-3 mb-2">
           {user && (
             <img src={user.avatar_url || '/images/default-avatar.png'} alt="User Avatar" className="w-12 h-12 rounded-full object-cover" />
@@ -87,9 +129,6 @@ const SharePostModal: React.FC<SharePostModalProps> = ({ isOpen, onClose, post, 
             <span className="font-medium text-slate-900 block">{user ? `${user.first_name} ${user.last_name}` : ''}</span>
             <span className="text-sm text-slate-500 block">{new Date().toLocaleString('vi-VN')}</span>
           </div>
-          <button onClick={handleReport} className="text-gray-500 hover:text-gray-700 ml-auto">
-            <span className="material-symbols-outlined text-2xl">more_horiz</span>
-          </button>
         </div>
 
         <div className="space-y-4 mt-2">
