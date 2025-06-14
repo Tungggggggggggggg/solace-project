@@ -1,7 +1,7 @@
 // Lấy danh sách từ cấm từ API backend
 export async function fetchForbiddenWords(): Promise<string[]> {
   try {
-    const res = await fetch('/api/forbidden_words');
+    const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/forbidden_words`);
     const data = await res.json();
     if (data.success && Array.isArray(data.forbiddenWords)) {
       // Nếu API trả về mảng object, lấy trường word

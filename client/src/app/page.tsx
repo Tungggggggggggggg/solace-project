@@ -83,7 +83,7 @@ export default function Home() {
   useEffect(() => {
     const fetchPosts = async () => {
       try {
-        const res = await axios.get<PostType[]>('/api/posts', {
+        const res = await axios.get<PostType[]>(`${process.env.NEXT_PUBLIC_API_URL}/api/posts`, {
           baseURL: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000',
         });
         setPosts(res.data);

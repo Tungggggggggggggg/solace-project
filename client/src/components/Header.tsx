@@ -183,7 +183,7 @@ const Header = memo<HeaderProps>(({
   useEffect(() => {
     if (!user) return;
     
-    fetch(`/api/messages/unread-total`, {
+    fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/messages/unread-total`, {
       headers: { Authorization: `Bearer ${accessToken}` }
     })
       .then(res => res.json())

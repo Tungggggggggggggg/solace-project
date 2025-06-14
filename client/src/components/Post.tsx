@@ -121,7 +121,7 @@ const Post = ({
     }
 
     // Fetch updated comment count
-    axios.get(`/api/posts/${id}`).then(res => {
+    axios.get(`${process.env.NEXT_PUBLIC_API_URL}/api/posts/${id}`).then(res => {
       setCommentCount(res.data.comment_count || comments);
     });
 
@@ -136,7 +136,7 @@ const Post = ({
     filterContent();
 
     if (shared_post_id) {
-      axios.get(`/api/posts/${shared_post_id}`)
+      axios.get(`${process.env.NEXT_PUBLIC_API_URL}/api/posts/${shared_post_id}`)
         .then(res => setSharedPost(res.data))
         .catch(() => setSharedPost(null));
     }

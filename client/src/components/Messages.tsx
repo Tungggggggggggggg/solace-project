@@ -208,9 +208,20 @@ const MessagePage: FC = () => {
     if (accessToken) fetchAllConversations();
   }, [accessToken, fetchAllConversations]);
 
+  useEffect(() => {
+    if (user?.id && socket.connected) {
+      console.log('[Messages.tsx] Re-mount → emit register');
+      socket.emit('register', user.id);
+    }
+  }, [user?.id]);
+
+
   // Online status
   useEffect(() => {
-    const onlineHandler = (users: string[]) => setOnlineUsers(new Set(users));
+    const onlineHandler = (users: string[]) => {
+      setOnlineUsers(new Set(users));
+      console.log("Update online: ", users);
+    }
     socket.on('onlineUsers', onlineHandler);
     
     return () => {

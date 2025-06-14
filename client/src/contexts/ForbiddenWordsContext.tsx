@@ -10,7 +10,7 @@ export const ForbiddenWordsProvider = ({ children }: { children: React.ReactNode
   const [words, setWords] = useState<string[]>([]);
   useEffect(() => {
     const fetchWords = async () => {
-      const res = await fetch('/api/forbidden_words');
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/forbidden_words`);
       const data = await res.json();
       if (data.success) setWords((data.forbiddenWords as ForbiddenWord[]).map(w => w.word.toLowerCase()));
     };

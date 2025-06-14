@@ -179,7 +179,7 @@ export default function UserProfilePage({ params }: { params: Promise<{ id: stri
         params.filter = 'media';
       }
 
-      const posts = await apiCall(`/api/posts/user/${unwrappedParams.id}`, {
+      const posts = await apiCall(`${process.env.NEXT_PUBLIC_API_URL}/api/posts/user/${unwrappedParams.id}`, {
         params,
         headers: {
           'Cache-Control': 'no-cache' // Đảm bảo luôn lấy dữ liệu mới nhất
