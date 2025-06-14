@@ -6,6 +6,8 @@ import { UserContextProvider } from "@/contexts/UserContext";
 import VisitTracker from '@/components/VisitTracker'; 
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import ReactQueryProvider from "./providers/ReactQueryProvider";
+import { ForbiddenWordsProvider } from "@/contexts/ForbiddenWordsContext";
+
 
 
 // Cấu hình font Be Vietnam Pro với các trọng lượng và hỗ trợ tiếng Việt
@@ -35,7 +37,7 @@ export const metadata: Metadata = {
 export default function RootLayout({
   children,
 }: Readonly<{
-  children: React.ReactNode; /* Nội dung con */
+  children: React.ReactNode;
 }>) {
   return (
     // HTML root với ngôn ngữ tiếng Anh
@@ -55,9 +57,11 @@ export default function RootLayout({
         <VisitTracker /> {/*  Gọi API visits khi user mở web */}
         
         <UserContextProvider>
-          <ReactQueryProvider>
-            {children}
-          </ReactQueryProvider>
+          <ForbiddenWordsProvider> {/* Bọc provider ở đây */}
+            <ReactQueryProvider>
+              {children}
+            </ReactQueryProvider>
+          </ForbiddenWordsProvider>
         </UserContextProvider>
       </body>
     </html>

@@ -17,6 +17,7 @@ const likesRouter = require('./routes/likes');
 const dashboardRoutes = require('./routes/dashboard.routes');
 const visitsRoutes = require('./routes/visits.routes'); 
 const messagesRoutes = require('./routes/messages.routes');
+const adminNotificationRoutes = require("./routes/adminNotification"); // Thêm dòng này
 const pool = require("./db");
 
 dotenv.config();
@@ -69,6 +70,8 @@ app.use("/api/forbidden_words", forbiddenWordsRoutes);
 app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/visits', visitsRoutes);
 app.use('/api/messages', messagesRoutes);
+app.use('/api/admin', adminNotificationRoutes); // Thêm dòng này
+
 
 
 // Khởi tạo HTTP server

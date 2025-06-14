@@ -7,8 +7,6 @@ import { toast, ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import FilteredInput from '@/components/FilteredInput';
 
-
-
 type Post = {
   id: string;
   content: string;
@@ -20,7 +18,8 @@ type Post = {
   last_name: string;
   avatar_url?: string;
   access_modifier?: 'public' | 'people' | 'lock';
-  images?: string[];
+  images?: string[] | string;
+  shared_post_id?: string | null;
 };
 
 export default function PostManagementPage() {
@@ -45,44 +44,62 @@ export default function PostManagementPage() {
 
   useEffect(() => {
     fetchPosts();
-      // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [type, status]);
 
   useEffect(() => {
     if (search.trim() === '') fetchPosts();
-        // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [search]);
 
   const handleApprove = async (id: string) => {
     const post = posts.find((p) => p.id === id);
     if (!post) return;
-  
+
     await fetch(`http://localhost:5000/api/admin/posts/${id}/approve`, { method: 'PUT' });
     toast.success(`Đã duyệt bài: "${post.content.slice(0, 50)}..."`);
     fetchPosts();
   };
-  
 
-  const handleDelete = async (id: string) => {
-    const post = posts.find((p) => p.id === id);
-    if (!post) return;
-  
-    if (window.confirm(`Bạn có chắc chắn muốn xóa bài: "${post.content.slice(0, 50)}..."?`)) {
-      await fetch(`http://localhost:5000/api/admin/posts/${id}`, { method: 'DELETE' });
+  const [selectedPost, setSelectedPost] = useState<Post | null>(null);
+  const [sharedPost, setSharedPost] = useState<Post | null>(null);
+  const [deletePostId, setDeletePostId] = useState<string | null>(null);
+
+  const handleViewPost = async (postId: string) => {
+    setSelectedPost(null);
+    setSharedPost(null);
+    try {
+      const res = await fetch(`/api/admin/posts/${postId}`);
+      if (!res.ok) return;
+      const data = await res.json();
+      setSelectedPost(data.post);
+      setSharedPost(data.shared_post);
+    } catch {
+      setSelectedPost(null);
+      setSharedPost(null);
+    }
+  };
+
+  const handleDelete = (id: string) => {
+    setDeletePostId(id);
+  };
+
+  const confirmDeletePost = async () => {
+    if (deletePostId) {
+      const post = posts.find((p) => p.id === deletePostId);
+      if (!post) return;
+      await fetch(`http://localhost:5000/api/admin/posts/${deletePostId}`, { method: 'DELETE' });
       toast.success(`Đã xóa bài: "${post.content.slice(0, 50)}..."`);
+      setDeletePostId(null);
       fetchPosts();
     }
   };
-  const [selectedPost, setSelectedPost] = useState<Post | null>(null);
-
-  
 
   return (
     <AdminLayout onOpenAuth={() => {}}>
       <main className="p-6">
         <h1 className="text-3xl font-bold mb-6 text-gray-900">Quản lý bài đăng</h1>
 
-        {/* Filters */}
         <div className="flex gap-4 mb-6">
           <div className="relative flex-1">
             <FiSearch className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500" />
@@ -94,27 +111,21 @@ export default function PostManagementPage() {
               className="pl-10 pr-4 py-2 bg-[#F5F0E5] rounded-xl text-gray-800 w-full outline-none"
             />
           </div>
-          <button
-            onClick={() => setType('all')}
-            className={`px-4 py-2 text-gray-800 rounded-lg transition-all duration-200 
-            bg-gray-100 ${type === 'all' ? 'ring-2 ring-gray-400 font-semibold' : ''}`}
-          >
-            Tất cả
-          </button>
-          <button
-            onClick={() => setType('positive')}
-            className={`px-4 py-2 text-gray-800 rounded-lg transition-all duration-200 
-             bg-blue-100 ${type === 'positive' ? 'ring-2 ring-blue-400 font-semibold' : ''}`}
-          >
-            Tích cực
-          </button>
-          <button
-            onClick={() => setType('negative')}
-            className={`px-4 py-2 text-gray-800 rounded-lg transition-all duration-200 
-             bg-red-100 ${type === 'negative' ? 'ring-2 ring-red-400 font-semibold' : ''}`}
-          >
-            Tiêu cực
-          </button>
+          {['all', 'positive', 'negative'].map((t) => (
+            <button
+              key={t}
+              onClick={() => setType(t as any)}
+              className={`px-4 py-2 text-gray-800 rounded-lg transition-all duration-200 ${
+                t === 'all'
+                  ? 'bg-gray-100 ' + (type === t ? 'ring-2 ring-gray-400 font-semibold' : '')
+                  : t === 'positive'
+                  ? 'bg-blue-100 ' + (type === t ? 'ring-2 ring-blue-400 font-semibold' : '')
+                  : 'bg-red-100 ' + (type === t ? 'ring-2 ring-red-400 font-semibold' : '')
+              }`}
+            >
+              {t === 'all' ? 'Tất cả' : t === 'positive' ? 'Tích cực' : 'Tiêu cực'}
+            </button>
+          ))}
 
           <div className="relative">
             <button
@@ -125,7 +136,7 @@ export default function PostManagementPage() {
                   const rect = dropdownRef.current.getBoundingClientRect();
                   setDropdownPos({
                     top: rect.bottom + window.scrollY + 4,
-                    left: rect.left + window.scrollX
+                    left: rect.left + window.scrollX,
                   });
                 }
               }}
@@ -157,7 +168,7 @@ export default function PostManagementPage() {
           </div>
         </div>
 
-        {/* Posts Table */}
+        {/* Table */}
         <div className="border border-[#DBE0E5] rounded-xl overflow-hidden">
           <div className="max-h-[500px] overflow-y-auto">
             <table className="w-full">
@@ -188,11 +199,15 @@ export default function PostManagementPage() {
                         {post.content}
                       </td>
                       <td className="p-4 text-gray-800">
-                        <span className={`px-2 py-1 rounded-full text-sm ${post.type_post === 'positive' ? 'bg-blue-200' : 'bg-red-100'}`}>
+                        <span
+                          className={`px-2 py-1 rounded-full text-sm ${
+                            post.type_post === 'positive' ? 'bg-blue-200' : 'bg-red-100'
+                          }`}
+                        >
                           {post.type_post === 'positive' ? 'Tích cực' : 'Tiêu cực'}
                         </span>
                       </td>
-                      <td className="p-4 text-gray-800 max-w-[200px] truncate" title={`${post.first_name} ${post.last_name}`}>
+                      <td className="p-4 text-gray-800 max-w-[200px] truncate">
                         {post.first_name} {post.last_name}
                       </td>
                       <td className="p-4 text-gray-800">{new Date(post.created_at).toLocaleDateString()}</td>
@@ -205,9 +220,7 @@ export default function PostManagementPage() {
                         )}
                       </td>
                       <td className="p-4 flex gap-2">
-                        <button className="text-blue-500 hover:underline"
-                          onClick={() => setSelectedPost(post)}
-                        >
+                        <button className="text-blue-500 hover:underline" onClick={() => handleViewPost(post.id)}>
                           <FiEye />
                         </button>
                         {!post.is_approved && (
@@ -227,76 +240,122 @@ export default function PostManagementPage() {
           </div>
         </div>
       </main>
+
       <ToastContainer position="top-right" autoClose={3000} aria-label="Thông báo hệ thống" />
+
+      {/* Modal Xem chi tiết */}
       {selectedPost && (
-        <div
-          className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-[9999]"
-          onClick={() => setSelectedPost(null)}
-        >
-          <div
-            className="bg-white rounded-2xl shadow-xl p-6 max-w-2xl w-full max-h-[90vh] overflow-y-auto animate-fadeIn"
-            onClick={(e) => e.stopPropagation()}
-          >
-            {/* Header */}
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-[9999]" onClick={() => { setSelectedPost(null); setSharedPost(null); }}>
+          <div className="bg-white rounded-2xl shadow-xl p-6 max-w-2xl w-full max-h-[90vh] overflow-y-auto animate-fadeIn" onClick={(e) => e.stopPropagation()}>
+            {/* Thông tin bài đăng */}
             <div className="flex items-center gap-4 mb-4">
-              <img
-                src={selectedPost.avatar_url || '/avatar.jpg'}
-                alt="avatar"
-                className="w-12 h-12 rounded-full object-cover border"
-              />
+              <img src={selectedPost.avatar_url || '/avatar.jpg'} alt="avatar" className="w-12 h-12 rounded-full object-cover border" />
               <div>
-                <h3 className="text-lg font-semibold text-gray-800">
-                  Bài viết của {selectedPost.first_name} {selectedPost.last_name}
-                </h3>
+                <h3 className="text-lg font-semibold text-gray-800">Bài viết của {selectedPost.first_name} {selectedPost.last_name}</h3>
                 <p className="text-sm text-gray-500">
-                  {new Date(selectedPost.created_at).toLocaleString()} · {selectedPost.access_modifier === 'lock'
-                    ? 'Chỉ mình tôi'
-                    : selectedPost.access_modifier === 'people'
-                    ? 'Mọi người'
-                    : 'Công khai'}
+                  {new Date(selectedPost.created_at).toLocaleString()} · {
+                    selectedPost.access_modifier === 'lock' ? 'Chỉ mình tôi' :
+                    selectedPost.access_modifier === 'people' ? 'Mọi người' : 'Công khai'
+                  }
                 </p>
+                {sharedPost && (
+                  <div className="text-xs text-gray-500">
+                    đã chia sẻ bài viết của {sharedPost.first_name} {sharedPost.last_name}
+                  </div>
+                )}
               </div>
             </div>
-
-            {/* Nội dung bài viết */}
             <p className="text-gray-700 mb-4 whitespace-pre-line">{selectedPost.content}</p>
-
-            {/* Hình ảnh (nếu có) */}
+            {/* Ảnh bài đăng */}
             {(() => {
               let parsedImages: string[] = [];
               if (selectedPost.images) {
                 if (typeof selectedPost.images === 'string') {
                   try {
                     parsedImages = JSON.parse(selectedPost.images);
-                  } catch (err) {
-                    console.error('Lỗi khi parse images:', err);
-                  }
+                  } catch {}
                 } else if (Array.isArray(selectedPost.images)) {
                   parsedImages = selectedPost.images;
                 }
               }
-
               return parsedImages.length > 0 ? (
                 <div className="grid grid-cols-2 gap-3 mb-4">
                   {parsedImages.map((img, i) => (
-                    <img
-                      key={i}
-                      src={img}
-                      alt={`Image ${i}`}
-                      className="w-full rounded-xl object-cover shadow"
-                    />
+                    <img key={i} src={img} alt={`Image ${i}`} className="w-full rounded-xl object-cover shadow" />
                   ))}
                 </div>
               ) : null;
             })()}
+            {/* Nếu là bài share thì hiển thị bài gốc trong khung bo viền */}
+            {sharedPost && (
+              <div className="border rounded-lg bg-gray-50 p-3 mt-2">
+                <div className="flex items-center gap-3 mb-1">
+                  <img
+                    src={sharedPost.avatar_url || '/avatar.jpg'}
+                    alt="avatar"
+                    width={32}
+                    height={32}
+                    className="w-8 h-8 rounded-full object-cover border"
+                  />
+                  <div>
+                    <div className="font-semibold text-gray-900 text-sm">
+                      {sharedPost.first_name} {sharedPost.last_name}
+                    </div>
+                    <div className="text-xs text-gray-500">
+                      {sharedPost.created_at
+                        ? new Date(sharedPost.created_at).toLocaleString('vi-VN')
+                        : ''}
+                    </div>
+                  </div>
+                </div>
+                <div className="text-gray-800 text-sm whitespace-pre-line">{sharedPost.content}</div>
+                {(() => {
+                  let imgs: string[] = [];
+                  if (sharedPost.images) {
+                    if (typeof sharedPost.images === 'string') {
+                      try { imgs = JSON.parse(sharedPost.images); } catch {}
+                    } else if (Array.isArray(sharedPost.images)) {
+                      imgs = sharedPost.images;
+                    }
+                  }
+                  return imgs.length > 0 ? (
+                    <div className="flex flex-wrap gap-2 mt-2">
+                      {imgs.map((img, idx) => (
+                        <img
+                          key={idx}
+                          src={img}
+                          alt={`Ảnh ${idx + 1}`}
+                          width={96}
+                          height={96}
+                          className="w-24 h-24 object-cover rounded border"
+                        />
+                      ))}
+                    </div>
+                  ) : null;
+                })()}
+              </div>
+            )}
+            <div className="flex justify-end mt-4">
+              <button className="px-4 py-2 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition" onClick={() => { setSelectedPost(null); setSharedPost(null); }}>Đóng</button>
+            </div>
+          </div>
+        </div>
+      )}
 
-            {/* Nút đóng */}
-            <div className="flex justify-end">
-              <button
-                className="px-4 py-2 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition"
-                onClick={() => setSelectedPost(null)}
-              >
-                Đóng
+      {/* Modal xác nhận xóa */}
+      {deletePostId && (
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-[9999]" onClick={() => setDeletePostId(null)}>
+          <div className="bg-white rounded-2xl shadow-xl p-6 w-full max-w-md animate-fadeIn" onClick={(e) => e.stopPropagation()}>
+            <div className="flex flex-col items-center text-center">
+              <h2 className="text-xl font-bold text-gray-800 mb-2">Xác nhận xóa</h2>
+              <p className="text-gray-600 mb-6">Bạn có chắc chắn muốn xóa bài đăng này không? Hành động này không thể hoàn tác.</p>
+            </div>
+            <div className="flex justify-end gap-3">
+              <button className="px-4 py-2 rounded-xl bg-gray-100 text-gray-700 hover:bg-gray-200 transition" onClick={() => setDeletePostId(null)}>
+                Hủy
+              </button>
+              <button className="px-4 py-2 rounded-xl bg-red-500 text-white hover:bg-red-600 transition font-medium" onClick={confirmDeletePost}>
+                Xóa bài
               </button>
             </div>
           </div>

@@ -516,22 +516,18 @@ export default function ReportsPage(): ReactElement {
         </div>
       )}
       {deleteReportId && (
-        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-[9999]" onClick={() => setDeleteReportId(null)}>
-          <div className="bg-white rounded-2xl shadow-xl p-6 max-w-sm w-full" onClick={e => e.stopPropagation()}>
-            <h2 className="text-lg font-bold mb-4 text-center">Xác nhận xóa</h2>
-            <p className="mb-6 text-center">Bạn có chắc chắn muốn xóa báo cáo này?</p>
-            <div className="flex justify-end gap-2">
-              <button
-                className="px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600"
-                onClick={confirmDelete}
-              >
-                Xóa
-              </button>
-              <button
-                className="px-4 py-2 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300"
-                onClick={() => setDeleteReportId(null)}
-              >
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-[9999]" onClick={() => setDeleteReportId(null)}>
+          <div className="bg-white rounded-2xl shadow-xl p-6 w-full max-w-md animate-fadeIn" onClick={e => e.stopPropagation()}>
+            <div className="flex flex-col items-center text-center">
+              <h2 className="text-xl font-bold text-gray-800 mb-2">Xác nhận xóa</h2>
+              <p className="text-gray-600 mb-6">Bạn có chắc chắn muốn xóa báo cáo này không? Hành động này không thể hoàn tác.</p>
+            </div>
+            <div className="flex justify-end gap-3">
+              <button className="px-4 py-2 rounded-xl bg-gray-100 text-gray-700 hover:bg-gray-200 transition" onClick={() => setDeleteReportId(null)}>
                 Hủy
+              </button>
+              <button className="px-4 py-2 rounded-xl bg-red-500 text-white hover:bg-red-600 transition font-medium" onClick={confirmDelete}>
+                Xóa báo cáo
               </button>
             </div>
           </div>

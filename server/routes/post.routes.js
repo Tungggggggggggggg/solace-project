@@ -74,4 +74,42 @@ router.delete('/:id', async (req, res) => {
   }
 });
 
+// Lấy chi tiết một bài đăng (và bài gốc nếu là bài chia sẻ)
+router.get('/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    // Lấy thông tin bài đăng
+    const postRes = await pool.query(
+      `SELECT p.*, u.first_name, u.last_name, u.avatar_url
+       FROM posts p
+       JOIN users u ON p.user_id = u.id
+       WHERE p.id = $1`, [id]
+    );
+    if (postRes.rows.length === 0) {
+      return res.status(404).json({ error: 'Không tìm thấy bài đăng' });
+    }
+    const post = postRes.rows[0];
+
+    // Nếu là bài share, lấy thêm bài gốc
+    let shared_post = null;
+    if (post.shared_post_id) {
+      const sharedRes = await pool.query(
+        `SELECT p.*, u.first_name, u.last_name, u.avatar_url
+         FROM posts p
+         JOIN users u ON p.user_id = u.id
+         WHERE p.id = $1`, [post.shared_post_id]
+      );
+      shared_post = sharedRes.rows[0] || null;
+    }
+
+    res.json({
+      success: true,
+      post,
+      shared_post,
+    });
+  } catch (err) {
+    res.status(500).json({ error: 'Lỗi server', detail: err.message });
+  }
+});
+
 module.exports = router;
