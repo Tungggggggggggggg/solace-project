@@ -4,8 +4,9 @@ import { Be_Vietnam_Pro } from "next/font/google";
 import "./globals.css";
 import { UserContextProvider } from "@/contexts/UserContext";
 import VisitTracker from '@/components/VisitTracker'; 
-import 'react-toastify/dist/ReactToastify.css';
-import { ForbiddenWordsProvider } from "@/contexts/ForbiddenWordsContext";
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import ReactQueryProvider from "./providers/ReactQueryProvider";
+
 
 // Cấu hình font Be Vietnam Pro với các trọng lượng và hỗ trợ tiếng Việt
 const beVietnamPro = Be_Vietnam_Pro({
@@ -13,6 +14,15 @@ const beVietnamPro = Be_Vietnam_Pro({
   subsets: ["latin", "vietnamese"], /* Hỗ trợ Latin và tiếng Việt */
   variable: "--font-be-vietnam-pro", /* Biến CSS cho font */
   display: "swap", /* Tối ưu hiển thị font */
+});
+
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      retry: 1,
+      refetchOnWindowFocus: false,
+    },
+  },
 });
 
 // Định nghĩa metadata cho ứng dụng
@@ -29,7 +39,7 @@ export default function RootLayout({
 }>) {
   return (
     // HTML root với ngôn ngữ tiếng Anh
-    <html lang="en">
+    <html lang="en" className="mdl-js">
       <head>
         {/* Thêm Google Material Symbols để sử dụng icon */}
         <link
@@ -43,9 +53,12 @@ export default function RootLayout({
         suppressHydrationWarning
       >
         <VisitTracker /> {/*  Gọi API visits khi user mở web */}
-        <ForbiddenWordsProvider>
-          <UserContextProvider>{children}</UserContextProvider>
-        </ForbiddenWordsProvider>
+        
+        <UserContextProvider>
+          <ReactQueryProvider>
+            {children}
+          </ReactQueryProvider>
+        </UserContextProvider>
       </body>
     </html>
   );

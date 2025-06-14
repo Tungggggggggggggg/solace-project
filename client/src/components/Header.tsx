@@ -2,12 +2,15 @@
 
 import React, { useEffect, useRef, useState, useCallback, memo } from "react";
 import Image from "next/image";
-import { useRouter } from "next/navigation";
+import { useRouter, usePathname } from "next/navigation";
 import { useUser } from "@/contexts/UserContext";
 import Toast, { ToastProps } from "./Toast";
 import Link from "next/link";
 import gsap from "gsap";
 import FilteredInput from "@/components/FilteredInput";
+import { debounce } from 'lodash';
+import { socket } from '@/socket';
+import { access } from "fs";
 
 
 // Định nghĩa kiểu props cho Header
@@ -38,7 +41,8 @@ const Header = memo<HeaderProps>(({
   onSearchKeyDown,
 }) => {
   const router = useRouter();
-  const { user, loading, logout } = useUser();
+  const pathname = usePathname();
+  const { user, loading, logout, accessToken } = useUser();
   console.log("Header rendered with user:", user);
 
   // State declarations
@@ -47,12 +51,28 @@ const Header = memo<HeaderProps>(({
   const [suggestions, setSuggestions] = useState<SearchSuggestion[]>([]);
   const [showUserMenu, setShowUserMenu] = useState(false);
   const [toast, setToast] = useState<{ message: string; type: ToastProps["type"] } | null>(null);
+  // Tổng số tin nhắn chưa đọc
+  const [unreadCount, setUnreadCount] = useState(0);
+  //Tổng số thông báo chưa đọc
+  const [unreadNotifications, setUnreadNotifications] = useState(5);
+  // State kiểm soát hiển thị biểu tượng tin nhắn và thông báo
+  const [showMessageIcon, setShowMessageIcon] = useState(true);
+  const [showNotificationIcon, setShowNotificationIcon] = useState(true);
 
   // Refs
   const inputRef = useRef<HTMLDivElement>(null);
   const userMenuRef = useRef<HTMLDivElement>(null);
   const loginBtnRef = useRef<HTMLButtonElement>(null);
   const signupBtnRef = useRef<HTMLButtonElement>(null);
+  const messageBtnRef = useRef<HTMLButtonElement>(null);
+  const notificationBtnRef = useRef<HTMLButtonElement>(null);
+
+  const debouncedUpdate = useCallback(
+    debounce((count: number) => {
+      setUnreadCount(count);
+    }, 300),
+    []
+  );
 
   // Constants
   const isControlled = typeof searchValue === 'string' && typeof onSearchChange === 'function';
@@ -60,6 +80,56 @@ const Header = memo<HeaderProps>(({
   const reflectiveColor = "#D5BDAF";
   const inspiringColor = "#AECBEB";
   const headerBg = theme === "reflective" ? reflectiveColor : inspiringColor;
+  // Hàm xử lý thay đổi giá trị ô tìm kiếm
+  const handleChange = isControlled ? onSearchChange : ((e: React.ChangeEvent<HTMLInputElement>) => setSearch(e.target.value));
+  // Hàm xử lý sự kiện nhấn phím trong ô tìm kiếm
+  const handleKeyDown = onSearchKeyDown || ((e) => {
+    if (e.key === "Enter") {
+      if (onSearch) onSearch();
+      else if (search.trim()) router.push(`/search?query=${encodeURIComponent(search.trim())}`);
+      setShowSuggestions(false);
+    }
+  });
+
+  // Hàm xử lý click nút tìm kiếm
+  const handleClick = onSearch || (() => {
+    if (value.trim()) router.push(`/search?query=${encodeURIComponent(value.trim())}`);
+    setShowSuggestions(false);
+  });
+
+  // Lấy gợi ý tìm kiếm từ API khi giá trị thay đổi
+  useEffect(() => {
+    const keyword = value.trim();
+    if (keyword) {
+      fetch(`/api/search-suggestions?query=${encodeURIComponent(keyword)}`)
+        .then(res => res.json())
+        .then(data => {
+          setSuggestions(Array.isArray(data) ? data : []);
+          setShowSuggestions(true);
+        });
+    } else {
+      setSuggestions([]);
+      setShowSuggestions(false);
+    }
+  }, [value]);
+
+  // Đóng gợi ý khi click ra ngoài
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (inputRef.current && !inputRef.current.contains(event.target as Node)) setShowSuggestions(false);
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  // Đóng menu người dùng khi click ra ngoài
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (userMenuRef.current && !userMenuRef.current.contains(event.target as Node)) setShowUserMenu(false);
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
 
   // Memoized handlers
   const memoizedHandleChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
@@ -107,6 +177,39 @@ const Header = memo<HeaderProps>(({
       else router.push(`/search?query=${encodeURIComponent(suggestion.name)}`);
     }
   }, [router, onSearchChange, onSearch, setSearch]);
+
+
+  // Fetch tổng số unread khi user thay đổi
+  useEffect(() => {
+    if (!user) return;
+    
+    fetch(`/api/messages/unread-total`, {
+      headers: { Authorization: `Bearer ${accessToken}` }
+    })
+      .then(res => res.json())
+      .then(data => {
+        setUnreadCount(data.total);
+      })
+      .catch(error => {
+        console.error('Error fetching unread count:', error);
+      });
+  }, [user, accessToken]);
+
+  // Realtime cập nhật khi có unread tăng
+  useEffect(() => {
+    if (!user) return;
+
+    const handleUnreadUpdate = (data: { total: number }) => {
+      debouncedUpdate(data.total);
+    };
+
+    socket.on("unreadTotalUpdated", handleUnreadUpdate);
+    
+    return () => {
+      socket.off("unreadTotalUpdated", handleUnreadUpdate);
+      debouncedUpdate.cancel();
+    };
+  }, [user, debouncedUpdate]);
 
   // Functions
   const showToast = (message: string, type: ToastProps["type"]) => {
@@ -187,6 +290,39 @@ const Header = memo<HeaderProps>(({
       });
     }
   }, []);
+
+  // Hiệu ứng xuất hiện cho các nút
+  useEffect(() => {
+    const buttons = [loginBtnRef.current, signupBtnRef.current, messageBtnRef.current, notificationBtnRef.current].filter(Boolean) as HTMLButtonElement[];
+    if (buttons.length > 0) {
+      gsap.from(buttons, {
+        opacity: 0,
+        y: 30,
+        duration: 0.7,
+        stagger: 0,
+        ease: "power3.out",
+        onComplete: () => resetAnimation(buttons),
+      });
+    }
+  }, []);
+
+  // Xử lý click vào nút tin nhắn
+  const handleMessageClick = () => {
+    setShowMessageIcon(false);
+    router.push("/messages");
+  };
+
+  // Xử lý click vào nút thông báo
+  const handleNotificationClick = () => {
+    setShowNotificationIcon(false);
+    router.push("/notifications");
+  };
+
+  // Hiển thị lại các biểu tượng dựa trên route hiện tại
+  useEffect(() => {
+    setShowMessageIcon(pathname !== "/messages");
+    setShowNotificationIcon(pathname !== "/notifications");
+  }, [pathname, user]);
 
   return (
     <>
@@ -270,39 +406,75 @@ const Header = memo<HeaderProps>(({
               </button>
             </>
           ) : (
-            <div className="relative" ref={userMenuRef}>
-              <button
-                className="flex items-center gap-2 hover:bg-gray-50 rounded-full p-2 transition-all duration-300 ease-in-out group"
-                onClick={() => setShowUserMenu(!showUserMenu)}
-              >
-                <Image 
-                  src={user.avatar_url || "https://media.istockphoto.com/id/1337144146/vector/default-avatar-profile-icon-vector.jpg?s=612x612&w=0&k=20&c=BIbFwuv7FxTWvh5S3vB6bkT0Qv8Vn8N5Ffseq84ClGI="} 
-                  alt="User Avatar" 
-                  width={36} 
-                  height={36} 
-                  className="rounded-full ring-2 ring-offset-2 ring-[#8CA9D5] group-hover:ring-blue-600 transition-all" 
-                />
-                <span className="text-sm font-medium text-gray-700 group-hover:text-blue-600">
-                  {user.last_name} {user.first_name}
-                </span>
-              </button>
-              {showUserMenu && (
-                <div className="absolute right-0 mt-2 w-48 bg-white rounded-xl shadow-lg py-1 z-50 transform transition-all duration-200 ease-out border border-gray-100">
-                  <button
-                    onClick={() => router.push("/profile")}
-                    className="flex items-center gap-2 w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-600 transition-colors duration-200"
-                  >
-                    <span className="material-symbols-outlined text-[20px]">person</span>Profile
-                  </button>
-                  <button
-                    onClick={handleLogout}
-                    className="flex items-center gap-2 w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 transition-colors duration-200"
-                  >
-                    <span className="material-symbols-outlined text-[20px]">logout</span>Sign out
-                  </button>
-                </div>
+            // Hiển thị biểu tượng tin nhắn, thông báo và menu người dùng nếu đã đăng nhập
+            <>
+              {showMessageIcon && (
+                <button
+                  ref={messageBtnRef}
+                  onClick={handleMessageClick}
+                  className="relative flex items-center justify-center w-10 h-10 rounded-full bg-white border border-[#8CA9D5] hover:bg-[#E1ECF7] transition-all duration-200"
+                  aria-label="Messages"
+                  onMouseEnter={() => handleBtnHover(messageBtnRef, 1.1)}
+                  onMouseLeave={() => handleBtnLeave(messageBtnRef)}
+                  onFocus={() => handleBtnHover(messageBtnRef, 1.1)}
+                  onBlur={() => handleBtnLeave(messageBtnRef)}
+                  type="button"
+                >
+                  <span className="material-symbols-outlined text-[#3B4252] text-[20px]">mail</span>
+                  {unreadCount > 0 && (
+                    <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center">
+                      {unreadCount}
+                    </span>
+                  )}
+                </button>
               )}
-            </div>
+              {showNotificationIcon && (
+                <button
+                  ref={notificationBtnRef}
+                  onClick={handleNotificationClick}
+                  className="relative flex items-center justify-center w-10 h-10 rounded-full bg-white border border-[#8CA9D5] hover:bg-[#E1ECF7] transition-all duration-200"
+                  aria-label="Notifications"
+                  onMouseEnter={() => handleBtnHover(notificationBtnRef, 1.1)}
+                  onMouseLeave={() => handleBtnLeave(notificationBtnRef)}
+                  onFocus={() => handleBtnHover(notificationBtnRef, 1.1)}
+                  onBlur={() => handleBtnLeave(notificationBtnRef)}
+                  type="button"
+                >
+                  <span className="material-symbols-outlined text-[#3B4252] text-[20px]">notifications</span>
+                  {unreadNotifications > 0 && (
+                    <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center">
+                      {unreadNotifications}
+                    </span>
+                  )}
+                </button>
+              )}
+              <div className="relative" ref={userMenuRef}>
+                <button
+                  className="flex items-center gap-2 hover:bg-gray-50 rounded-full p-2 transition-all duration-300 ease-in-out group"
+                  onClick={() => setShowUserMenu(!showUserMenu)}
+                >
+                  <Image src={user.avatar_url || "/default-avatar.png"} 
+                    alt="User Avatar" width={36} height={36} className="rounded-full ring-2 ring-offset-2 ring-[#8CA9D5] group-hover:ring-blue-600 transition-all" />
+                  <span className="text-sm font-medium text-gray-700 group-hover:text-blue-600">{user.last_name} {user.first_name}</span>
+                </button>
+                {showUserMenu && (
+                  <div className="absolute right-0 mt-2 w-48 bg-white rounded-xl shadow-lg py-1 z-50 transform transition-all duration-200 ease-out border border-gray-100">
+                    <button
+                      onClick={() => router.push("/profile")}
+                      className="flex items-center gap-2 w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-600 transition-colors duration-200"
+                    >
+                      <span className="material-symbols-outlined text-[20px]">person</span>Profile
+                    </button>
+                    <button
+                      onClick={handleLogout}
+                      className="flex items-center gap-2 w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 transition-colors duration-200"
+                    >
+                      <span className="material-symbols-outlined text-[20px]">logout</span>Sign out
+                    </button>
+                  </div>
+                )}
+              </div>
+            </>
           )}
         </div>
       </header>

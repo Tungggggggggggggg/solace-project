@@ -1,8 +1,9 @@
-require('dotenv').config();
 const express = require("express");
 const dotenv = require("dotenv");
 const cors = require("cors");
 const cookieParser = require("cookie-parser");
+const path = require('path');
+const http = require('http');
 
 const userRoutes = require("./routes/user.routes");
 const authRoutes = require("./routes/auth.routes");
@@ -15,6 +16,7 @@ const commentsRouter = require('./routes/comments');
 const likesRouter = require('./routes/likes');
 const dashboardRoutes = require('./routes/dashboard.routes');
 const visitsRoutes = require('./routes/visits.routes'); 
+const messagesRoutes = require('./routes/messages.routes');
 const pool = require("./db");
 
 dotenv.config();
@@ -45,9 +47,7 @@ pool.query("SELECT NOW()", (err, res) => {
   if (err) {
     console.error("Kết nối PostgreSQL thất bại:", err.message);
   } else {
-    if (process.env.NODE_ENV !== 'production') {
-      console.log("Kết nối PostgreSQL thành công:", res.rows[0]);
-    }
+    console.log("Kết nối PostgreSQL thành công:", res.rows[0]);
   }
 });
 
@@ -68,13 +68,16 @@ app.use('/api/likes', likesRouter);
 app.use("/api/forbidden_words", forbiddenWordsRoutes);
 app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/visits', visitsRoutes);
+app.use('/api/messages', messagesRoutes);
+
+
+// Khởi tạo HTTP server
+const PORT = process.env.PORT || 5000;
+const server = http.createServer(app);
+
+// Khởi tạo socket.io qua module riêng
+const socketModule = require('./socket');
+socketModule.init(server);
 
 // Khởi động server
-const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => {
-  if (process.env.NODE_ENV !== 'production') {
-    console.log(`Server chạy trên http://localhost:${PORT}`);
-  }
-});
-
-module.exports = app;
+server.listen(PORT, () => console.log(`Server chạy trên http://localhost:${PORT}`));
