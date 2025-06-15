@@ -8,6 +8,9 @@ import { toast, ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import Image from 'next/image';
 import FilteredInput from '@/components/FilteredInput';
+import axios from 'axios';
+import SkeletonPost from '@/components/SkeletonPost';
+
 type Report = {
   report_id: string;
   date_reported: string;
@@ -100,7 +103,19 @@ export default function ReportsPage(): ReactElement {
     if (result.success) {
       setSelectedReport(result.report);
       setReportedPost(result.post);
-      setSharedPost(result.shared_post || null); // <-- thêm dòng này
+      if (result.post.shared_post_id) {
+        setSharedPost(null); // loading
+        axios.get(`/api/posts/${result.post.shared_post_id}`)
+          .then(res => {
+            // Nếu có lỗi hoặc không có post, coi như không còn tồn tại
+            if (!res.data || res.data.error || !res.data.post) {
+              setSharedPost(undefined);
+            } else {
+              setSharedPost(res.data.post);
+            }
+          })
+          .catch(() => setSharedPost(undefined));
+      }
     } else {
       toast.error(result.error || 'Không lấy được chi tiết báo cáo');
     }
@@ -387,104 +402,105 @@ export default function ReportsPage(): ReactElement {
                 <h4 className="font-semibold text-gray-700 mb-2">Bài đăng bị báo cáo</h4>
                 <div className="bg-white rounded-xl shadow border p-4 flex flex-col gap-2">
                   {/* Header: Avatar, tên, trạng thái share, thời gian */}
-                  <div className="flex items-center gap-3">
-                    {reportedPost.avatar_url && (
-                      <Image
-                        src={reportedPost.avatar_url}
-                        alt="avatar"
-                        width={40}
-                        height={40}
-                        className="w-10 h-10 rounded-full object-cover border"
-                      />
-                    )}
+                  <div className="flex items-center gap-4 mb-4">
+                    <img
+                      src={reportedPost.avatar_url || '/avatar.jpg'}
+                      alt="avatar"
+                      className="w-12 h-12 rounded-full object-cover border"
+                    />
                     <div>
-                      <div className="font-semibold text-gray-900">
-                        {(reportedPost.first_name || '') + ' ' + (reportedPost.last_name || '')}
-                      </div>
-                      {/* Nếu là bài share thì hiển thị trạng thái chia sẻ */}
+                      <h3 className="text-lg font-semibold text-gray-800">
+                        Bài viết của {(reportedPost.first_name || '') + ' ' + (reportedPost.last_name || '')}
+                      </h3>
+                      <p className="text-sm text-gray-500">
+                        {reportedPost.created_at
+                          ? new Date(reportedPost.created_at).toLocaleString('vi-VN')
+                          : ''}
+                      </p>
                       {sharedPost && (
                         <div className="text-xs text-gray-500">
                           đã chia sẻ bài viết của {(sharedPost.first_name || '') + ' ' + (sharedPost.last_name || '')}
                         </div>
                       )}
-                      <div className="text-xs text-gray-500">
-                        {reportedPost.created_at
-                          ? new Date(reportedPost.created_at).toLocaleString('vi-VN')
-                          : ''}
-                      </div>
                     </div>
                   </div>
-                  {/* Nội dung bài chia sẻ */}
-                  <div className="text-gray-800 whitespace-pre-line">{reportedPost.content}</div>
-                  {/* Ảnh bài chia sẻ nếu có */}
-                  {reportedPost.images && (() => {
-                    let imgs: string[] = [];
-                    try {
-                      imgs = JSON.parse(reportedPost.images);
-                    } catch {}
-                    return Array.isArray(imgs) && imgs.length > 0 ? (
-                      <div className="flex flex-wrap gap-2 mt-2">
-                        {imgs.map((img, idx) => (
-                          <Image
-                            key={idx}
-                            src={img}
-                            alt={`Ảnh ${idx + 1}`}
-                            width={128}
-                            height={128}
-                            className="w-32 h-32 object-cover rounded border"
-                            unoptimized
-                          />
+                  <p className="text-gray-700 mb-4 whitespace-pre-line">{reportedPost.content}</p>
+                  {/* Ảnh bài chia sẻ */}
+                  {(() => {
+                    let parsedImages: string[] = [];
+                    if (reportedPost.images) {
+                      try {
+                        parsedImages = JSON.parse(reportedPost.images);
+                      } catch {}
+                    }
+                    return parsedImages.length > 0 ? (
+                      <div className="grid grid-cols-2 gap-3 mb-4">
+                        {parsedImages.map((img, i) => (
+                          <img key={i} src={img} alt={`Image ${i}`} className="w-full rounded-xl object-cover shadow" />
                         ))}
                       </div>
                     ) : null;
                   })()}
                   {/* Nếu là bài share thì hiển thị bài gốc trong khung bo viền */}
-                  {sharedPost && (
-                    <div className="border rounded-lg bg-gray-50 p-3 mt-2">
-                      <div className="flex items-center gap-3 mb-1">
-                        {sharedPost.avatar_url && (
-                          <Image
-                            src={sharedPost.avatar_url}
+                  {reportedPost.shared_post_id && (
+                    sharedPost === null ? (
+                      <SkeletonPost />
+                    ) : sharedPost === undefined ? (
+                      <div className="border-2 border-dashed border-gray-300 rounded-2xl bg-gray-50 p-8 mt-4 flex flex-col items-center justify-center shadow-sm">
+                        <span className="material-symbols-outlined text-5xl text-gray-400 mb-2">
+                          block
+                        </span>
+                        <div className="text-lg font-semibold text-gray-700 mb-1">
+                          Nội dung này không còn tồn tại
+                        </div>
+                        <div className="text-sm text-gray-500">
+                          Bài viết gốc đã bị xóa hoặc không khả dụng.
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="border rounded-lg bg-gray-50 p-3 mt-2">
+                        <div className="flex items-center gap-3 mb-1">
+                          <img
+                            src={sharedPost.avatar_url || '/avatar.jpg'}
                             alt="avatar"
                             width={32}
                             height={32}
                             className="w-8 h-8 rounded-full object-cover border"
                           />
-                        )}
-                        <div>
-                          <div className="font-semibold text-gray-900 text-sm">
-                            {(sharedPost.first_name || '') + ' ' + (sharedPost.last_name || '')}
-                          </div>
-                          <div className="text-xs text-gray-500">
-                            {sharedPost.created_at
-                              ? new Date(sharedPost.created_at).toLocaleString('vi-VN')
-                              : ''}
+                          <div>
+                            <div className="font-semibold text-gray-900 text-sm">
+                              {(sharedPost.first_name || '') + ' ' + (sharedPost.last_name || '')}
+                            </div>
+                            <div className="text-xs text-gray-500">
+                              {sharedPost.created_at
+                                ? new Date(sharedPost.created_at).toLocaleString('vi-VN')
+                                : ''}
+                            </div>
                           </div>
                         </div>
+                        <div className="text-gray-800 text-sm whitespace-pre-line">{sharedPost.content}</div>
+                        {(() => {
+                          let imgs: string[] = [];
+                          if (sharedPost.images) {
+                            try { imgs = JSON.parse(sharedPost.images); } catch {}
+                          }
+                          return imgs.length > 0 ? (
+                            <div className="flex flex-wrap gap-2 mt-2">
+                              {imgs.map((img, idx) => (
+                                <img
+                                  key={idx}
+                                  src={img}
+                                  alt={`Ảnh ${idx + 1}`}
+                                  width={96}
+                                  height={96}
+                                  className="w-24 h-24 object-cover rounded border"
+                                />
+                              ))}
+                            </div>
+                          ) : null;
+                        })()}
                       </div>
-                      <div className="text-gray-800 text-sm whitespace-pre-line">{sharedPost.content}</div>
-                      {sharedPost.images && (() => {
-                        let imgs: string[] = [];
-                        try {
-                          imgs = JSON.parse(sharedPost.images);
-                        } catch {}
-                        return Array.isArray(imgs) && imgs.length > 0 ? (
-                          <div className="flex flex-wrap gap-2 mt-2">
-                            {imgs.map((img, idx) => (
-                              <Image
-                                key={idx}
-                                src={img}
-                                alt={`Ảnh ${idx + 1}`}
-                                width={96}
-                                height={96}
-                                className="w-24 h-24 object-cover rounded border"
-                                unoptimized
-                              />
-                            ))}
-                          </div>
-                        ) : null;
-                      })()}
-                    </div>
+                    )
                   )}
                 </div>
               </div>

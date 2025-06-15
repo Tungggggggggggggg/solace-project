@@ -54,6 +54,16 @@ export default function HeaderAdmin({
     }
   }, [showDropdown, notifications]);
 
+  // Scroll lên đầu danh sách khi mở dropdown
+  useEffect(() => {
+    if (showDropdown && notiListRef.current) {
+      notiListRef.current.scrollTo({
+        top: 0,
+        behavior: 'smooth',
+      });
+    }
+  }, [showDropdown]);
+
   // Tải thêm khi cuộn
   const handleNotiScroll = () => {
     if (!notiListRef.current) return;
@@ -72,6 +82,11 @@ export default function HeaderAdmin({
     };
   }, [showDropdown, notifications.length]);
 
+  // Toggle dropdown
+  const handleToggleDropdown = () => {
+    setShowDropdown((prev) => !prev);
+  };
+
   return (
     <header className="h-16 bg-[#AECBEB] px-6 flex items-center justify-between fixed top-0 left-64 right-0 z-30">
       <div className="flex items-center gap-4">
@@ -89,17 +104,26 @@ export default function HeaderAdmin({
 
       <div className="flex items-center gap-4 relative" ref={notiWrapperRef}>
         {/* Bell icon */}
-        <button
-          className="p-2 hover:bg-gray-100 rounded-full relative"
-          onClick={() => setShowDropdown((prev) => !prev)}
-        >
-          <FiBell className="w-6 h-6 text-gray-600" />
-          {notiCount > 0 && (
-            <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full px-1.5 animate-pingOnce">
-              {notiCount}
-            </span>
-          )}
-        </button>
+          <button
+            className={`p-2 rounded-full relative transition-all duration-200 ${
+              showDropdown
+                ? 'bg-gray-100 hover:bg-gray-200' // Đã mở => giữ màu, hover sáng hơn chút
+                : 'hover:bg-gray-100'
+            }`}
+            onClick={handleToggleDropdown}
+          >
+            <FiBell
+              className={`w-6 h-6 transition-colors duration-200 ${
+                showDropdown ? 'text-blue-600' : 'text-gray-600'
+              }`}
+            />
+            {notiCount > 0 && (
+              <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full px-1.5 animate-pingOnce">
+                {notiCount}
+              </span>
+            )}
+          </button>
+
 
         {/* User icon */}
         <button onClick={() => onOpenAuth('login')} className="p-2 hover:bg-gray-100 rounded-full">
@@ -109,7 +133,7 @@ export default function HeaderAdmin({
         {/* Dropdown */}
         {showDropdown && (
           <div
-            className="absolute right-10 mt-2 w-96 bg-white shadow-lg rounded-xl border z-50 animate-slide-down"
+            className="absolute right-10 mt-0 w-96 bg-white shadow-lg rounded-xl border z-50 animate-slide-down"
             style={{ top: '100%' }}
           >
             <div className="p-4 border-b font-semibold text-gray-700">Thông báo mới</div>
@@ -129,7 +153,6 @@ export default function HeaderAdmin({
                     <div className="w-10 h-10 flex-shrink-0 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 text-xl">
                       {noti.title === 'Báo cáo mới' ? '🚨' : '📝'}
                     </div>
-
                     <div className="flex flex-col flex-grow">
                       <div className="text-sm font-semibold text-gray-800">{noti.title}</div>
                       <div className="text-sm text-gray-600 line-clamp-2">{noti.content}</div>

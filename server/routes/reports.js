@@ -160,24 +160,26 @@ router.get('/:id', async (req, res) => {
     const report = reportRes.rows[0];
 
     // Lấy thông tin bài đăng bị báo cáo
+    let post = null;
+    let shared_post = null;
     const postRes = await pool.query(
       `SELECT p.*, u.first_name, u.last_name, u.avatar_url
        FROM posts p
        JOIN users u ON p.user_id = u.id
        WHERE p.id = $1`, [report.post_id]
     );
-    const post = postRes.rows[0] || null;
-
-    // Nếu là bài share, lấy thêm bài gốc
-    let shared_post = null;
-    if (post && post.shared_post_id) {
-      const sharedRes = await pool.query(
-        `SELECT p.*, u.first_name, u.last_name, u.avatar_url
-         FROM posts p
-         JOIN users u ON p.user_id = u.id
-         WHERE p.id = $1`, [post.shared_post_id]
-      );
-      shared_post = sharedRes.rows[0] || null;
+    if (postRes.rows.length > 0) {
+      post = postRes.rows[0];
+      // Nếu là bài chia sẻ, lấy bài gốc
+      if (post.shared_post_id) {
+        const sharedRes = await pool.query(
+          `SELECT p.*, u.first_name, u.last_name, u.avatar_url
+           FROM posts p
+           JOIN users u ON p.user_id = u.id
+           WHERE p.id = $1`, [post.shared_post_id]
+        );
+        shared_post = sharedRes.rows[0] || null;
+      }
     }
 
     res.json({
