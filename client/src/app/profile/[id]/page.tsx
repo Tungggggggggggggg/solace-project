@@ -116,9 +116,7 @@ export default function UserProfilePage({ params }: { params: Promise<{ id: stri
         // Gọi API lấy profile user và follow-stats, truyền accessToken để backend xác thực user hiện tại
         const [userResponse, followStats] = await Promise.all([
           apiCall(`/api/users/${unwrappedParams.id}`),
-          apiCall(`/api/users/${unwrappedParams.id}/follow-stats`, {
-            headers: { Authorization: `Bearer ${accessToken || ''}` }
-          })
+          apiCall(`/api/users/${unwrappedParams.id}/follow-stats`)
         ]);
         setProfileUser(userResponse);
         setFollowersCount(followStats.followers_count);
@@ -232,9 +230,11 @@ export default function UserProfilePage({ params }: { params: Promise<{ id: stri
 
   // Load initial posts
   useEffect(() => {
-    fetchUserPosts(0);
+    if (unwrappedParams.id && accessToken) {
+      fetchUserPosts(0);
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [unwrappedParams.id, activeTab]);
+  }, [unwrappedParams.id, activeTab, accessToken]);
 
   // Handle infinite scroll
   const handleScroll = useCallback(() => {
