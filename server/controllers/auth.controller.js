@@ -449,9 +449,9 @@ exports.forgotPassword = async (req, res) => {
     try {
       await sendResetEmail(email, resetLink);
     } catch (emailErr) {
-      console.error("Lỗi gửi email:", emailErr.message);
+      console.error("Lỗi gửi email:", emailErr && (emailErr.stack || emailErr.message || emailErr));
       return res.status(400).json({
-        error: "Không thể gửi email. Có thể địa chỉ email không tồn tại thật.",
+        error: "Không thể gửi email. Có thể địa chỉ email không tồn tại thật hoặc cấu hình gửi mail bị sai. Chi tiết lỗi đã được log ở server.",
       });
     }
 
@@ -506,22 +506,27 @@ async function sendResetEmail(email, link) {
   });
 
   await transporter.sendMail({
-    from: `"Solace Support" <${process.env.EMAIL_USER}>`,
+    from: `Solace Support <${process.env.EMAIL_USER}>`,
     to: email,
-    subject: "Yêu cầu khôi phục mật khẩu",
+    subject: "[Solace] Yêu cầu đặt lại mật khẩu tài khoản của bạn",
     html: `
-      <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
-        <h2>Yêu cầu khôi phục mật khẩu</h2>
-        <p>Xin chào,</p>
-        <p>Chúng tôi đã nhận được yêu cầu khôi phục mật khẩu cho tài khoản liên kết với địa chỉ email này.</p>
-        <p>Vui lòng nhấn vào nút bên dưới để đặt lại mật khẩu của bạn. Liên kết sẽ hết hạn sau 15 phút.</p>
-        <p style="text-align: center; margin: 20px 0;">
-          <a href="${link}" style="background-color: #007bff; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">
-            Đặt lại mật khẩu
-          </a>
-        </p>
-        <p>Nếu bạn không yêu cầu hành động này, vui lòng bỏ qua email này.</p>
-        <p>Trân trọng,<br/>Đội ngũ hỗ trợ Solace</p>
+      <div style="font-family: 'Segoe UI', Arial, sans-serif; background: #f4f6fb; padding: 32px 0;">
+        <div style="max-width: 480px; margin: 0 auto; background: #fff; border-radius: 16px; box-shadow: 0 4px 24px rgba(99,102,241,0.08); padding: 32px 28px 28px 28px;">
+          <div style="text-align: center; margin-bottom: 18px;">
+            <img src='https://i.imgur.com/1Q9Z1Zm.png' alt='Solace Logo' width='48' height='48' style='border-radius:12px; box-shadow:0 2px 8px rgba(99,102,241,0.08); background:#f1f5f9;'/>
+          </div>
+          <h2 style="color: #1e293b; font-size: 1.5rem; font-weight: 700; margin-bottom: 8px; text-align: center;">Yêu cầu đặt lại mật khẩu</h2>
+          <p style="color: #334155; font-size: 1rem; margin-bottom: 18px; text-align: center;">Chúng tôi nhận được yêu cầu đặt lại mật khẩu cho tài khoản liên kết với địa chỉ email này.</p>
+          <div style="text-align: center; margin: 24px 0;">
+            <a href="${link}" style="display:inline-block; background: linear-gradient(90deg,#6366f1 0%,#2563eb 100%); color: #fff; padding: 12px 32px; border-radius: 8px; font-weight: 600; font-size: 1.1rem; text-decoration: none; box-shadow: 0 2px 8px rgba(99,102,241,0.08); transition: background 0.2s;">Đặt lại mật khẩu</a>
+          </div>
+          <p style="color: #64748b; font-size: 0.98rem; margin-bottom: 8px;">Liên kết trên sẽ hết hạn sau <b>15 phút</b> vì lý do bảo mật. Nếu bạn không thực hiện yêu cầu này, vui lòng bỏ qua email này.</p>
+          <div style="margin-top: 18px; padding-top: 12px; border-top: 1px solid #e5e7eb; color: #94a3b8; font-size: 0.95rem; text-align: center;">
+            Nếu có bất kỳ thắc mắc hoặc cần hỗ trợ, hãy liên hệ đội ngũ Solace qua email <a href="mailto:support@solace.com" style="color:#6366f1; text-decoration:underline;">support@solace.com</a>.<br/>
+            <span style="font-size: 0.93rem;">Trân trọng,<br/>Đội ngũ Solace</span>
+          </div>
+        </div>
+        <div style="text-align:center; color:#b6bbc7; font-size:0.92rem; margin-top:18px;">© ${new Date().getFullYear()} Solace. All rights reserved.</div>
       </div>
     `,
   });
