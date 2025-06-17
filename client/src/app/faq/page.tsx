@@ -4,8 +4,12 @@
 import LeftSidebar from "../../components/LeftSidebar";
 import Header from "../../components/Header";
 import { useRouter } from "next/navigation";
-import React, { useState } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import AuthModal from "../../components/AuthModal";
+import { gsap } from "gsap";
+import { ScrollTrigger } from "gsap/ScrollTrigger";
+
+gsap.registerPlugin(ScrollTrigger);
 
 // Component FAQPage hiển thị trang câu hỏi thường gặp
 const FAQPage = () => {
@@ -17,6 +21,36 @@ const FAQPage = () => {
   const [authTab, setAuthTab] = useState<'login' | 'signup'>('login');
   // State để theo dõi câu hỏi đang được mở
   const [activeQuestion, setActiveQuestion] = useState<number | null>(null);
+  const faqRefs = useRef<(HTMLDivElement | null)[]>([]);
+
+  // Animate FAQ cards on mount and on scroll
+  useEffect(() => {
+    faqRefs.current.forEach((faqCard, i) => {
+      if (faqCard) {
+        gsap.fromTo(
+          faqCard,
+          { opacity: 0, scale: 0.9 },
+          {
+            opacity: 1,
+            scale: 1,
+            duration: 0.9,
+            ease: "back.out(1.7)",
+            delay: i * 0.1,
+            scrollTrigger: {
+              trigger: faqCard,
+              start: "top 90%",
+              toggleActions: "play none none none",
+            },
+          }
+        );
+      }
+    });
+
+    // Background animation - more subtle
+    gsap.to(".bg-circle-faq-1", { y: 15, x: 15, duration: 6, repeat: -1, yoyo: true, ease: "sine.inOut" });
+    gsap.to(".bg-circle-faq-2", { y: -20, x: -20, duration: 7, repeat: -1, yoyo: true, ease: "sine.inOut" });
+
+  }, []);
 
   // Hàm mở modal với tab được chỉ định
   const handleOpenAuth = (tab: 'login' | 'signup') => {
@@ -60,7 +94,11 @@ const FAQPage = () => {
 
   return (
     // Container chính với gradient background
-    <div className="min-h-screen flex flex-col w-full bg-gradient-to-br from-[#E1ECF7] to-[#AECBEB]">
+    <div className="min-h-screen flex flex-col w-full bg-slate-50 overflow-hidden relative font-sans text-gray-800">
+      {/* Background animated circles */}
+      {/* <div className="absolute top-1/4 left-1/4 w-64 h-64 bg-blue-100/50 rounded-full mix-blend-multiply filter blur-3xl opacity-60 animate-blob bg-circle-faq-1" aria-hidden="true" />
+      <div className="absolute bottom-1/4 right-1/4 w-72 h-72 bg-purple-100/50 rounded-full mix-blend-multiply filter blur-3xl opacity-60 animate-blob animation-delay-2000 bg-circle-faq-2" aria-hidden="true" /> */}
+
       {/* Header component với khả năng mở modal đăng nhập/đăng ký */}
       <Header onOpenAuth={handleOpenAuth} />
       {/* Modal xác thực (đăng nhập/đăng ký) */}
@@ -70,85 +108,88 @@ const FAQPage = () => {
         {/* Sidebar trái hiển thị các icon điều hướng */}
         <LeftSidebar />
         {/* Nội dung chính của trang */}
-        <main className="flex-1 flex flex-col items-center px-6 md:px-12 pb-16">
-          <div className="w-full max-w-4xl relative">
-            {/* Các vòng tròn trang trí mờ để tăng tính thẩm mỹ */}
-            <div className="absolute top-0 right-0 w-96 h-96 bg-white/20 rounded-full blur-3xl -mr-48 -mt-24" />
-            <div className="absolute bottom-0 left-0 w-96 h-96 bg-white/20 rounded-full blur-3xl -ml-48 -mb-24" />
+        <main className="flex-1 flex flex-col items-center px-4 md:px-12 pb-16">
+          <div className="w-full max-w-3xl relative z-10">
+            {/* Nút điều hướng quay về trang chủ */}
+            <nav className="mb-10">
+              <button
+                onClick={() => router.push("/")}
+                className="inline-flex items-center gap-2 text-blue-700 hover:text-blue-900 font-medium transition-all hover:-translate-x-1 bg-white/70 backdrop-blur-md px-4 py-2 rounded-full shadow-md hover:shadow-lg focus:outline-none focus:ring-2 focus:ring-blue-300"
+                aria-label="Về trang chủ"
+              >
+                <span className="material-symbols-outlined text-base">arrow_back</span>
+                Trang chủ
+              </button>
+            </nav>
 
-            {/* Nội dung chính được đặt trong một div có z-index cao */}
-            <div className="relative z-10">
-              {/* Nút điều hướng quay về trang chủ */}
-              <nav className="mb-12">
-                <button
-                  onClick={() => router.push("/")}
-                  className="inline-flex items-center gap-2 text-gray-700 hover:text-blue-700 font-medium transition-all hover:-translate-x-1 bg-white/50 backdrop-blur-sm px-4 py-2 rounded-full"
+            {/* Tiêu đề chính của trang */}
+            <header className="mb-14 text-center pt-6">
+              <h1 className="text-6xl font-extrabold text-gray-900 mb-3 tracking-tight leading-tight drop-shadow-sm">
+                Câu hỏi thường gặp
+                <span className="text-blue-600"> FAQ</span>
+              </h1>
+              <p className="text-xl text-gray-700 font-normal max-w-xl mx-auto leading-relaxed">
+                Tất cả những điều bạn cần biết về Solace – từ tính năng đến quyền riêng tư.
+              </p>
+            </header>
+
+            {/* FAQ Accordion hiển thị danh sách câu hỏi và câu trả lời */}
+            <section className="space-y-6">
+              {faqData.map((faq, idx) => (
+                <div
+                  key={faq.question}
+                  ref={el => { faqRefs.current[idx] = el; }}
+                  className={`
+                    bg-white/75 backdrop-blur-md rounded-2xl shadow-sm transition-all duration-200
+                    hover:shadow-md
+                  `}
+                  tabIndex={0}
+                  aria-labelledby={`faq-question-${idx}`}
                 >
-                  <span className="material-symbols-outlined text-lg">arrow_back</span>
-                  Về trang chủ
-                </button>
-              </nav>
-
-              {/* Tiêu đề chính của trang */}
-              <header className="mb-16 text-center">
-                <h1 className="text-5xl font-extrabold text-gray-900 mb-4">
-                  Câu hỏi thường gặp
-                  <span className="text-blue-400"> FAQ</span>
-                </h1>
-                <p className="text-xl text-gray-600">Tất cả những điều bạn cần biết về Solace</p>
-              </header>
-
-              {/* FAQ Accordion hiển thị danh sách câu hỏi và câu trả lời */}
-              <div className="space-y-6">
-                {faqData.map((faq, index) => (
-                  <div
-                    key={index}
-                    className="backdrop-blur-sm bg-white/60 rounded-2xl transition-all duration-300"
+                  <button
+                    onClick={() => setActiveQuestion(activeQuestion === idx ? null : idx)}
+                    className="w-full px-6 py-5 flex items-center justify-between text-left group hover:bg-white/90 rounded-t-2xl transition-all focus:outline-none"
+                    aria-expanded={activeQuestion === idx}
+                    aria-controls={`faq-answer-${idx}`}
                   >
-                    {/* Nút để mở/đóng câu trả lời */}
-                    <button
-                      onClick={() => setActiveQuestion(activeQuestion === index ? null : index)}
-                      className="w-full px-8 py-6 flex items-center justify-between text-left group hover:bg-white/80 rounded-2xl transition-all"
-                    >
-                      <div className="flex items-center gap-4">
-                        <span className="material-symbols-outlined text-blue-600 text-3xl group-hover:scale-110 transition-transform">{faq.icon}</span>
-                        <h2 className="text-xl font-bold text-gray-800">{faq.question}</h2>
-                      </div>
-                      <span
-                        className={`material-symbols-outlined text-blue-600 transition-transform duration-300 ${
-                          activeQuestion === index ? 'rotate-180' : ''
-                        }`}
-                      >
-                        expand_more
-                      </span>
-                    </button>
-                    {/* Nội dung câu trả lời, hiển thị khi được chọn */}
-                    <div
-                      className={`transition-all duration-300 ease-in-out ${
-                        activeQuestion === index ? 'max-h-96 opacity-100' : 'max-h-0 opacity-0'
-                      }`}
-                    >
-                      <p className="px-8 pb-6 pl-20 text-gray-600 leading-relaxed">{faq.answer}</p>
+                    <div className="flex items-center gap-4">
+                      <span className="material-symbols-outlined text-blue-500 text-3xl flex-shrink-0 group-hover:scale-105 transition-transform duration-200">{faq.icon}</span>
+                      <h2 id={`faq-question-${idx}`} className="text-lg font-semibold text-gray-800 leading-snug">{faq.question}</h2>
                     </div>
+                    <span
+                      className={`material-symbols-outlined text-gray-500 transition-transform duration-300 expand-icon ${activeQuestion === idx ? 'rotate-180' : ''}`}
+                      aria-hidden="true"
+                    >
+                      expand_more
+                    </span>
+                  </button>
+                  <div
+                    id={`faq-answer-${idx}`}
+                    className={`faq-answer overflow-hidden transition-all duration-300 ease-in-out ${activeQuestion === idx ? 'max-h-96 opacity-100 px-6 pb-5' : 'max-h-0 opacity-0 px-6'}`}
+                    aria-labelledby={`faq-question-${idx}`}
+                    aria-hidden={activeQuestion !== idx}
+                  >
+                    <p className="text-gray-700 leading-relaxed">{faq.answer}</p>
                   </div>
-                ))}
-              </div>
-
-              {/* Footer với thông tin liên hệ */}
-              <footer className="mt-16 text-center">
-                <div className="inline-flex items-center gap-8 px-8 py-4 bg-white/60 backdrop-blur-sm rounded-full">
-                  <a href="mailto:support@solace.com" className="flex items-center gap-2 text-gray-600 hover:text-blue-600 transition-colors">
-                    <span className="material-symbols-outlined">mail</span>
-                    <span>support@solace.com</span>
-                  </a>
-                  <div className="h-6 w-px bg-gray-300"></div>
-                  <a href="#" className="flex items-center gap-2 text-gray-600 hover:text-blue-600 transition-colors">
-                    <span className="material-symbols-outlined">chat</span>
-                    <span>Live Chat</span>
-                  </a>
                 </div>
-              </footer>
-            </div>
+              ))}
+            </section>
+
+            {/* Footer với thông tin liên hệ */}
+            <footer className="mt-16 text-center">
+              <div className="inline-flex flex-col sm:flex-row items-center gap-5 sm:gap-6 px-7 py-4 bg-white/70 backdrop-blur-md rounded-full shadow-md">
+                <a href="mailto:support@solace.com" className="flex items-center gap-2 text-gray-600 hover:text-blue-600 transition-colors font-medium text-sm">
+                  <span className="material-symbols-outlined text-base">mail</span>
+                  <span>support@solace.com</span>
+                </a>
+                <div className="hidden sm:block h-5 w-px bg-gray-300"></div>
+                <a href="#" className="flex items-center gap-2 text-gray-600 hover:text-blue-600 transition-colors font-medium text-sm">
+                  <span className="material-symbols-outlined text-base">chat</span>
+                  <span>Trò chuyện trực tiếp</span>
+                </a>
+              </div>
+              <p className="text-xs text-gray-500 mt-5">© 2024 Solace. All rights reserved.</p>
+            </footer>
           </div>
         </main>
       </div>
