@@ -271,6 +271,7 @@ router.get('/user/:userId/count', isAuthenticated, async (req, res) => {
         SUM(
           CASE 
             WHEN p.images IS NOT NULL AND p.images != '[]' 
+            AND jsonb_typeof(CAST(p.images AS JSONB)) = 'array'
             THEN JSONB_ARRAY_LENGTH(CAST(p.images AS JSONB))
             ELSE 0 
           END
