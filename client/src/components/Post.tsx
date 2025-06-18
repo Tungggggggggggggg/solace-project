@@ -152,36 +152,14 @@ const Post = ({
 
     const endpoint = liked ? '/api/likes/unlike' : '/api/likes/like';
     try {
-      const response = await axios.post(endpoint, 
+      // Cập nhật local trước
+      setLiked(!liked);
+      setLikeCount(prev => liked ? prev - 1 : prev + 1);
+      // Gửi request lên server để cập nhật, không lấy lại số lượng like từ response
+      await axios.post(endpoint, 
         { post_id: id, user_id: currentUser.id },
         { baseURL: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000' }
       );
-
-      setLiked(!liked);
-      setLikeCount(response.data.likeCount);
-      setLikeList(response.data.likeList || []);
-
-      // Animate like button
-      if (likeBtnRef.current) {
-        if (!liked) {
-          gsap.fromTo(
-            likeBtnRef.current,
-            { scale: 1.4, rotate: 0, filter: 'drop-shadow(0 0 24px #ff1744cc)' },
-            { scale: 1, rotate: 0, filter: 'drop-shadow(0 0 18px #ff1744cc)', duration: 0.5, ease: 'elastic.out(1, 0.5)' }
-          );
-          gsap.fromTo(
-            likeBtnRef.current,
-            { rotate: -15 },
-            { rotate: 15, yoyo: true, repeat: 3, duration: 0.08, ease: 'power1.inOut', clearProps: 'rotate' }
-          );
-        } else {
-          gsap.fromTo(
-            likeBtnRef.current,
-            { scale: 0.8, rotate: -10, filter: 'drop-shadow(0 0 8px #ff174488)' },
-            { scale: 1, rotate: 0, filter: 'none', duration: 0.35, ease: 'elastic.out(1, 0.5)' }
-          );
-        }
-      }
     } catch (error) {
       console.error('Error handling like:', error);
     }
@@ -274,7 +252,13 @@ const Post = ({
   };
 
   return (
-    <div className="bg-white rounded-2xl p-6 shadow-sm w-full max-w-3xl my-6 transform transition-all duration-200 hover:shadow-md">
+    <div className="bg-white rounded-2xl p-6 shadow-sm w-full max-w-3xl my-6 transform transition-all duration-200 hover:shadow-md relative">
+      <button
+        className="absolute top-4 right-4 p-2 hover:bg-slate-50 rounded-full transition-colors z-10"
+        onClick={handleReportClick}
+      >
+        <span className="material-symbols-outlined text-slate-400">more_horiz</span>
+      </button>
       {shared_post_id && sharedPost === null ? (
         <SkeletonPost />
       ) : sharedPost ? (
@@ -341,9 +325,13 @@ const Post = ({
                 onClick={handleLike}
                 className="flex-1 flex items-center justify-center gap-1 py-2 text-slate-600 hover:text-rose-500 transition-all duration-200 rounded-lg hover:bg-slate-50"
               >
-                <span className="material-symbols-outlined" style={{ color: liked ? '#f43f5e' : 'currentColor' }}>
-                  favorite
-                </span>
+                <div className="w-7 h-7 flex items-center justify-center mr-1">
+                  {liked ? (
+                    <img src="/heart_fill.svg" alt="liked" className="w-6 h-6" />
+                  ) : (
+                    <img src="/heart.svg" alt="like" className="w-6 h-6" />
+                  )}
+                </div>
                 <span
                   className="cursor-pointer hover:underline"
                   onClick={e => { e.stopPropagation(); setShowLikeList(true); }}
@@ -398,12 +386,6 @@ const Post = ({
               </Link>
               <p className="text-sm text-slate-500">{formatDate(date)}</p>
             </div>
-            <button
-              className="p-2 hover:bg-slate-50 rounded-full transition-colors"
-              onClick={handleReportClick}
-            >
-              <span className="material-symbols-outlined text-slate-400">more_horiz</span>
-            </button>
           </div>
           {/* Post Content */}
           <div className="space-y-4">
@@ -442,9 +424,13 @@ const Post = ({
                   onClick={handleLike}
                   className="flex-1 flex items-center justify-center gap-1 py-2 text-slate-600 hover:text-rose-500 transition-all duration-200 rounded-lg hover:bg-slate-50"
                 >
-                  <span className="material-symbols-outlined" style={{ color: liked ? '#f43f5e' : 'currentColor' }}>
-                    favorite
-                  </span>
+                  <div className="w-7 h-7 flex items-center justify-center mr-1">
+                    {liked ? (
+                      <img src="/heart_fill.svg" alt="liked" className="w-6 h-6" />
+                    ) : (
+                      <img src="/heart.svg" alt="like" className="w-6 h-6" />
+                    )}
+                  </div>
                   <span
                     className="cursor-pointer hover:underline"
                     onClick={e => { e.stopPropagation(); setShowLikeList(true); }}

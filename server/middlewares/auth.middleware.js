@@ -14,19 +14,33 @@ exports.isAuthenticated = async (req, res, next) => {
   try {
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
 
-    const result = await pool.query(
+    // 1. Kiểm tra xem user có tồn tại trong bảng public.users không
+    let userResult = await pool.query(
       "SELECT id, email, first_name, last_name, avatar_url FROM users WHERE id = $1",
       [decoded.id]
     );
 
-    if (result.rows.length === 0) {
-      return res.status(401).json({ error: "Token không hợp lệ hoặc user không tồn tại" });
+    let userProfile = userResult.rows[0];
+
+    // 2. Nếu user chưa có profile trong public.users, tạo một entry cơ bản
+    if (!userProfile) {
+      console.warn(`User ${decoded.id} not found in public.users, creating a basic profile.`);
+      // Bạn có thể lấy thêm thông tin từ decoded JWT (như email) nếu có
+      const insertResult = await pool.query(
+        "INSERT INTO users (id, email, first_name, last_name) VALUES ($1, $2, $3, $4) RETURNING id, email, first_name, last_name, avatar_url",
+        [decoded.id, decoded.email, 'Người', 'Dùng Mới'] // Giá trị mặc định
+      );
+      userProfile = insertResult.rows[0];
     }
 
-    req.user = result.rows[0]; // Gắn thông tin user vào req
+    // 3. Gắn thông tin user vào req
+    req.user = {
+      id: decoded.id, // ID từ JWT (auth.users.id)
+      ...userProfile, // Thông tin từ public.users (đã có hoặc vừa tạo)
+    };
     next();
   } catch (err) {
     console.error("Lỗi xác thực:", err);
-    res.status(401).json({ error: "Token không hợp lệ" });
+    res.status(401).json({ error: "Token không hợp lệ hoặc đã hết hạn" });
   }
 };

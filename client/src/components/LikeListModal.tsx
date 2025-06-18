@@ -16,7 +16,7 @@ export default function LikeListModal({ postId, onClose }: { postId: string, onC
         <div className="space-y-3 max-h-80 overflow-y-auto">
           {users.map(u => (
             <div key={u.id} className="flex items-center gap-3">
-              <img src={u.avatar_url || '/images/default-avatar.png'} alt={u.first_name ? `${u.first_name} ${u.last_name}` : 'avatar'} className="w-8 h-8 rounded-full object-cover" />
+              <img src={u.avatar_url || '/default-avatar.png'} alt={u.first_name ? `${u.first_name} ${u.last_name}` : 'avatar'} className="w-8 h-8 rounded-full object-cover" />
               <span className="font-medium">{u.first_name} {u.last_name}</span>
             </div>
           ))}

@@ -6,11 +6,12 @@ import { useRouter, usePathname } from "next/navigation";
 import { useUser } from "@/contexts/UserContext";
 import Toast, { ToastProps } from "./Toast";
 import Link from "next/link";
-import gsap from "gsap";
+import gsap, { Power3 } from "gsap";
 import FilteredInput from "@/components/FilteredInput";
 import { debounce } from 'lodash';
 import { socket } from '@/socket';
 import { access } from "fs";
+import axios from 'axios';
 
 
 // Định nghĩa kiểu props cho Header
@@ -58,14 +59,19 @@ const Header = memo<HeaderProps>(({
   // State kiểm soát hiển thị biểu tượng tin nhắn và thông báo
   const [showMessageIcon, setShowMessageIcon] = useState(true);
   const [showNotificationIcon, setShowNotificationIcon] = useState(true);
+  const [searchHistory, setSearchHistory] = useState<string[]>([]);
+  const [showHistory, setShowHistory] = useState(false);
 
   // Refs
-  const inputRef = useRef<HTMLDivElement>(null);
+  const inputWrapperRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
   const userMenuRef = useRef<HTMLDivElement>(null);
   const loginBtnRef = useRef<HTMLButtonElement>(null);
   const signupBtnRef = useRef<HTMLButtonElement>(null);
   const messageBtnRef = useRef<HTMLButtonElement>(null);
   const notificationBtnRef = useRef<HTMLButtonElement>(null);
+  const historyRef = useRef<HTMLDivElement>(null);
+  const dropdownRef = useRef<HTMLDivElement>(null);
 
   const debouncedUpdate = useCallback(
     debounce((count: number) => {
@@ -80,22 +86,25 @@ const Header = memo<HeaderProps>(({
   const reflectiveColor = "#D5BDAF";
   const inspiringColor = "#AECBEB";
   const headerBg = theme === "reflective" ? reflectiveColor : inspiringColor;
+  const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
   // Hàm xử lý thay đổi giá trị ô tìm kiếm
-  const handleChange = isControlled ? onSearchChange : ((e: React.ChangeEvent<HTMLInputElement>) => setSearch(e.target.value));
+  const handleChange = isControlled ? onSearchChange : (e: React.ChangeEvent<HTMLInputElement>) => setSearch(e.target.value);
   // Hàm xử lý sự kiện nhấn phím trong ô tìm kiếm
-  const handleKeyDown = onSearchKeyDown || ((e) => {
-    if (e.key === "Enter") {
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (onSearchKeyDown) {
+      onSearchKeyDown(e);
+      return;
+    }
+    if (e.key === 'Enter') {
       if (onSearch) onSearch();
-      else if (search.trim()) router.push(`/search?query=${encodeURIComponent(search.trim())}`);
       setShowSuggestions(false);
     }
-  });
-
+  };
   // Hàm xử lý click nút tìm kiếm
-  const handleClick = onSearch || (() => {
-    if (value.trim()) router.push(`/search?query=${encodeURIComponent(value.trim())}`);
+  const handleClick = () => {
+    if (onSearch) onSearch();
     setShowSuggestions(false);
-  });
+  };
 
   // Lấy gợi ý tìm kiếm từ API khi giá trị thay đổi
   useEffect(() => {
@@ -116,7 +125,7 @@ const Header = memo<HeaderProps>(({
   // Đóng gợi ý khi click ra ngoài
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
-      if (inputRef.current && !inputRef.current.contains(event.target as Node)) setShowSuggestions(false);
+      if (inputWrapperRef.current && !inputWrapperRef.current.contains(event.target as Node)) setShowSuggestions(false);
     }
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
@@ -164,19 +173,55 @@ const Header = memo<HeaderProps>(({
     setShowSuggestions(false);
   }, [onSearch, value, router]);
 
-  const handleSuggestionClick = useCallback((suggestion: SearchSuggestion) => {
-    setShowSuggestions(false);
-    if (suggestion.type === 'user') {
-      router.push(`/profile/${suggestion.id}`);
-    } else if (suggestion.type === 'post') {
-      router.push(`/posts/${suggestion.id}`);
-    } else {
-      if (onSearchChange) onSearchChange({ target: { value: suggestion.name } } as React.ChangeEvent<HTMLInputElement>);
-      else setSearch(suggestion.name);
-      if (onSearch) onSearch();
-      else router.push(`/search?query=${encodeURIComponent(suggestion.name)}`);
+  const handleInputFocus = async () => {
+    setShowSuggestions(true);
+    if (user) {
+      try {
+        const res = await axios.get(`${API_URL}/api/search_history`, {
+          withCredentials: true,
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+          },
+        });
+        if (res.data && Array.isArray(res.data.history)) {
+          setSearchHistory(res.data.history.map((h: any) => h.keyword));
+          setShowHistory(true);
+        }
+      } catch (error) {
+        console.error("Error fetching search history:", error);
+      }
     }
-  }, [router, onSearchChange, onSearch, setSearch]);
+  };
+
+  const handleInputBlur = () => setTimeout(() => setShowHistory(false), 200);
+
+  const handleSearchWithHistory = async () => {
+    if (onSearch) onSearch();
+    else if (value.trim()) router.push(`/search?query=${encodeURIComponent(value.trim())}`);
+    setShowSuggestions(false);
+    await saveSearchHistory(value);
+  };
+
+  const saveSearchHistory = async (keyword: string) => {
+    if (user && keyword.trim()) {
+      try {
+        await axios.post(`${API_URL}/api/search_history`, { keyword: keyword.trim() }, {
+          withCredentials: true,
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+          },
+        });
+      } catch (error) {
+        console.error("Error saving search history:", error);
+      }
+    }
+  };
+
+  const handleSuggestionClick = useCallback(async (suggestion: SearchSuggestion) => {
+    setShowSuggestions(false);
+    if (onSearchChange) onSearchChange({ target: { value: suggestion.name } } as any);
+    if (onSearch) onSearch();
+  }, [onSearchChange, onSearch]);
 
 
   // Fetch tổng số unread khi user thay đổi
@@ -264,7 +309,7 @@ const Header = memo<HeaderProps>(({
 
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
-      if (inputRef.current && !inputRef.current.contains(event.target as Node)) setShowSuggestions(false);
+      if (inputWrapperRef.current && !inputWrapperRef.current.contains(event.target as Node)) setShowSuggestions(false);
     }
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
@@ -324,6 +369,49 @@ const Header = memo<HeaderProps>(({
     setShowNotificationIcon(pathname !== "/notifications");
   }, [pathname, user]);
 
+  // Hàm xóa lịch sử tìm kiếm theo từ khóa
+  const deleteSearchHistoryEntry = async (keywordToDelete: string) => {
+    if (!user) return;
+    try {
+      await axios.delete(`${API_URL}/api/search_history/${encodeURIComponent(keywordToDelete)}`, {
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+        },
+      });
+      // Cập nhật lại lịch sử tìm kiếm sau khi xóa thành công
+      setSearchHistory(prevHistory => prevHistory.filter(kw => kw !== keywordToDelete));
+    } catch (error) {
+      console.error("Error deleting search history entry:", error);
+    }
+  };
+
+  useEffect(() => {
+    if (showHistory && historyRef.current) {
+      gsap.fromTo(historyRef.current, 
+        { opacity: 0, y: -10 }, 
+        { opacity: 1, y: 0, duration: 0.3, ease: Power3.easeOut });
+    }
+  }, [showHistory]);
+
+  useEffect(() => {
+    if ((showSuggestions && suggestions.length > 0) || (showHistory && searchHistory.length > 0)) {
+      gsap.fromTo(
+        dropdownRef.current,
+        { opacity: 0, y: -10, scale: 0.98 },
+        { opacity: 1, y: 0, scale: 1, duration: 0.35, ease: "power3.out" }
+      );
+    }
+  }, [showSuggestions, showHistory, suggestions.length, searchHistory.length]);
+
+  // Khi xóa keyword
+  const handleDeleteKeyword = async (keyword: string, idx: number) => {
+    const el = document.getElementById(`history-item-${idx}`);
+    if (el) {
+      await gsap.to(el, { opacity: 0, height: 0, margin: 0, duration: 0.3, ease: "power2.in" });
+    }
+    await deleteSearchHistoryEntry(keyword);
+  };
+
   return (
     <>
       <header className="flex items-center justify-between w-full h-20 px-16" style={{ backgroundColor: headerBg }}>
@@ -331,15 +419,20 @@ const Header = memo<HeaderProps>(({
           <Image src="/logo.png" alt="Solace Logo" width={128} height={48} className="object-contain" priority />
         </Link>
         <div className="flex-1 max-w-xl mx-8 relative">
-          <div className="flex w-full rounded-full border border-black bg-white overflow-hidden" ref={inputRef}>
+          <div className="flex w-full rounded-full border border-black bg-white overflow-hidden" ref={inputWrapperRef}>
             <FilteredInput
+              ref={inputRef}
               type="text"
               value={value}
               onChange={memoizedHandleChange}
-              onKeyDown={memoizedHandleKeyDown}
-              placeholder="Search for anything ..."
+              onFocus={handleInputFocus}
+              onBlur={handleInputBlur}
+              onKeyDown={e => {
+                if (e.key === 'Enter') handleSearchWithHistory();
+                else memoizedHandleKeyDown(e);
+              }}
+              placeholder="Tìm kiếm..."
               className="flex-1 px-5 py-2 bg-white text-base font-normal placeholder:text-gray-400 focus:outline-none border-none rounded-none text-black"
-              onFocus={() => value && setShowSuggestions(true)}
             />
             <div 
               className="flex items-center justify-center px-5 border-l border-black cursor-pointer" 
@@ -352,12 +445,14 @@ const Header = memo<HeaderProps>(({
               </svg>
             </div>
           </div>
-          {showSuggestions && suggestions.length > 0 && (
-            <div className="absolute left-0 right-0 top-full z-50 bg-white border border-black/10 rounded-b-xl shadow-lg max-h-60 overflow-y-auto">
+          {showSuggestions && suggestions.length > 0 ? (
+            <div ref={dropdownRef} className="absolute left-0 right-0 top-full z-50 bg-white border border-black/10 rounded-b-xl shadow-lg max-h-60 overflow-y-auto">
               {suggestions.map((s, idx) => (
-                <div 
-                  key={s.id + s.type + idx} 
-                  className="flex items-center gap-3 px-5 py-3 cursor-pointer hover:bg-[#E1ECF7] text-black text-base" 
+                <div
+                  key={s.id + s.type + idx}
+                  className="flex items-center gap-3 px-5 py-3 cursor-pointer hover:bg-[#E1ECF7] text-black text-base group"
+                  onMouseEnter={e => gsap.to(e.currentTarget, { background: '#E1ECF7', duration: 0.2 })}
+                  onMouseLeave={e => gsap.to(e.currentTarget, { background: '#fff', duration: 0.2 })}
                   onClick={() => handleSuggestionClick(s)}
                 >
                   {s.avatar && <Image src={s.avatar} alt={s.name} width={32} height={32} className="rounded-full" />}
@@ -368,7 +463,44 @@ const Header = memo<HeaderProps>(({
                 </div>
               ))}
             </div>
-          )}
+          ) : showHistory && searchHistory.length > 0 ? (
+            <div ref={dropdownRef} className="absolute left-0 right-0 top-full bg-white border rounded shadow z-50 max-h-60 overflow-y-auto animate-fade-in-down">
+              {searchHistory.map((keyword, idx) => (
+                <div
+                  key={idx}
+                  id={`history-item-${idx}`}
+                  className="flex items-center justify-between px-4 py-2 hover:bg-blue-50 cursor-pointer text-gray-700 group"
+                  onMouseEnter={e => gsap.to(e.currentTarget, { background: '#E1ECF7', duration: 0.2 })}
+                  onMouseLeave={e => gsap.to(e.currentTarget, { background: '#fff', duration: 0.2 })}
+                >
+                  <span 
+                    className="flex items-center flex-1"
+                    onMouseDown={async (e) => {
+                      e.stopPropagation(); // Ngăn sự kiện blur của input
+                      setSearch(keyword);
+                      setShowHistory(false);
+                      if (onSearchChange) onSearchChange({ target: { value: keyword } } as any);
+                      await saveSearchHistory(keyword); // Lưu lại vì vừa tìm kiếm
+                      router.push(`/search?query=${encodeURIComponent(keyword)}`);
+                    }}
+                  >
+                    <span className="material-symbols-outlined text-base mr-2 text-gray-400">history</span>
+                    <span className="text-sm text-gray-800 font-medium">{keyword}</span>
+                  </span>
+                  <button
+                    className="ml-4 p-1 rounded-full hover:bg-gray-200 transition-colors opacity-0 group-hover:opacity-100 focus:opacity-100"
+                    onClick={e => {
+                      e.stopPropagation();
+                      handleDeleteKeyword(keyword, idx);
+                    }}
+                    aria-label="Xóa lịch sử tìm kiếm"
+                  >
+                    <span className="material-symbols-outlined text-sm text-gray-500">close</span>
+                  </button>
+                </div>
+              ))}
+            </div>
+          ) : null}
         </div>
         <div className="flex items-center gap-3 justify-end">
           {loading ? (
