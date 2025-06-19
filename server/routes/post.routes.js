@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router(); 
 const pool = require('../db');
 const { getUserPosts, getUserPostStats } = require('../controllers/post.controller');
+const { getIO } = require('../socket');
 
 // GET /api/posts/user/:id - Get user posts with access control
 router.get('/user/:id', getUserPosts);
@@ -57,6 +58,11 @@ router.put('/:id/approve', async (req, res) => {
   try {
     const { id } = req.params;
     await pool.query('UPDATE posts SET is_approved = true WHERE id = $1', [id]);
+    // Emit event cho tất cả client khi bài được duyệt
+    try {
+      const io = getIO();
+      io.emit('postApproved', { postId: id });
+    } catch (e) { console.error('Socket emit postApproved error:', e); }
     res.json({ success: true });
   } catch (err) {
     res.status(500).json({ error: err.message });

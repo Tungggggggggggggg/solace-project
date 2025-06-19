@@ -37,6 +37,7 @@ interface PostProps {
   theme?: string;
   hideActions?: boolean;
   author?: Author;
+  is_approved?: boolean;
 }
 
 // Thêm hàm tối ưu URL Cloudinary với các parameters phù hợp
@@ -89,7 +90,8 @@ const Post = ({
   hideActions, 
   shared_post_id,
   onPostCreated,
-  theme
+  theme,
+  is_approved
 }: PostProps & { shared_post_id?: string, onPostCreated?: (post: any) => void }) => {
   const [showReport, setShowReport] = useState(false);
   const { user: currentUser } = useUser();
@@ -253,6 +255,12 @@ const Post = ({
 
   return (
     <div className="bg-white rounded-2xl p-6 shadow-sm w-full max-w-3xl my-6 transform transition-all duration-200 hover:shadow-md relative">
+      {/* Nếu chưa duyệt thì hiển thị nhãn */}
+      {is_approved === false && (
+        <div className="absolute top-8 left-1/2 transform -translate-x-1/2 bg-yellow-300 text-yellow-900 px-4 py-1 rounded-full text-xs font-bold z-20 animate-pulse shadow-md">
+          Đang chờ duyệt
+        </div>
+      )}
       <button
         className="absolute top-4 right-4 p-2 hover:bg-slate-50 rounded-full transition-colors z-10"
         onClick={handleReportClick}

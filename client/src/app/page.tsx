@@ -15,6 +15,7 @@ import CreatePostModal from "@/components/CreatePostModal";
 import axios from "axios";
 import type { PostType } from '@/types/Post';
 import SkeletonPost from "@/components/SkeletonPost";
+import { socket } from '@/socket';
 
 interface OpenPostType {
   id: string;
@@ -92,12 +93,16 @@ export default function Home() {
       }
     };
     fetchPosts();
+    socket.on('postApproved', fetchPosts);
+    return () => { socket.off('postApproved', fetchPosts); };
   }, []);
 
   // Lọc bài viết theo tab
-  const filteredPosts = posts.filter(post =>
-    activeTab === 0 ? post.type_post === 'positive' : post.type_post === 'negative'
-  );
+  const filteredPosts = posts
+    .filter(post => post.is_approved) // chỉ lấy bài đã duyệt
+    .filter(post =>
+      activeTab === 0 ? post.type_post === 'positive' : post.type_post === 'negative'
+    );
 
   // Lazy load: tăng số lượng post hiển thị khi kéo gần cuối trang
   const handleScroll = useCallback(() => {

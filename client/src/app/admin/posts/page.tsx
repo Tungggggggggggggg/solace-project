@@ -6,6 +6,7 @@ import AdminLayout from '@/components/AdminLayout';
 import { toast, ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import FilteredInput from '@/components/FilteredInput';
+import { socket } from '@/socket';
 
 type Post = {
   id: string;
@@ -44,6 +45,8 @@ export default function PostManagementPage() {
 
   useEffect(() => {
     fetchPosts();
+    socket.on('newPost', fetchPosts);
+    return () => { socket.off('newPost', fetchPosts); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [type, status]);
 

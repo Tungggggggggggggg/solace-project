@@ -8,6 +8,7 @@ import gsap from "gsap";
 import Post from "@/components/Post";
 import axios from "axios";
 import FollowListModal from "@/components/FollowListModal";
+import { socket } from '@/socket';
 
 interface Tab {
     id: string;
@@ -33,6 +34,7 @@ interface PostType {
     last_name?: string;
     avatar_url?: string;
     is_liked?: boolean;
+    is_approved?: boolean;
 }
 
 const tabs: Tab[] = [
@@ -156,6 +158,8 @@ export default function ProfilePage() {
         if (!userLoading && user?.id && accessToken) {
             fetchUserTabData("posts", true);
         }
+        socket.on('postApproved', () => fetchUserTabData('posts', true));
+        return () => { socket.off('postApproved', () => fetchUserTabData('posts', true)); };
     }, [fetchUserTabData, user?.id, userLoading, accessToken]);
 
     // Fetch follow stats
@@ -436,14 +440,13 @@ export default function ProfilePage() {
                                                         date={post.created_at}
                                                         content={post.content}
                                                         likes={post.like_count}
-                                                        comments={
-                                                            post.comment_count
-                                                        }
+                                                        comments={post.comment_count}
                                                         shares={0}
                                                         images={post.images}
                                                         avatar={post.avatar_url}
                                                         feeling={post.feeling}
                                                         location={post.location}
+                                                        is_approved={post.is_approved}
                                                     />
                                                 </div>
                                             ))}

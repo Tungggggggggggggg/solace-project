@@ -16,6 +16,7 @@ import Post from "@/components/Post";
 import axios from "axios";
 import FollowListModal from "@/components/FollowListModal";
 import { useClickAway } from "react-use";
+import { socket } from '@/socket';
 
 interface Tab {
     id: string;
@@ -41,6 +42,7 @@ interface PostType {
     last_name?: string;
     avatar_url?: string;
     is_liked?: boolean;
+    is_approved?: boolean;
 }
 
 interface ProfileUser {
@@ -307,6 +309,8 @@ export default function UserProfilePage({
         if (unwrappedParams.id && accessToken) {
             fetchUserPosts(0);
         }
+        socket.on('postApproved', () => fetchUserPosts(0));
+        return () => { socket.off('postApproved', () => fetchUserPosts(0)); };
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [unwrappedParams.id, activeTab, accessToken]);
 
@@ -860,6 +864,8 @@ export default function UserProfilePage({
                                                 avatar={post.avatar_url}
                                                 feeling={post.feeling}
                                                 location={post.location}
+                                                is_approved={post.is_approved}
+                                                hideActions={false}
                                             />
                                         ))}
                                         {loadingMore && (

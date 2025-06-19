@@ -81,7 +81,25 @@ router.post('/', async (req, res) => {
     let insertQuery, values;
     if (shared_post_id) {
       insertQuery = `
-        INSERT INTO posts (user_id, content, images, access_modifier, type_post, created_at, feeling, location, shared_post_id)
+        INSERT INTO posts (user_id, content, images, access_modifier, type_post, created_at, feeling, location, shared_post_id, is_approved)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+        RETURNING *;
+      `;
+      values = [
+        user_id,
+        content,
+        imagesStr,
+        privacy,
+        safeTypePost,
+        new Date().toISOString(),
+        feelingStr,
+        location || null,
+        shared_post_id,
+        false // luôn là chờ duyệt
+      ];
+    } else {
+      insertQuery = `
+        INSERT INTO posts (user_id, content, images, access_modifier, type_post, created_at, feeling, location, is_approved)
         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
         RETURNING *;
       `;
@@ -94,23 +112,7 @@ router.post('/', async (req, res) => {
         new Date().toISOString(),
         feelingStr,
         location || null,
-        shared_post_id
-      ];
-    } else {
-      insertQuery = `
-        INSERT INTO posts (user_id, content, images, access_modifier, type_post, created_at, feeling, location)
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-        RETURNING *;
-      `;
-      values = [
-        user_id,
-        content,
-        imagesStr,
-        privacy,
-        safeTypePost,
-        new Date().toISOString(),
-        feelingStr,
-        location || null
+        false // luôn là chờ duyệt
       ];
     }
     const { rows } = await pool.query(insertQuery, values);
@@ -146,6 +148,7 @@ router.get('/', async (req, res) => {
              (SELECT COUNT(*) FROM comments c WHERE c.post_id = p.id) AS comment_count
       FROM posts p
       JOIN users u ON p.user_id = u.id
+      WHERE p.is_approved = true
       ORDER BY p.created_at DESC
     `;
     const { rows } = await pool.query(query);

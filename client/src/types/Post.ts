@@ -14,4 +14,5 @@ export interface PostType {
   location?: string;
   type_post: 'positive' | 'negative';
   shared_post_id?: string;
+  is_approved?: boolean;
 } 
