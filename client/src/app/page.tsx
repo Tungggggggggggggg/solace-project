@@ -164,7 +164,7 @@ export default function Home() {
                   theme={theme}
                   id={post.id}
                   userId={post.user_id}
-                  name={post.first_name && post.last_name ? `${post.first_name} ${post.last_name}` : ''}
+                  name={`${post.first_name} ${post.last_name}`}
                   date={post.created_at || ""}
                   content={post.content}
                   likes={post.likes || 0}

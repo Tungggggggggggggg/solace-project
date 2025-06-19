@@ -3,6 +3,10 @@ const router = express.Router();
 const pool = require('../db');
 const { getUserPosts, getUserPostStats } = require('../controllers/post.controller');
 const { getIO } = require('../socket');
+const {
+  createPostApprovedNotification,
+  createPostForFollowersNotification
+} = require('../utils/notification');
 
 // GET /api/posts/user/:id - Get user posts with access control
 router.get('/user/:id', getUserPosts);
@@ -58,6 +62,13 @@ router.put('/:id/approve', async (req, res) => {
   try {
     const { id } = req.params;
     await pool.query('UPDATE posts SET is_approved = true WHERE id = $1', [id]);
+
+    const postResult = await pool.query('SELECT user_id FROM posts WHERE id = $1', [id]);
+    const postAuthorId = postResult.rows[0]?.user_id;
+    
+    await createPostApprovedNotification(id, postAuthorId);
+    await createPostForFollowersNotification(id, postAuthorId);
+
     // Emit event cho tất cả client khi bài được duyệt
     try {
       const io = getIO();

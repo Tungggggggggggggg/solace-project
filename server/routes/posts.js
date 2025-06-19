@@ -3,6 +3,7 @@ const multer = require('multer');
 const cloudinary = require('cloudinary').v2;
 const pool = require('../db');
 const router = express.Router();
+const { createPostNotification } = require("../utils/notification")
 
 cloudinary.config({
   cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
@@ -117,6 +118,8 @@ router.post('/', async (req, res) => {
     }
     const { rows } = await pool.query(insertQuery, values);
     const post = rows[0];
+
+    await createPostNotification(post.id, user_id, content);
 
     // Truy vấn lại để lấy thông tin user kèm theo post
     const selectQuery = `

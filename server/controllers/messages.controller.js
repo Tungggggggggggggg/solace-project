@@ -402,7 +402,7 @@ exports.sendMessage = async (req, res) => {
     const userId = req.user.id;
 
     const message = await transaction(async (client) => {
-      // 1. Xác minh quyền
+      // Xác minh quyền
       const { rowCount } = await client.query(
         'SELECT 1 FROM conversation_members WHERE conversation_id = $1 AND user_id = $2',
         [conversationId, userId]
@@ -411,7 +411,7 @@ exports.sendMessage = async (req, res) => {
         throw { status: 403, message: 'Not authorized to send messages in this conversation' };
       }
 
-      // 2. Chèn tin nhắn
+      // Chèn tin nhắn
       const msgInsertRes = await client.query(`
         INSERT INTO messages (conversation_id, sender_id, content, type, image_url, reply_to_message_id)
         VALUES ($1, $2, $3, $4, $5, $6)
@@ -419,12 +419,12 @@ exports.sendMessage = async (req, res) => {
       `, [conversationId, userId, content, type, imageUrl, replyToMessageId]);
       const { id: messageId, created_at } = msgInsertRes.rows[0];
 
-      // 3. Cập nhật thời gian tin nhắn cuối cùng
+      // Cập nhật thời gian tin nhắn cuối cùng
       await client.query(`
         UPDATE conversations SET last_message_at = $1, updated_at = $1, last_message_id = $2 WHERE id = $3
       `, [created_at, messageId, conversationId]);
 
-      // 4. Lấy thông tin đầy đủ của tin nhắn
+      // Lấy thông tin đầy đủ của tin nhắn
       const result = await client.query(`
         SELECT 
           m.*, 
@@ -442,51 +442,51 @@ exports.sendMessage = async (req, res) => {
       return result.rows[0];
     });
 
-    // 5. Gửi message về client
     res.status(201).json(message);
 
-    // 6. Emit real-time
+    // Emit real-time
     const io = getIO();
     io.to(conversationId).emit('newMessage', message);
 
-    // 7. Lấy thành viên trừ người gửi
+    // Lấy conversation members
     const membersRes = await pool.query(
       'SELECT user_id FROM conversation_members WHERE conversation_id = $1 AND user_id != $2',
       [conversationId, userId]
     );
-    const targetUsers = membersRes.rows.map(row => row.user_id);
+    const targetUsers = membersRes.rows.map((row) => row.user_id);
 
-    // 8. Danh sách socket đang trong phòng
+    // Lấy user đang ở trong phòng
     const socketsInRoom = await io.in(conversationId).allSockets();
-    const socketsById = new Map();
-    socketsInRoom.forEach(socketId => {
+    const usersInRoom = new Set();
+    for (const socketId of socketsInRoom) {
       const socket = io.sockets.sockets.get(socketId);
-      if (socket?.userId) socketsById.set(socket.userId, true);
-    });
-
-    // 9. Xử lý unread counts và gửi updates
-    await Promise.all(targetUsers.map(async targetUserId => {
-      const isUserInRoom = socketsById.has(targetUserId);
-      
-      if (!isUserInRoom) {
-        // Tăng unread count
-        await pool.query(`
-          UPDATE conversation_members 
-          SET unread_count = unread_count + 1 
-          WHERE user_id = $1 AND conversation_id = $2
-        `, [targetUserId, conversationId]);
-
-        // Lấy tổng số unread mới
-        const totalUnread = await getUnreadTotal(targetUserId);
-
-        // Gửi update cho tất cả socket của user
-        const sockets = userSockets[targetUserId] || [];
-        sockets.forEach(socketId => {
-          io.to(socketId).emit('newMessage', message);
-          io.to(socketId).emit('unreadTotalUpdated', { total: totalUnread });
-        });
+      if (socket?.userId) {
+        usersInRoom.add(socket.userId);
       }
-    }));
+    }
+
+    // Cập nhật tin nhắn chưa được và gửi thông báo đến user khong ở trong phòng
+    await Promise.all(
+      targetUsers.map(async (targetUserId) => {
+        const isUserInRoom = usersInRoom.has(targetUserId);
+
+        if (!isUserInRoom) {
+          // Tăng tin nhắn chưa đọc
+          await pool.query(
+            `UPDATE conversation_members 
+             SET unread_count = unread_count + 1 
+             WHERE user_id = $1 AND conversation_id = $2`,
+            [targetUserId, conversationId]
+          );
+
+          const totalUnread = await getUnreadTotal(targetUserId);
+
+          // Emit newMessage và unreadTotalUpdated đến user
+          io.to(`user:${targetUserId}`).emit('newMessage', message);
+          io.to(`user:${targetUserId}`).emit('unreadTotalUpdated', { total: totalUnread });
+        }
+      })
+    );
 
   } catch (error) {
     if (error.status === 403) {

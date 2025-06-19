@@ -3,6 +3,7 @@ const router = express.Router();
 const { pool, getClient } = require("../db");
 const { sanitizeInput } = require("../utils/security");
 const { isAuthenticated } = require("../middlewares/auth.middleware");
+const { createFollowNotification } = require("../utils/notification")
 
 // GET /api/users/search
 router.get("/search", isAuthenticated, async (req, res) => {
@@ -328,16 +329,6 @@ router.post("/:id/follow", isAuthenticated, async (req, res) => {
             [id, followerId]
         );
 
-        // Send notification to followed user
-        await pool.query(
-            `INSERT INTO notifications (user_id, title, content, type)
-       VALUES ($1, 'Người theo dõi mới', $2, 'follow')`,
-            [
-                id,
-                `${req.user.first_name} ${req.user.last_name} đã bắt đầu theo dõi bạn`,
-            ]
-        );
-
         // Get updated stats
         const stats = await pool.query(
             `
@@ -351,6 +342,11 @@ router.post("/:id/follow", isAuthenticated, async (req, res) => {
         );
 
         await pool.query("COMMIT");
+
+        await createFollowNotification(
+            followerId, 
+            id
+        );
 
         res.json({
             success: true,

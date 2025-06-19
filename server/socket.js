@@ -1,88 +1,98 @@
 const { Server } = require('socket.io');
 const { pool } = require('./db');
+
 let io;
-const userSockets = {}; // { userId: [socketId, ...] }
 
 function init(server) {
   io = new Server(server, {
     cors: {
-      origin: [
-        'http://localhost:3000',
-        'http://127.0.0.1:3000'
-      ],
-      credentials: true
-    }
+      origin: process.env.CORS_ORIGINS ? process.env.CORS_ORIGINS.split(',') : ['http://localhost:3000', 'http://127.0.0.1:3000'],
+      credentials: true,
+    },
   });
 
-  // Socket.IO logic cho realtime chat
   const onlineUsers = new Set();
 
   io.on('connection', (socket) => {
     let userId = null;
 
-    // Khi client xác thực xong, gửi userId lên
     socket.on('register', (id) => {
+      if (!id) {
+        socket.emit('error', { message: 'Invalid user ID' });
+        return;
+      }
       userId = id;
-      if (!userSockets[userId]) userSockets[userId] = [];
-      userSockets[userId].push(socket.id);
-      socket.userId = userId;
-
-      // Gửi broadcast về user online
+      socket.join(`user:${userId}`);
       onlineUsers.add(userId);
       io.emit('onlineUsers', Array.from(onlineUsers));
+      console.log(`User ${userId} joined room user:${userId}`);
     });
 
     socket.on('joinConversation', async ({ userId, conversationId }) => {
+      if (!userId || !conversationId) {
+        socket.emit('error', { message: 'Missing userId or conversationId' });
+        return;
+      }
+
       try {
         socket.join(conversationId);
 
-        // Cập nhật lại tin nhắn đã đọc
         const result = await pool.query(
           'UPDATE conversation_members SET unread_count = 0 WHERE user_id = $1 AND conversation_id = $2 RETURNING unread_count',
           [userId, conversationId]
         );
 
-        // Lấy tổng số unread mới
-        const { rows } = await pool.query(`
-          SELECT COALESCE(SUM(unread_count), 0) as total
-          FROM conversation_members
-          WHERE user_id = $1 AND unread_count > 0
-        `, [userId]);
+        if (result.rowCount === 0) {
+          socket.emit('error', { message: 'Conversation member not found' });
+          return;
+        }
+
+        const { rows } = await pool.query(
+          `SELECT COALESCE(SUM(unread_count), 0) as total
+           FROM conversation_members
+           WHERE user_id = $1 AND unread_count > 0`,
+          [userId]
+        );
 
         const totalUnread = parseInt(rows[0].total, 10);
-
-        // Emit tổng số unread mới
-        if (userSockets[userId]) {
-          userSockets[userId].forEach((socketId) => {
-            io.to(socketId).emit('unreadTotalUpdated', { total: totalUnread });
-          });
-        }
+        io.to(`user:${userId}`).emit('unreadTotalUpdated', { total: totalUnread });
       } catch (error) {
         console.error('Error updating unread_count:', error);
+        socket.emit('error', { message: 'Failed to update unread count' });
       }
     });
 
     socket.on('leave', (conversationId) => {
-      socket.leave(conversationId);
+      if (conversationId) {
+        socket.leave(conversationId);
+      }
     });
 
     socket.on('typing', ({ conversationId, userId }) => {
-      socket.to(conversationId).emit('typing', { userId });
+      if (conversationId && userId) {
+        socket.to(conversationId).emit('typing', { userId });
+      }
     });
 
     socket.on('stopTyping', ({ conversationId, userId }) => {
-      socket.to(conversationId).emit('stopTyping', { userId });
+      if (conversationId && userId) {
+        socket.to(conversationId).emit('stopTyping', { userId });
+      }
     });
 
-    socket.on('disconnect', () => {
+    socket.on('disconnect', async () => {
       if (userId) {
-        if (userSockets[userId]) {
-          userSockets[userId] = userSockets[userId].filter((id) => id !== socket.id);
-          if (userSockets[userId].length === 0) {
-            delete userSockets[userId];
+        socket.leave(`user:${userId}`);
+        try {
+          // Check if any sockets remain in the user:${userId} room
+          const socketsInRoom = await io.in(`user:${userId}`).allSockets();
+          if (socketsInRoom.size === 0) {
             onlineUsers.delete(userId);
             io.emit('onlineUsers', Array.from(onlineUsers));
+            console.log(`User ${userId} is now offline`);
           }
+        } catch (error) {
+          console.error('Error checking room membership on disconnect:', error);
         }
       }
     });
@@ -94,4 +104,4 @@ function getIO() {
   return io;
 }
 
-module.exports = { init, getIO, userSockets };
+module.exports = { init, getIO };
