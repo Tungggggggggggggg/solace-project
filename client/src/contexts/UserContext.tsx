@@ -18,6 +18,7 @@ interface UserData {
     last_name: string;
     avatar_url: string;
     created_at?: string;
+    role?: string;
 }
 
 interface UserContextType {

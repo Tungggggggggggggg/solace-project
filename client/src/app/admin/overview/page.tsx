@@ -8,6 +8,7 @@ import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, ReferenceLin
 import { PieChart, Pie, Cell } from 'recharts';
 import { LineChart, Line } from 'recharts';
 import AdminLayout from '@/components/AdminLayout';
+import AdminGuard from '@/components/AdminGuard';
 
 type Summary = {
   reports_today: number;
@@ -106,153 +107,155 @@ export default function AdminPage(): ReactElement {
 
 
   return (
-    <AdminLayout onOpenAuth={handleOpenAuth}>
-      <main className="flex-1 bg-white">
-        <div className="p-6">
-          <h1 className="text-3xl font-bold text-gray-900 mb-6">Tổng quan hệ thống</h1>
-          {/* Stats Cards */}
-          <div className="grid grid-cols-3 gap-6 mb-6">
-            <div className="p-6 border border-[#DBE0E5] rounded-xl bg-white">
-              <div className="flex items-center justify-between mb-2">
-                <p className="text-base font-medium text-gray-900">Báo cáo vi phạm hôm nay</p>
-                <FiFlag className="w-6 h-6 text-gray-800" />
+    <AdminGuard>
+      <AdminLayout onOpenAuth={handleOpenAuth}>
+        <main className="flex-1 bg-white">
+          <div className="p-6">
+            <h1 className="text-3xl font-bold text-gray-900 mb-6">Tổng quan hệ thống</h1>
+            {/* Stats Cards */}
+            <div className="grid grid-cols-3 gap-6 mb-6">
+              <div className="p-6 border border-[#DBE0E5] rounded-xl bg-white">
+                <div className="flex items-center justify-between mb-2">
+                  <p className="text-base font-medium text-gray-900">Báo cáo vi phạm hôm nay</p>
+                  <FiFlag className="w-6 h-6 text-gray-800" />
+                </div>
+                <p className="text-2xl font-bold text-gray-900 mb-1">{summary?.reports_today ?? '...'}</p>
+                <p className={`text-sm ${summary && summary.reports_today < summary.reports_yesterday ? 'text-red-500' : 'text-green-600'}`}>
+                  {summary ? getGrowthPercent(summary.reports_today, summary.reports_yesterday) : '...'} so với hôm qua
+                </p>
               </div>
-              <p className="text-2xl font-bold text-gray-900 mb-1">{summary?.reports_today ?? '...'}</p>
-              <p className={`text-sm ${summary && summary.reports_today < summary.reports_yesterday ? 'text-red-500' : 'text-green-600'}`}>
-                {summary ? getGrowthPercent(summary.reports_today, summary.reports_yesterday) : '...'} so với hôm qua
-              </p>
+
+              <div className="p-6 border border-[#DBE0E5] rounded-xl bg-white">
+                <div className="flex items-center justify-between mb-2">
+                  <p className="text-base font-medium text-gray-900">Bài đăng trong tuần</p>
+                  <HiOutlineDocumentText className="w-6 h-6 text-gray-800" />
+                </div>
+                <p className="text-2xl font-bold text-gray-900 mb-1">{summary?.posts_this_week ?? '...'}</p>
+                <p className={`text-sm ${summary && summary.posts_this_week < summary.posts_last_week ? 'text-red-500' : 'text-green-600'}`}>
+                  {summary ? getGrowthPercent(summary.posts_this_week, summary.posts_last_week) : '...'} so với tuần trước
+                </p>
+              </div>
+
+              <div className="p-6 border border-[#DBE0E5] rounded-xl bg-white">
+                <div className="flex items-center justify-between mb-2">
+                  <p className="text-base font-medium text-gray-900">Người dùng mới hôm nay</p>
+                  <FiUserPlus className="w-6 h-6 text-gray-800" />
+                </div>
+                <p className="text-2xl font-bold text-gray-900 mb-1">{summary?.new_users_today ?? '...'}</p>
+                <p className={`text-sm ${summary && summary.new_users_today < summary.new_users_yesterday ? 'text-red-500' : 'text-green-600'}`}>
+                  {summary ? getGrowthPercent(summary.new_users_today, summary.new_users_yesterday) : '...'} so với hôm qua
+                </p>
+              </div>
             </div>
 
-            <div className="p-6 border border-[#DBE0E5] rounded-xl bg-white">
-              <div className="flex items-center justify-between mb-2">
-                <p className="text-base font-medium text-gray-900">Bài đăng trong tuần</p>
-                <HiOutlineDocumentText className="w-6 h-6 text-gray-800" />
-              </div>
-              <p className="text-2xl font-bold text-gray-900 mb-1">{summary?.posts_this_week ?? '...'}</p>
-              <p className={`text-sm ${summary && summary.posts_this_week < summary.posts_last_week ? 'text-red-500' : 'text-green-600'}`}>
-                {summary ? getGrowthPercent(summary.posts_this_week, summary.posts_last_week) : '...'} so với tuần trước
-              </p>
-            </div>
-
-            <div className="p-6 border border-[#DBE0E5] rounded-xl bg-white">
-              <div className="flex items-center justify-between mb-2">
-                <p className="text-base font-medium text-gray-900">Người dùng mới hôm nay</p>
-                <FiUserPlus className="w-6 h-6 text-gray-800" />
-              </div>
-              <p className="text-2xl font-bold text-gray-900 mb-1">{summary?.new_users_today ?? '...'}</p>
-              <p className={`text-sm ${summary && summary.new_users_today < summary.new_users_yesterday ? 'text-red-500' : 'text-green-600'}`}>
-                {summary ? getGrowthPercent(summary.new_users_today, summary.new_users_yesterday) : '...'} so với hôm qua
-              </p>
-            </div>
-          </div>
-
-          {/* Charts Section */}
-          <div className="grid grid-cols-3 gap-6">
-            <div className="p-6 border border-[#DBE0E5] rounded-xl bg-white col-span-2">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-semibold text-gray-800">📈 Tài khoản mới theo tháng</h3>
-                <div>
-                  <label className="mr-2 font-medium text-gray-700">Chọn năm:</label>
-                  <select
-                    value={selectedYear}
-                    onChange={(e) => setSelectedYear(Number(e.target.value))}
-                    className="p-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                  >
-                    <option value={2025}>2025</option>
-                    <option value={2026}>2026</option>
-                  </select>
+            {/* Charts Section */}
+            <div className="grid grid-cols-3 gap-6">
+              <div className="p-6 border border-[#DBE0E5] rounded-xl bg-white col-span-2">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-lg font-semibold text-gray-800">📈 Tài khoản mới theo tháng</h3>
+                  <div>
+                    <label className="mr-2 font-medium text-gray-700">Chọn năm:</label>
+                    <select
+                      value={selectedYear}
+                      onChange={(e) => setSelectedYear(Number(e.target.value))}
+                      className="p-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    >
+                      <option value={2025}>2025</option>
+                      <option value={2026}>2026</option>
+                    </select>
+                  </div>
+                </div>
+                <div className="h-72 bg-[#FAFAFA] rounded-2xl px-4 py-2 shadow-inner">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={monthlyUsers} barCategoryGap="20%">
+                      <XAxis dataKey="month" tick={{ fill: '#6B7280', fontSize: 12 }} />
+                      <YAxis tick={{ fill: '#6B7280', fontSize: 12 }} />
+                      <Tooltip
+                        contentStyle={{ backgroundColor: '#fff', borderRadius: 8, borderColor: '#E5E7EB' }}
+                        labelStyle={{ color: '#374151', fontWeight: 500 }}
+                        cursor={{ fill: '#F3F4F6' }}
+                      />
+                      <ReferenceLine
+                        y={average}
+                        stroke="#EF4444"
+                        strokeDasharray="4 2"
+                        label={{
+                          value: 'Trung bình',
+                          position: 'top',
+                          fill: '#EF4444',
+                          fontSize: 12
+                        }}
+                      />
+                      <Bar dataKey="total" radius={[6, 6, 0, 0]}>
+                        {monthlyUsers.map((_, index) => (
+                          <Cell key={`bar-${index}`} fill={COLORS[index % COLORS.length]} />
+                        ))}
+                      </Bar>
+                    </BarChart>
+                  </ResponsiveContainer>
                 </div>
               </div>
-              <div className="h-72 bg-[#FAFAFA] rounded-2xl px-4 py-2 shadow-inner">
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={monthlyUsers} barCategoryGap="20%">
-                    <XAxis dataKey="month" tick={{ fill: '#6B7280', fontSize: 12 }} />
-                    <YAxis tick={{ fill: '#6B7280', fontSize: 12 }} />
-                    <Tooltip
-                      contentStyle={{ backgroundColor: '#fff', borderRadius: 8, borderColor: '#E5E7EB' }}
-                      labelStyle={{ color: '#374151', fontWeight: 500 }}
-                      cursor={{ fill: '#F3F4F6' }}
-                    />
-                    <ReferenceLine
-                      y={average}
-                      stroke="#EF4444"
-                      strokeDasharray="4 2"
-                      label={{
-                        value: 'Trung bình',
-                        position: 'top',
-                        fill: '#EF4444',
-                        fontSize: 12
-                      }}
-                    />
-                    <Bar dataKey="total" radius={[6, 6, 0, 0]}>
-                      {monthlyUsers.map((_, index) => (
-                        <Cell key={`bar-${index}`} fill={COLORS[index % COLORS.length]} />
-                      ))}
-                    </Bar>
-                  </BarChart>
-                </ResponsiveContainer>
+              <div className="p-6 border border-[#DBE0E5] rounded-xl bg-white">
+                <div className="flex justify-between items-center mb-4">
+                  <h3 className=" text-lg font-semibold text-gray-800">💬 Phân tích cảm xúc bài viết</h3>
+                  <select
+                    value={sentimentRange}
+                    onChange={(e) => setSentimentRange(e.target.value)}
+                    className="p-2 border rounded"
+                  >
+                    <option value="week">7 ngày gần nhất</option>
+                    <option value="month">Tháng này</option>
+                  </select>
+                </div>
+                  <div className="h-64">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <PieChart>
+                        <Pie
+                          data={postSentiment}
+                          dataKey="count"
+                          nameKey="type"
+                          outerRadius={80}
+                          label={renderCustomizedLabel}
+                        >
+                          {postSentiment.map((entry, index) => (
+                            <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                          ))}
+                        </Pie>
+                        <Tooltip />
+                      </PieChart>
+                    </ResponsiveContainer>
+                  </div>    
               </div>
-            </div>
-            <div className="p-6 border border-[#DBE0E5] rounded-xl bg-white">
-              <div className="flex justify-between items-center mb-4">
-                <h3 className=" text-lg font-semibold text-gray-800">💬 Phân tích cảm xúc bài viết</h3>
-                <select
-                  value={sentimentRange}
-                  onChange={(e) => setSentimentRange(e.target.value)}
-                  className="p-2 border rounded"
-                >
-                  <option value="week">7 ngày gần nhất</option>
-                  <option value="month">Tháng này</option>
-                </select>
-              </div>
+              <div className="p-6 border border-[#DBE0E5] rounded-xl bg-white">
+                <div className="flex justify-between items-center mb-4">
+                  <h3 className="text-lg font-semibold text-gray-800">📊 Lượt truy cập theo ngày</h3>
+                  <select
+                    value={visitRange}
+                    onChange={(e) => setVisitRange(e.target.value)}
+                    className="p-2 border rounded"
+                  >
+                    <option value="7">7 ngày</option>
+                    <option value="30">30 ngày</option>
+                    <option value="all">Toàn bộ</option>
+                  </select>
+                </div>
                 <div className="h-64">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <PieChart>
-                      <Pie
-                        data={postSentiment}
-                        dataKey="count"
-                        nameKey="type"
-                        outerRadius={80}
-                        label={renderCustomizedLabel}
-                      >
-                        {postSentiment.map((entry, index) => (
-                          <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                        ))}
-                      </Pie>
-                      <Tooltip />
-                    </PieChart>
-                  </ResponsiveContainer>
-                </div>    
-            </div>
-            <div className="p-6 border border-[#DBE0E5] rounded-xl bg-white">
-              <div className="flex justify-between items-center mb-4">
-                <h3 className="text-lg font-semibold text-gray-800">📊 Lượt truy cập theo ngày</h3>
-                <select
-                  value={visitRange}
-                  onChange={(e) => setVisitRange(e.target.value)}
-                  className="p-2 border rounded"
-                >
-                  <option value="7">7 ngày</option>
-                  <option value="30">30 ngày</option>
-                  <option value="all">Toàn bộ</option>
-                </select>
-              </div>
-              <div className="h-64">
-              <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={dailyVisits}>
-                  <XAxis dataKey="date" />
-                  <YAxis />
-                  <Tooltip />
-                  <Line type="monotone" dataKey="total" stroke="#10B981" strokeWidth={3}
-                    dot={{ r: 4, stroke: '#10B981', strokeWidth: 2, fill: '#fff' }}
-                  />
-                </LineChart>
-              </ResponsiveContainer>
+                <ResponsiveContainer width="100%" height="100%">
+                  <LineChart data={dailyVisits}>
+                    <XAxis dataKey="date" />
+                    <YAxis />
+                    <Tooltip />
+                    <Line type="monotone" dataKey="total" stroke="#10B981" strokeWidth={3}
+                      dot={{ r: 4, stroke: '#10B981', strokeWidth: 2, fill: '#fff' }}
+                    />
+                  </LineChart>
+                </ResponsiveContainer>
+                </div>
               </div>
             </div>
           </div>
-        </div>
-      </main>
-    </AdminLayout>
+        </main>
+      </AdminLayout>
+    </AdminGuard>
   );
 }
