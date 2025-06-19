@@ -74,16 +74,6 @@ export default function SearchPage() {
   // Khi tìm kiếm mới
   const handleSearch = async () => {
     if (search.trim()) {
-      if (user && accessToken) {
-        await fetch(`${API_URL}/api/search_history`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${accessToken}`,
-          },
-          body: JSON.stringify({ keyword: search.trim() }),
-        });
-      }
       router.push(`/search?query=${encodeURIComponent(search.trim())}`);
     }
   };
@@ -92,7 +82,8 @@ export default function SearchPage() {
   };
 
   // Lọc kết quả liên quan
-  const allPosts = results.filter(item => item.type === "post");
+  const themePostType = theme === 'inspiring' ? 'positive' : 'reflective';
+  const allPosts = results.filter(item => item.type === "post" && item.type_post === themePostType);
   const allUsers = results.filter(item => item.type === "user");
   const postsTab = allPosts.slice(0, postTabLimit);
   const usersTab = allUsers.slice(0, userTabLimit);

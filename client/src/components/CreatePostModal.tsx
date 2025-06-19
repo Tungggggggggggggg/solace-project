@@ -261,7 +261,6 @@ export default function CreatePostModal({ onClose, onPostCreated, theme, default
             onChange={handleContentChange}
             onFocus={handleTextareaFocus}
             onBlur={handleTextareaBlur}
-            maxLength={1000}
             disabled={uploading}
           />
           {/* Hiển thị cảm xúc và vị trí đã chọn */}

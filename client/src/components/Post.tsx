@@ -106,6 +106,8 @@ const Post = ({
   const [showShareModal, setShowShareModal] = useState(false);
   const [shareCount, setShareCount] = useState(shares);
   const [sharedPost, setSharedPost] = useState<any>(null);
+  const [showFullContent, setShowFullContent] = useState(false);
+  const [showFullSharedContent, setShowFullSharedContent] = useState(false);
 
   useEffect(() => {
     // Kiểm tra user đã like chưa
@@ -253,6 +255,15 @@ const Post = ({
     }
   };
 
+  // Thêm hàm handleCollapseContent
+  const handleCollapseContent = () => {
+    if (showFullContent) setShowFullContent(false);
+  };
+  const handleCollapseSharedContent = (e: React.MouseEvent) => {
+    if (showFullSharedContent) setShowFullSharedContent(false);
+    e.stopPropagation();
+  };
+
   return (
     <div className="bg-white rounded-2xl p-6 shadow-sm w-full max-w-3xl my-6 transform transition-all duration-200 hover:shadow-md relative">
       {/* Nếu chưa duyệt thì hiển thị nhãn */}
@@ -299,7 +310,25 @@ const Post = ({
             </div>
           </div>
           {/* Nội dung shareText nếu có */}
-          {content && <div className="mb-2 text-slate-900 whitespace-pre-wrap">{content}</div>}
+          {content && (
+            <div className="mb-2 text-slate-900 whitespace-pre-wrap break-words"
+              onClick={showFullContent ? handleCollapseContent : undefined}
+              style={showFullContent ? { cursor: 'pointer' } : {}}>
+              {content.length > 300 && !showFullContent ? (
+                <>
+                  {content.slice(0, 300)}
+                  <button
+                    className="ml-1 text-indigo-600 hover:underline font-medium focus:outline-none"
+                    onClick={e => { e.stopPropagation(); setShowFullContent(true); }}
+                  >
+                    ... Xem thêm
+                  </button>
+                </>
+              ) : (
+                content
+              )}
+            </div>
+          )}
           {/* Bài viết gốc */}
           <div
             className="bg-gray-50 border rounded-lg p-4 cursor-pointer hover:bg-gray-100 transition"
@@ -314,7 +343,23 @@ const Post = ({
               </Link>
               <span className="text-gray-500 text-xs">{formatDate(sharedPost.created_at)}</span>
             </div>
-            <div className="mb-2 text-slate-900 whitespace-pre-wrap">{sharedPost.content}</div>
+            <div className="mb-2 text-slate-900 whitespace-pre-wrap break-words"
+              onClick={showFullSharedContent ? handleCollapseSharedContent : undefined}
+              style={showFullSharedContent ? { cursor: 'pointer' } : {}}>
+              {sharedPost?.content && sharedPost.content.length > 300 && !showFullSharedContent ? (
+                <>
+                  {sharedPost.content.slice(0, 300)}
+                  <button
+                    className="ml-1 text-indigo-600 hover:underline font-medium focus:outline-none"
+                    onClick={e => { e.stopPropagation(); setShowFullSharedContent(true); }}
+                  >
+                    ... Xem thêm
+                  </button>
+                </>
+              ) : (
+                sharedPost?.content
+              )}
+            </div>
             {sharedPost.images && sharedPost.images.length > 0 && (
               <div className={`grid ${sharedPost.images.length > 1 ? 'grid-cols-2' : 'grid-cols-1'} gap-2 mb-2`}>
                 {sharedPost.images.map((img: string, idx: number) => (
@@ -397,7 +442,23 @@ const Post = ({
           </div>
           {/* Post Content */}
           <div className="space-y-4">
-            <p className="text-slate-900 whitespace-pre-wrap">{filteredContent}</p>
+            <p className="text-slate-900 whitespace-pre-wrap break-words"
+              onClick={showFullContent ? handleCollapseContent : undefined}
+              style={showFullContent ? { cursor: 'pointer' } : {}}>
+              {filteredContent.length > 300 && !showFullContent ? (
+                <>
+                  {filteredContent.slice(0, 300)}
+                  <button
+                    className="ml-1 text-indigo-600 hover:underline font-medium focus:outline-none"
+                    onClick={e => { e.stopPropagation(); setShowFullContent(true); }}
+                  >
+                    ... Xem thêm
+                  </button>
+                </>
+              ) : (
+                filteredContent
+              )}
+            </p>
             {/* Post Images */}
             {imagesArray.length > 0 && (
               <div className={`grid ${imagesArray.length > 1 ? 'grid-cols-2' : 'grid-cols-1'} gap-2`}>

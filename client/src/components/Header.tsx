@@ -59,7 +59,7 @@ const Header = memo<HeaderProps>(({
   // State kiểm soát hiển thị biểu tượng tin nhắn và thông báo
   const [showMessageIcon, setShowMessageIcon] = useState(true);
   const [showNotificationIcon, setShowNotificationIcon] = useState(true);
-  const [searchHistory, setSearchHistory] = useState<string[]>([]);
+  const [searchHistory, setSearchHistory] = useState<{ id: string; keyword: string }[]>([]);
   const [showHistory, setShowHistory] = useState(false);
 
   // Refs
@@ -113,7 +113,8 @@ const Header = memo<HeaderProps>(({
       fetch(`/api/search-suggestions?query=${encodeURIComponent(keyword)}`)
         .then(res => res.json())
         .then(data => {
-          setSuggestions(Array.isArray(data) ? data : []);
+          // Lọc lại ở client: chỉ user có avatar
+          setSuggestions(Array.isArray(data) ? data.filter(s => s.type === 'user' && s.avatar) : []);
           setShowSuggestions(true);
         });
     } else {
@@ -125,7 +126,15 @@ const Header = memo<HeaderProps>(({
   // Đóng gợi ý khi click ra ngoài
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
-      if (inputWrapperRef.current && !inputWrapperRef.current.contains(event.target as Node)) setShowSuggestions(false);
+      if (
+        inputWrapperRef.current &&
+        !inputWrapperRef.current.contains(event.target as Node) &&
+        dropdownRef.current &&
+        !dropdownRef.current.contains(event.target as Node)
+      ) {
+        setShowSuggestions(false);
+        setShowHistory(false);
+      }
     }
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
@@ -175,25 +184,20 @@ const Header = memo<HeaderProps>(({
 
   const handleInputFocus = async () => {
     setShowSuggestions(true);
-    if (user) {
-      try {
-        const res = await axios.get(`${API_URL}/api/search_history`, {
-          withCredentials: true,
-          headers: {
-            Authorization: `Bearer ${accessToken}`,
-          },
-        });
-        if (res.data && Array.isArray(res.data.history)) {
-          setSearchHistory(res.data.history.map((h: any) => h.keyword));
-          setShowHistory(true);
-        }
-      } catch (error) {
-        console.error("Error fetching search history:", error);
-      }
-    }
+    await fetchSearchHistory();
+    setShowHistory(true);
   };
 
-  const handleInputBlur = () => setTimeout(() => setShowHistory(false), 200);
+  const handleInputBlur = (e: React.FocusEvent<HTMLInputElement>) => {
+    const relatedTarget = e.relatedTarget as Node;
+    if (dropdownRef.current && relatedTarget && dropdownRef.current.contains(relatedTarget)) {
+      return;
+    }
+    setTimeout(() => {
+      setShowHistory(false);
+      setShowSuggestions(false);
+    }, 200);
+  };
 
   const handleSearchWithHistory = async () => {
     if (onSearch) onSearch();
@@ -219,9 +223,13 @@ const Header = memo<HeaderProps>(({
 
   const handleSuggestionClick = useCallback(async (suggestion: SearchSuggestion) => {
     setShowSuggestions(false);
-    if (onSearchChange) onSearchChange({ target: { value: suggestion.name } } as any);
-    if (onSearch) onSearch();
-  }, [onSearchChange, onSearch]);
+    if (suggestion.type === 'user') {
+      router.push(`/profile/${suggestion.id}`);
+    } else {
+      if (onSearchChange) onSearchChange({ target: { value: suggestion.name } } as any);
+      if (onSearch) onSearch();
+    }
+  }, [onSearchChange, onSearch, router]);
 
 
   // Fetch tổng số unread khi user thay đổi
@@ -298,7 +306,8 @@ const Header = memo<HeaderProps>(({
       fetch(`/api/search-suggestions?query=${encodeURIComponent(keyword)}`)
         .then(res => res.json())
         .then(data => {
-          setSuggestions(Array.isArray(data) ? data : []);
+          // Lọc lại ở client: chỉ user có avatar
+          setSuggestions(Array.isArray(data) ? data.filter(s => s.type === 'user' && s.avatar) : []);
           setShowSuggestions(true);
         });
     } else {
@@ -369,47 +378,119 @@ const Header = memo<HeaderProps>(({
     setShowNotificationIcon(pathname !== "/notifications");
   }, [pathname, user]);
 
-  // Hàm xóa lịch sử tìm kiếm theo từ khóa
-  const deleteSearchHistoryEntry = async (keywordToDelete: string) => {
-    if (!user) return;
-    try {
-      await axios.delete(`${API_URL}/api/search_history/${encodeURIComponent(keywordToDelete)}`, {
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-        },
-      });
-      // Cập nhật lại lịch sử tìm kiếm sau khi xóa thành công
-      setSearchHistory(prevHistory => prevHistory.filter(kw => kw !== keywordToDelete));
-    } catch (error) {
-      console.error("Error deleting search history entry:", error);
-    }
-  };
-
-  useEffect(() => {
-    if (showHistory && historyRef.current) {
-      gsap.fromTo(historyRef.current, 
-        { opacity: 0, y: -10 }, 
-        { opacity: 1, y: 0, duration: 0.3, ease: Power3.easeOut });
-    }
-  }, [showHistory]);
-
+  // Hiệu ứng xuất hiện cho box đề xuất/lịch sử
   useEffect(() => {
     if ((showSuggestions && suggestions.length > 0) || (showHistory && searchHistory.length > 0)) {
       gsap.fromTo(
         dropdownRef.current,
-        { opacity: 0, y: -10, scale: 0.98 },
+        { opacity: 0, y: -20, scale: 0.98 },
         { opacity: 1, y: 0, scale: 1, duration: 0.35, ease: "power3.out" }
       );
     }
   }, [showSuggestions, showHistory, suggestions.length, searchHistory.length]);
 
-  // Khi xóa keyword
-  const handleDeleteKeyword = async (keyword: string, idx: number) => {
-    const el = document.getElementById(`history-item-${idx}`);
-    if (el) {
-      await gsap.to(el, { opacity: 0, height: 0, margin: 0, duration: 0.3, ease: "power2.in" });
+  // Hiệu ứng xuất hiện từng item
+  useEffect(() => {
+    if (showSuggestions && suggestions.length > 0 && dropdownRef.current) {
+      gsap.fromTo(
+        dropdownRef.current.querySelectorAll('.suggestion-item'),
+        { opacity: 0, x: -20 },
+        { opacity: 1, x: 0, stagger: 0.05, duration: 0.25, ease: "power2.out" }
+      );
     }
-    await deleteSearchHistoryEntry(keyword);
+    if (showHistory && searchHistory.length > 0 && dropdownRef.current) {
+      gsap.fromTo(
+        dropdownRef.current.querySelectorAll('.history-item'),
+        { opacity: 0, x: -20 },
+        { opacity: 1, x: 0, stagger: 0.05, duration: 0.25, ease: "power2.out" }
+      );
+    }
+  }, [showSuggestions, showHistory, suggestions.length, searchHistory.length]);
+
+  // Hàm xóa local trước, 1s sau mới xóa thật và reload lại lịch sử
+  const handleDeleteKeywordByIndex = async (idx: number) => {
+    const el = document.getElementById(`history-item-${idx}`);
+    if (el && dropdownRef.current) {
+      el.classList.add('being-removed');
+      const dropdownHeight = dropdownRef.current.offsetHeight;
+      dropdownRef.current.style.height = `${dropdownHeight}px`;
+      await gsap.to(el, { opacity: 0, height: 0, margin: 0, duration: 0.35, ease: "power2.in" });
+      dropdownRef.current.style.height = '';
+    }
+    const item = searchHistory[idx];
+    setSearchHistory(prev => prev.filter((_, i) => i !== idx));
+    if (inputRef.current) {
+      inputRef.current.focus();
+      setShowHistory(true);
+    }
+    setTimeout(async () => {
+      try {
+        await axios.delete(`${API_URL}/api/search_history/by-keyword/${encodeURIComponent(item.keyword)}`, {
+          headers: { Authorization: `Bearer ${accessToken}` },
+          withCredentials: true,
+        });
+        await fetchSearchHistory();
+      } catch (error) {
+        console.error("Error deleting search history:", error);
+      }
+    }, 1000);
+  };
+
+  // Khi focus vào input hoặc mount lại, luôn fetch lại lịch sử mới nhất
+  const fetchSearchHistory = async () => {
+    if (user) {
+      try {
+        const res = await axios.get(`${API_URL}/api/search_history`, {
+          withCredentials: true,
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+          },
+        });
+        if (res.data && Array.isArray(res.data.history)) {
+          setSearchHistory(res.data.history.map((h: any) => ({ id: h.id, keyword: h.keyword })));
+        }
+      } catch (error) {
+        console.error("Error fetching search history:", error);
+      }
+    }
+  };
+
+  useEffect(() => {
+    fetchSearchHistory();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user]);
+
+  // Thêm hàm xóa tất cả với hiệu ứng:
+  const handleDeleteAllHistory = async () => {
+    if (!searchHistory.length) return;
+    // Hiệu ứng GSAP cho tất cả item
+    const ids = searchHistory.slice(0, 8).map((_, idx) => `history-item-${idx}`);
+    const els = ids.map(id => document.getElementById(id)).filter(Boolean);
+    if (els.length) {
+      await Promise.all(els.map(el => {
+        if (el) {
+          el.classList.add('being-removed');
+          return gsap.to(el, { opacity: 0, height: 0, margin: 0, duration: 0.35, ease: 'power2.in' });
+        }
+        return Promise.resolve();
+      }));
+    }
+    setSearchHistory([]); // Xóa local ngay
+    if (inputRef.current) {
+      inputRef.current.focus();
+      setShowHistory(true);
+    }
+    setTimeout(async () => {
+      try {
+        await axios.delete(`${API_URL}/api/search_history/all`, {
+          headers: { Authorization: `Bearer ${accessToken}` },
+          withCredentials: true,
+        });
+        await fetchSearchHistory();
+      } catch (error) {
+        console.error('Error deleting all search history:', error);
+      }
+    }, 1000);
   };
 
   return (
@@ -445,62 +526,88 @@ const Header = memo<HeaderProps>(({
               </svg>
             </div>
           </div>
-          {showSuggestions && suggestions.length > 0 ? (
-            <div ref={dropdownRef} className="absolute left-0 right-0 top-full z-50 bg-white border border-black/10 rounded-b-xl shadow-lg max-h-60 overflow-y-auto">
-              {suggestions.map((s, idx) => (
-                <div
-                  key={s.id + s.type + idx}
-                  className="flex items-center gap-3 px-5 py-3 cursor-pointer hover:bg-[#E1ECF7] text-black text-base group"
-                  onMouseEnter={e => gsap.to(e.currentTarget, { background: '#E1ECF7', duration: 0.2 })}
-                  onMouseLeave={e => gsap.to(e.currentTarget, { background: '#fff', duration: 0.2 })}
-                  onClick={() => handleSuggestionClick(s)}
-                >
-                  {s.avatar && <Image src={s.avatar} alt={s.name} width={32} height={32} className="rounded-full" />}
-                  <span className="font-medium">{s.name}</span>
-                  <span className="ml-auto text-xs px-2 py-1 rounded bg-gray-100 text-gray-500 border border-gray-200">
-                    {s.type === 'user' ? 'User' : 'Post'}
-                  </span>
-                </div>
-              ))}
-            </div>
-          ) : showHistory && searchHistory.length > 0 ? (
-            <div ref={dropdownRef} className="absolute left-0 right-0 top-full bg-white border rounded shadow z-50 max-h-60 overflow-y-auto animate-fade-in-down">
-              {searchHistory.map((keyword, idx) => (
-                <div
-                  key={idx}
-                  id={`history-item-${idx}`}
-                  className="flex items-center justify-between px-4 py-2 hover:bg-blue-50 cursor-pointer text-gray-700 group"
-                  onMouseEnter={e => gsap.to(e.currentTarget, { background: '#E1ECF7', duration: 0.2 })}
-                  onMouseLeave={e => gsap.to(e.currentTarget, { background: '#fff', duration: 0.2 })}
-                >
-                  <span 
-                    className="flex items-center flex-1"
-                    onMouseDown={async (e) => {
-                      e.stopPropagation(); // Ngăn sự kiện blur của input
-                      setSearch(keyword);
-                      setShowHistory(false);
-                      if (onSearchChange) onSearchChange({ target: { value: keyword } } as any);
-                      await saveSearchHistory(keyword); // Lưu lại vì vừa tìm kiếm
-                      router.push(`/search?query=${encodeURIComponent(keyword)}`);
-                    }}
+          <div className="dropdown-wrapper absolute left-0 right-0 top-full z-50">
+            {showSuggestions && suggestions.length > 0 ? (
+              <div ref={dropdownRef} className="bg-white border border-gray-200 rounded-xl shadow-lg max-h-60 overflow-y-auto mt-1">
+                {suggestions.filter(s => s.type === 'user' && s.avatar).map((s, idx) => (
+                  <div
+                    key={s.id}
+                    className="flex items-center gap-3 px-4 py-2 cursor-pointer hover:bg-gradient-to-r from-blue-50 to-white text-gray-800 text-sm group suggestion-item transition-all duration-200"
+                    onMouseEnter={e => gsap.to(e.currentTarget, { background: 'linear-gradient(to right, #e6f0fa, #ffffff)', duration: 0.2 })}
+                    onMouseLeave={e => gsap.to(e.currentTarget, { background: 'transparent', duration: 0.2 })}
+                    onMouseDown={() => handleSuggestionClick(s)}
                   >
-                    <span className="material-symbols-outlined text-base mr-2 text-gray-400">history</span>
-                    <span className="text-sm text-gray-800 font-medium">{keyword}</span>
-                  </span>
-                  <button
-                    className="ml-4 p-1 rounded-full hover:bg-gray-200 transition-colors opacity-0 group-hover:opacity-100 focus:opacity-100"
-                    onClick={e => {
-                      e.stopPropagation();
-                      handleDeleteKeyword(keyword, idx);
-                    }}
-                    aria-label="Xóa lịch sử tìm kiếm"
-                  >
-                    <span className="material-symbols-outlined text-sm text-gray-500">close</span>
-                  </button>
+                    <Image src={typeof s.avatar === 'string' && s.avatar ? s.avatar : '/default-avatar.png'} alt={s.name} width={32} height={32} className="rounded-full object-cover" />
+                    <span className="font-medium text-gray-900 truncate">{s.name}</span>
+                  </div>
+                ))}
+              </div>
+            ) : showHistory && searchHistory.length > 0 ? (
+              <div ref={dropdownRef} className="bg-white border border-gray-200 rounded-xl shadow-lg max-h-72 overflow-y-auto mt-1">
+                <div className="flex flex-col divide-y divide-gray-100">
+                  {searchHistory.slice(0, 8).map((item, idx) => (
+                    <div
+                      key={item.id}
+                      id={`history-item-${idx}`}
+                      role="option"
+                      aria-selected="false"
+                      tabIndex={0}
+                      className="flex items-center justify-between px-4 py-2 hover:bg-gradient-to-r from-blue-50 to-white cursor-pointer text-gray-700 group bg-white history-item transition-all duration-200"
+                      onMouseEnter={e => {
+                        if (!e.currentTarget.classList.contains('being-removed')) {
+                          gsap.to(e.currentTarget, { background: 'linear-gradient(to right, #e6f0fa, #ffffff)', duration: 0.2 });
+                        }
+                      }}
+                      onMouseLeave={e => {
+                        if (!e.currentTarget.classList.contains('being-removed')) {
+                          gsap.to(e.currentTarget, { background: 'transparent', duration: 0.2 });
+                        }
+                      }}
+                    >
+                      <div
+                        className="flex items-center gap-2 flex-1 min-w-0"
+                        onMouseDown={async (e) => {
+                          e.stopPropagation();
+                          setSearch(item.keyword);
+                          setShowHistory(false);
+                          if (onSearchChange) onSearchChange({ target: { value: item.keyword } } as any);
+                          await saveSearchHistory(item.keyword);
+                          router.push(`/search?query=${encodeURIComponent(item.keyword)}`);
+                        }}
+                      >
+                        <span className="inline-flex items-center justify-center w-7 h-7 text-gray-500">
+                          <svg viewBox="0 0 21 21" aria-hidden="true" width="20" height="20">
+                            <g>
+                              <path d="M9.094 3.095c-3.314 0-6 2.686-6 6s2.686 6 6 6c1.657 0 3.155-.67 4.243-1.757 1.087-1.088 1.757-2.586 1.757-4.243 0-3.314-2.686-6-6-6zm-9 6c0-4.971 4.029-9 9-9s9 4.029 9 9c0 1.943-.617 3.744-1.664 5.215l4.475 4.474-2.122 2.122-4.474-4.475c-1.471 1.047-3.272 1.664-5.215 1.664-4.97-.001-8.999-4.03-9-9z"></path>
+                            </g>
+                          </svg>
+                        </span>
+                        <span className="truncate text-sm font-medium text-gray-900">{item.keyword}</span>
+                      </div>
+                      <button
+                        aria-label="Xóa"
+                        type="button"
+                        className="ml-2 p-1 rounded-full hover:bg-red-100 text-red-500 opacity-0 group-hover:opacity-100 focus:opacity-100 transition-opacity duration-200"
+                        onMouseDown={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          handleDeleteKeywordByIndex(idx);
+                        }}
+                      >
+                        <span className="inline-flex items-center justify-center w-6 h-6">
+                          <svg viewBox="0 0 24 24" aria-hidden="true" width="16" height="16">
+                            <g>
+                              <path d="M10.59 12L4.54 5.96l1.42-1.42L12 10.59l6.04-6.05 1.42 1.42L13.41 12l6.05 6.04-1.42 1.42L12 13.41l-6.04 6.05-1.42-1.42L10.59 12z"></path>
+                            </g>
+                          </svg>
+                        </span>
+                      </button>
+                    </div>
+                  ))}
                 </div>
-              ))}
-            </div>
-          ) : null}
+              </div>
+            ) : null}
+          </div>
         </div>
         <div className="flex items-center gap-3 justify-end">
           {loading ? (

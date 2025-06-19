@@ -33,36 +33,40 @@ router.post('/', isAuthenticated, async (req, res) => {
   }
 });
 
-// Lấy lịch sử tìm kiếm
+// Lấy lịch sử tìm kiếm (chỉ trả về mỗi keyword 1 lần, mới nhất trước)
 router.get('/', isAuthenticated, async (req, res) => {
-  const user_id = req.user.id; // Lấy user_id từ req.user sau khi xác thực
-
+  const user_id = req.user.id;
   try {
     const { rows } = await pool.query(
-      'SELECT keyword FROM search_history WHERE user_id = $1 ORDER BY created_at DESC LIMIT 10',
+      `SELECT DISTINCT ON (keyword) id, keyword, created_at
+       FROM search_history
+       WHERE user_id = $1
+       ORDER BY keyword, created_at DESC`,
       [user_id]
     );
-    // Trả về mảng các từ khóa
-    res.json({ history: rows.map(row => row.keyword) });
+    // Sắp xếp lại theo created_at mới nhất trước, chỉ lấy tối đa 10
+    const unique = rows
+      .sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
+      .slice(0, 10)
+      .map(row => ({ id: row.id, keyword: row.keyword }));
+    res.json({ history: unique });
   } catch (err) {
-    console.error('Lỗi khi lấy lịch sử tìm kiếm:', err); // Log chi tiết lỗi
+    console.error('Lỗi khi lấy lịch sử tìm kiếm:', err);
     res.status(500).json({ error: 'Lỗi server khi lấy lịch sử tìm kiếm', detail: err.message, stack: err.stack });
   }
 });
 
-// DELETE route để xóa một từ khóa tìm kiếm khỏi lịch sử
-router.delete('/:keyword', isAuthenticated, async (req, res) => {
+// Xóa tất cả bản ghi keyword đó của user
+router.delete('/by-keyword/:keyword', isAuthenticated, async (req, res) => {
   const { keyword } = req.params;
-  const userId = req.user.id; // Lấy userId từ middleware xác thực
-
+  const userId = req.user.id;
   if (!userId) {
     return res.status(401).json({ error: 'Unauthorized: User ID not found.' });
   }
-
   try {
     const query = 'DELETE FROM search_history WHERE user_id = $1 AND keyword = $2';
     await pool.query(query, [userId, keyword]);
-    res.status(200).json({ message: 'Search history entry deleted successfully.' });
+    res.status(200).json({ message: 'All search history entries with this keyword deleted successfully.' });
   } catch (error) {
     console.error('Error deleting search history entry:', error);
     res.status(500).json({ error: 'Internal Server Error' });
