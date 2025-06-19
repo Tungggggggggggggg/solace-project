@@ -96,13 +96,13 @@ const PostDetailPopup = ({ post, onClose, theme = 'inspiring' }: PostDetailPopup
               post.avatar_url ? (
                 <Image src={post.avatar_url} alt={post.name || 'avatar'} width={48} height={48} className="object-cover w-12 h-12" />
               ) : (
-                <span className="material-symbols-outlined text-gray-500 text-3xl">person</span>
+                <span className="material-symbols-outlined text-[40px] text-slate-300 flex items-center justify-center w-12 h-12">person</span>
               )
             ) : (
               post.avatar_url ? (
                 <Image src={post.avatar_url} alt={post.name || 'avatar'} width={48} height={48} className="object-cover w-12 h-12" />
               ) : (
-                <span className="material-symbols-outlined text-gray-500 text-3xl">person</span>
+                <span className="material-symbols-outlined text-[40px] text-slate-300 flex items-center justify-center w-12 h-12">person</span>
               )
             )}
           </div>
@@ -145,7 +145,7 @@ const PostDetailPopup = ({ post, onClose, theme = 'inspiring' }: PostDetailPopup
               {post.shared_post.avatar_url ? (
                 <Image src={post.shared_post.avatar_url} alt={post.shared_post.name || 'avatar'} width={32} height={32} className="w-8 h-8 rounded-full object-cover" />
               ) : (
-                <span className="material-symbols-outlined text-slate-400">person</span>
+                <span className="material-symbols-outlined text-[28px] text-slate-300 flex items-center justify-center w-8 h-8">person</span>
               )}
               <span className="font-semibold">{post.shared_post.name}</span>
               <span className="text-gray-500 text-xs">{formatDate(post.shared_post.date)}</span>

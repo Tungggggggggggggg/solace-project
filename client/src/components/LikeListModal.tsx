@@ -1,8 +1,16 @@
 import React, { useEffect, useState } from 'react';
 import axios from 'axios';
+import Image from 'next/image';
+
+interface UserLike {
+  id: string;
+  avatar_url?: string | null;
+  first_name?: string;
+  last_name?: string;
+}
 
 export default function LikeListModal({ postId, onClose }: { postId: string, onClose: () => void }) {
-  const [users, setUsers] = useState<any[]>([]);
+  const [users, setUsers] = useState<UserLike[]>([]);
   useEffect(() => {
     axios.get('/api/likes/list', {
       params: { post_id: postId },
@@ -16,7 +24,11 @@ export default function LikeListModal({ postId, onClose }: { postId: string, onC
         <div className="space-y-3 max-h-80 overflow-y-auto">
           {users.map(u => (
             <div key={u.id} className="flex items-center gap-3">
-              <img src={u.avatar_url || '/default-avatar.png'} alt={u.first_name ? `${u.first_name} ${u.last_name}` : 'avatar'} className="w-8 h-8 rounded-full object-cover" />
+              {u.avatar_url ? (
+                <Image src={u.avatar_url} alt={u.first_name ? `${u.first_name} ${u.last_name}` : 'avatar'} width={32} height={32} className="w-8 h-8 rounded-full object-cover" />
+              ) : (
+                <span className="material-symbols-outlined text-[28px] text-slate-300 flex items-center justify-center w-8 h-8">person</span>
+              )}
               <span className="font-medium">{u.first_name} {u.last_name}</span>
             </div>
           ))}
