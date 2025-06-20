@@ -495,11 +495,11 @@ const Header = memo<HeaderProps>(({
 
   return (
     <>
-      <header className="flex items-center justify-between w-full h-20 px-16" style={{ backgroundColor: headerBg }}>
-        <Link href="/" className="flex items-center h-12 w-32 hover:opacity-80 transition-opacity duration-200 cursor-pointer">
-          <Image src="/logo.png" alt="Solace Logo" width={128} height={48} className="object-contain" priority />
+      <header className="flex items-center justify-between w-full h-16 sm:h-20 px-4 sm:px-8 lg:px-16" style={{ backgroundColor: headerBg }}>
+        <Link href="/" className="flex items-center h-10 w-24 sm:h-12 sm:w-32 hover:opacity-80 transition-opacity duration-200 cursor-pointer">
+          <Image src="/logo.png" alt="Solace Logo" width={96} height={36} className="object-contain sm:w-128 sm:h-48" priority />
         </Link>
-        <div className="flex-1 max-w-xl mx-8 relative">
+        <div className="flex-1 max-w-md sm:max-w-xl mx-4 sm:mx-8 relative">
           <div className="flex w-full rounded-full border border-black bg-white overflow-hidden" ref={inputWrapperRef}>
             <FilteredInput
               ref={inputRef}
@@ -513,14 +513,14 @@ const Header = memo<HeaderProps>(({
                 else memoizedHandleKeyDown(e);
               }}
               placeholder="Tìm kiếm..."
-              className="flex-1 px-5 py-2 bg-white text-base font-normal placeholder:text-gray-400 focus:outline-none border-none rounded-none text-black"
+              className="flex-1 px-3 sm:px-5 py-2 bg-white text-sm sm:text-base font-normal placeholder:text-gray-400 focus:outline-none border-none rounded-none text-black"
             />
             <div 
-              className="flex items-center justify-center px-5 border-l border-black cursor-pointer" 
-              style={{ minHeight: "40px", backgroundColor: headerBg }} 
+              className="flex items-center justify-center px-3 sm:px-5 border-l border-black cursor-pointer" 
+              style={{ minHeight: "36px", backgroundColor: headerBg }} 
               onClick={memoizedHandleClick}
             >
-              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="black" className="w-6 h-6">
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="black" className="w-5 h-5 sm:w-6 sm:h-6">
                 <circle cx="11" cy="11" r="7" />
                 <line x1="16.5" y1="16.5" x2="21" y2="21" stroke="black" strokeWidth={2} strokeLinecap="round" />
               </svg>
@@ -609,18 +609,18 @@ const Header = memo<HeaderProps>(({
             ) : null}
           </div>
         </div>
-        <div className="flex items-center gap-3 justify-end">
+        <div className="flex items-center gap-2 sm:gap-3 justify-end">
           {loading ? (
             <div className="flex items-center gap-2 p-2">
-              <div className="bg-gray-200 rounded-full w-8 h-8 animate-pulse" />
-              <div className="bg-gray-200 rounded-full w-20 h-4 animate-pulse" />
+              <div className="bg-gray-200 rounded-full w-6 h-6 sm:w-8 sm:h-8 animate-pulse" />
+              <div className="bg-gray-200 rounded-full w-16 sm:w-20 h-4 animate-pulse" />
             </div>
           ) : !user ? (
             <>
               <button
                 ref={loginBtnRef}
                 onClick={() => onOpenAuth?.("login")}
-                className="inline-flex items-center justify-center min-w-[110px] h-11 px-6 text-base font-semibold rounded-full border-2 border-[#8CA9D5] bg-white text-[#3B4252] shadow-sm transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#8CA9D5]"
+                className="hidden sm:inline-flex items-center justify-center min-w-[90px] h-10 sm:h-11 px-4 sm:px-6 text-sm sm:text-base font-semibold rounded-full border-2 border-[#8CA9D5] bg-white text-[#3B4252] shadow-sm transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#8CA9D5]"
                 aria-label="Log in"
                 onMouseEnter={() => handleBtnHover(loginBtnRef)}
                 onMouseLeave={() => handleBtnLeave(loginBtnRef)}
@@ -633,7 +633,7 @@ const Header = memo<HeaderProps>(({
               <button
                 ref={signupBtnRef}
                 onClick={() => onOpenAuth?.("signup")}
-                className="inline-flex items-center justify-center min-w-[110px] h-11 px-6 text-base font-bold rounded-full bg-gradient-to-r from-[#8CA9D5] to-blue-600 text-white shadow-lg transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-400"
+                className="inline-flex items-center justify-center min-w-[90px] h-10 sm:h-11 px-4 sm:px-6 text-sm sm:text-base font-bold rounded-full bg-gradient-to-r from-[#8CA9D5] to-blue-600 text-white shadow-lg transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-400"
                 aria-label="Sign up"
                 onMouseEnter={() => handleBtnHover(signupBtnRef)}
                 onMouseLeave={() => handleBtnLeave(signupBtnRef)}
@@ -645,13 +645,12 @@ const Header = memo<HeaderProps>(({
               </button>
             </>
           ) : (
-            // Hiển thị biểu tượng tin nhắn, thông báo và menu người dùng nếu đã đăng nhập
             <>
               {showMessageIcon && (
                 <button
                   ref={messageBtnRef}
                   onClick={handleMessageClick}
-                  className="relative flex items-center justify-center w-10 h-10 rounded-full bg-white border border-[#8CA9D5] hover:bg-[#E1ECF7] transition-all duration-200"
+                  className="relative flex items-center justify-center w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-white border border-[#8CA9D5] hover:bg-[#E1ECF7] transition-all duration-200"
                   aria-label="Messages"
                   onMouseEnter={() => handleBtnHover(messageBtnRef, 1.1)}
                   onMouseLeave={() => handleBtnLeave(messageBtnRef)}
@@ -659,9 +658,9 @@ const Header = memo<HeaderProps>(({
                   onBlur={() => handleBtnLeave(messageBtnRef)}
                   type="button"
                 >
-                  <span className="material-symbols-outlined text-[#3B4252] text-[20px]">mail</span>
+                  <span className="material-symbols-outlined text-[#3B4252] text-lg sm:text-[20px]">mail</span>
                   {unreadCount > 0 && (
-                    <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center">
+                    <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs font-bold rounded-full w-4 h-4 sm:w-5 sm:h-5 flex items-center justify-center">
                       {unreadCount}
                     </span>
                   )}
@@ -671,7 +670,7 @@ const Header = memo<HeaderProps>(({
                 <button
                   ref={notificationBtnRef}
                   onClick={handleNotificationClick}
-                  className="relative flex items-center justify-center w-10 h-10 rounded-full bg-white border border-[#8CA9D5] hover:bg-[#E1ECF7] transition-all duration-200"
+                  className="relative flex items-center justify-center w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-white border border-[#8CA9D5] hover:bg-[#E1ECF7] transition-all duration-200"
                   aria-label="Notifications"
                   onMouseEnter={() => handleBtnHover(notificationBtnRef, 1.1)}
                   onMouseLeave={() => handleBtnLeave(notificationBtnRef)}
@@ -679,9 +678,9 @@ const Header = memo<HeaderProps>(({
                   onBlur={() => handleBtnLeave(notificationBtnRef)}
                   type="button"
                 >
-                  <span className="material-symbols-outlined text-[#3B4252] text-[20px]">notifications</span>
+                  <span className="material-symbols-outlined text-[#3B4252] text-lg sm:text-[20px]">notifications</span>
                   {unreadNotifications > 0 && (
-                    <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center">
+                    <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs font-bold rounded-full w-4 h-4 sm:w-5 sm:h-5 flex items-center justify-center">
                       {unreadNotifications}
                     </span>
                   )}
@@ -689,26 +688,26 @@ const Header = memo<HeaderProps>(({
               )}
               <div className="relative" ref={userMenuRef}>
                 <button
-                  className="flex items-center gap-2 hover:bg-gray-50 rounded-full p-2 transition-all duration-300 ease-in-out group"
+                  className="flex items-center gap-1 sm:gap-2 hover:bg-gray-50 rounded-full p-1 sm:p-2 transition-all duration-300 ease-in-out group"
                   onClick={() => setShowUserMenu(!showUserMenu)}
                 >
                   <Image src={user.avatar_url || "/default-avatar.png"} 
-                    alt="User Avatar" width={36} height={36} className="rounded-full ring-2 ring-offset-2 ring-[#8CA9D5] group-hover:ring-blue-600 transition-all" />
-                  <span className="text-sm font-medium text-gray-700 group-hover:text-blue-600">{user.last_name} {user.first_name}</span>
+                    alt="User Avatar" width={32} height={32} className="rounded-full ring-2 ring-offset-2 ring-[#8CA9D5] group-hover:ring-blue-600 transition-all" />
+                  <span className="hidden sm:inline text-sm font-medium text-gray-700 group-hover:text-blue-600">{user.last_name} {user.first_name}</span>
                 </button>
                 {showUserMenu && (
-                  <div className="absolute right-0 mt-2 w-48 bg-white rounded-xl shadow-lg py-1 z-50 transform transition-all duration-200 ease-out border border-gray-100">
+                  <div className="absolute right-0 mt-2 w-40 sm:w-48 bg-white rounded-xl shadow-lg py-1 z-50 transform transition-all duration-200 ease-out border border-gray-100">
                     <button
                       onClick={() => router.push("/profile")}
                       className="flex items-center gap-2 w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-600 transition-colors duration-200"
                     >
-                      <span className="material-symbols-outlined text-[20px]">person</span>Profile
+                      <span className="material-symbols-outlined text-lg sm:text-[20px]">person</span>Profile
                     </button>
                     <button
                       onClick={handleLogout}
                       className="flex items-center gap-2 w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 transition-colors duration-200"
                     >
-                      <span className="material-symbols-outlined text-[20px]">logout</span>Sign out
+                      <span className="material-symbols-outlined text-lg sm:text-[20px]">logout</span>Sign out
                     </button>
                   </div>
                 )}

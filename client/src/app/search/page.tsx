@@ -133,188 +133,71 @@ export default function SearchPage() {
         />
       </div>
       {/* Main Content */}
-      <div className="pt-20">
-        <div className="flex w-full">
-          {/* Sidebar trái cố định */}
-          <div className="fixed top-[80px] left-0 z-20">
-            <Sidebar theme={theme} />
-          </div>
-          {/* Nội dung trung tâm */}
-          <div className="flex-1 flex justify-center">
-            <div className="w-full max-w-3xl px-4" style={{ minHeight: '100vh' }}>
-              {/* Nút quay về trang chủ */}
-              <nav className="w-full max-w-3xl mb-4">
+      <div className="pt-20 flex flex-col lg:flex-row w-full">
+        {/* Sidebar trái cố định - Ẩn trên mobile */}
+        <div className="hidden lg:block fixed top-[80px] left-0 z-20">
+          <Sidebar theme={theme} />
+        </div>
+        {/* Nội dung trung tâm */}
+        <div className="flex-1 flex justify-center px-4 sm:px-6 lg:px-8">
+          <div className="w-full max-w-4xl" style={{ minHeight: '100vh' }}>
+            {/* Nút quay về trang chủ */}
+            <nav className="w-full mb-4">
+              <button
+                onClick={() => router.push("/")}
+                className="inline-flex items-center gap-2 text-gray-700 hover:text-blue-700 font-medium transition-all hover:-translate-x-1 hover:scale-105 bg-white/50 backdrop-blur-sm px-4 py-2 rounded-full shadow-md hover:shadow-xl duration-200"
+                style={{ transition: 'all 0.2s cubic-bezier(.4,2,.6,1)' }}
+              >
+                <span className="material-symbols-outlined text-lg">arrow_back</span>
+                Về trang chủ
+              </button>
+            </nav>
+            {/* Tiêu đề */}
+            <div className="w-full mb-6">
+              <span className="font-bold text-xl sm:text-2xl text-[#1E1E1E]">
+                Kết quả tìm kiếm cho: <span className="text-blue-600">"{query}"</span>
+              </span>
+            </div>
+            {/* Tabs với hiệu ứng underline trượt */}
+            <div className="flex gap-4 sm:gap-6 mb-6 text-base sm:text-lg font-semibold relative">
+              {[
+                { key: "all", label: "Tất cả" },
+                { key: "post", label: "Bài viết" },
+                { key: "user", label: "Người dùng" },
+              ].map((t) => (
                 <button
-                  onClick={() => router.push("/")}
-                  className="inline-flex items-center gap-2 text-gray-700 hover:text-blue-700 font-medium transition-all hover:-translate-x-1 hover:scale-105 bg-white/50 backdrop-blur-sm px-4 py-2 rounded-full shadow-md hover:shadow-xl duration-200"
-                  style={{ transition: 'all 0.2s cubic-bezier(.4,2,.6,1)' }}
+                  key={t.key}
+                  className={
+                    tab === t.key
+                      ? "text-blue-700 relative"
+                      : "text-gray-500 relative"
+                  }
+                  style={{ transition: 'color 0.2s' }}
+                  onClick={() => setTab(t.key as any)}
                 >
-                  <span className="material-symbols-outlined text-lg">arrow_back</span>
-                  Về trang chủ
+                  {t.label}
+                  {tab === t.key && (
+                    <span className="absolute left-0 right-0 -bottom-1 h-1 bg-blue-700 rounded-full animate-slidein" style={{ transition: 'all 0.3s cubic-bezier(.4,2,.6,1)' }} />
+                  )}
                 </button>
-              </nav>
-              {/* Tiêu đề */}
-              <div className="w-full max-w-3xl mb-6">
-                <span className="font-bold text-2xl text-[#1E1E1E]">
-                  Kết quả tìm kiếm cho: <span className="text-blue-600">&quot;{query}&quot;</span>
-                </span>
-              </div>
-              {/* Tabs với hiệu ứng underline trượt */}
-              <div className="flex gap-6 mb-6 text-lg font-semibold relative">
-                {[
-                  { key: "all", label: "Tất cả" },
-                  { key: "post", label: "Bài viết" },
-                  { key: "user", label: "Người dùng" },
-                ].map((t) => (
-                  <button
-                    key={t.key}
-                    className={
-                      tab === t.key
-                        ? "text-blue-700 relative"
-                        : "text-gray-500 relative"
-                    }
-                    style={{ transition: 'color 0.2s' }}
-                    onClick={() => setTab(t.key as any)}
-                  >
-                    {t.label}
-                    {tab === t.key && (
-                      <span className="absolute left-0 right-0 -bottom-1 h-1 bg-blue-700 rounded-full animate-slidein" style={{ transition: 'all 0.3s cubic-bezier(.4,2,.6,1)' }} />
-                    )}
-                  </button>
-                ))}
-              </div>
-              {/* Nội dung theo tab với hiệu ứng fade-in */}
-              <div className="w-full max-w-3xl flex flex-col gap-6 animate-fadein">
-                {loading ? (
-                  <>
-                    <SkeletonPost />
-                    <SkeletonPost />
-                    <SkeletonPost />
-                  </>
-                ) : tab === "all" ? (
-                  <>
-                    {results.length === 0 ? (
-                      <div className="text-gray-400 text-lg py-8 bg-white rounded-[32px] shadow border-2 border-[#E3E3E3] text-center">Không có kết quả phù hợp.</div>
-                    ) : (
-                      <>
-                        {/* Render 2 post đầu */}
-                        {allPosts.slice(0, 2).map((item) => (
-                          <Post
-                            key={item.id}
-                            id={item.id}
-                            userId={item.user_id}
-                            name={`${item.first_name || ''} ${item.last_name || ''}`.trim() || "Người dùng ẩn danh"}
-                            date={item.created_at || ''}
-                            content={item.content}
-                            likes={item.like_count || 0}
-                            comments={item.comment_count || 0}
-                            shares={item.shares || 0}
-                            images={item.images || []}
-                            avatar={item.avatar_url}
-                            feeling={item.feeling}
-                            location={item.location}
-                            onOpenDetail={() => setSelectedPost(item)}
-                            theme={theme}
-                          />
-                        ))}
-
-                        {/* Chỉ render div 'Mọi người' sau 2 post đầu nếu có user */}
-                        {allUsers.length > 0 && (
-                          <div className="rounded-2xl shadow px-8 py-6 border-2 border-[#E3E3E3] bg-white mb-6">
-                            <div className="font-bold text-lg mb-4">Mọi người</div>
-                            {allUsers.slice(0, 3).map((item) => {
-                              function stringToColor(str: string) {
-                                let hash = 0;
-                                for (let i = 0; i < str.length; i++) hash = str.charCodeAt(i) + ((hash << 5) - hash);
-                                const c = (hash & 0x00FFFFFF).toString(16).toUpperCase();
-                                return '#' + '00000'.substring(0, 6 - c.length) + c;
-                              }
-                              const isAnonymous = !item.name || item.name.toLowerCase().includes('ẩn danh');
-                              const avatarBg = isAnonymous ? '#E5E7EB' : stringToColor(item.id || item.name || 'user');
-                              const initials = item.name ? item.name.split(' ').map((w: string) => w[0]).join('').toUpperCase().slice(0,2) : 'U';
-                              return (
-                                <div
-                                  key={item.id}
-                                  className="flex items-center gap-5 rounded-[32px] px-4 py-3 border mb-3 bg-[#F8FAFC]"
-                                >
-                                  <div className="w-12 h-12 rounded-full flex items-center justify-center border" style={{ background: avatarBg }}>
-                                    {item.avatar ? (
-                                      <Image src={item.avatar} alt={item.name} width={40} height={40} className="rounded-full" />
-                                    ) : isAnonymous ? (
-                                      <span className="material-symbols-outlined text-gray-400 text-3xl">person</span>
-                                    ) : (
-                                      <span className="text-white font-bold text-xl">{initials}</span>
-                                    )}
-                                  </div>
-                                  <span className={`font-semibold text-base flex-1 ${isAnonymous ? 'text-gray-600' : ''}`}>{item.name || 'Người dùng'}</span>
-                                  {friendRequests[item.id] ? (
-                                    <button
-                                      className="friend-btn px-4 py-2 rounded-full bg-gray-400 text-white font-semibold shadow cursor-not-allowed text-sm"
-                                      disabled
-                                    >
-                                      Đã theo dõi
-                                    </button>
-                                  ) : (
-                                    <button
-                                      className="friend-btn px-4 py-2 rounded-full bg-blue-500 text-white font-semibold shadow transition-all hover:bg-blue-600 hover:scale-105 text-sm"
-                                      onClick={() => {
-                                        if (!user) {
-                                          setShowAuthModal(true);
-                                          return;
-                                        }
-                                        setFriendRequests(prev => ({ ...prev, [item.id]: true }));
-                                        // TODO: Gửi request follow lên server ở đây nếu muốn
-                                      }}
-                                    >
-                                      Follow
-                                    </button>
-                                  )}
-                                </div>
-                              );
-                            })}
-                            <button
-                              className="mt-2 px-4 py-2 rounded-full bg-slate-100 text-blue-700 font-semibold hover:bg-blue-50 transition-all"
-                              onClick={() => setTab('user')}
-                            >
-                              Xem tất cả
-                            </button>
-                          </div>
-                        )}
-
-                        {/* Render các post còn lại */}
-                        {allPosts.slice(2, combinedLimit).map((item) => (
-                          <Post
-                            key={item.id}
-                            id={item.id}
-                            userId={item.user_id}
-                            name={`${item.first_name || ''} ${item.last_name || ''}`.trim() || "Người dùng ẩn danh"}
-                            date={item.created_at || ''}
-                            content={item.content}
-                            likes={item.like_count || 0}
-                            comments={item.comment_count || 0}
-                            shares={item.shares || 0}
-                            images={item.images || []}
-                            avatar={item.avatar_url}
-                            feeling={item.feeling}
-                            location={item.location}
-                            onOpenDetail={() => setSelectedPost(item)}
-                            theme={theme}
-                          />
-                        ))}
-                      </>
-                    )}
-                    {(tab === 'all' && combinedLimit < results.length) && (
-                      <div ref={loaderRef} className="w-full flex justify-center py-4">
-                        <span className="text-gray-400">Đang tải thêm...</span>
-                      </div>
-                    )}
-                  </>
-                ) : tab === "post" ? (
-                  <>
-                    {postsTab.length === 0 ? (
-                      <div className="text-gray-400 text-lg py-8 bg-white rounded-[32px] shadow border-2 border-[#E3E3E3] text-center">Không có bài viết phù hợp.</div>
-                    ) : (
-                      postsTab.map((item) => (
+              ))}
+            </div>
+            {/* Nội dung theo tab với hiệu ứng fade-in */}
+            <div className="w-full flex flex-col gap-6 animate-fadein">
+              {loading ? (
+                <>
+                  <SkeletonPost />
+                  <SkeletonPost />
+                  <SkeletonPost />
+                </>
+              ) : tab === "all" ? (
+                <>
+                  {results.length === 0 ? (
+                    <div className="text-gray-400 text-lg py-8 bg-white rounded-[32px] shadow border-2 border-[#E3E3E3] text-center">Không có kết quả phù hợp.</div>
+                  ) : (
+                    <>
+                      {/* Render 2 post đầu */}
+                      {allPosts.slice(0, 2).map((item) => (
                         <Post
                           key={item.id}
                           id={item.id}
@@ -332,90 +215,205 @@ export default function SearchPage() {
                           onOpenDetail={() => setSelectedPost(item)}
                           theme={theme}
                         />
-                      ))
-                    )}
-                    {postsTab.length < allPosts.length && (
-                      <div ref={loaderRef} className="w-full flex justify-center py-4">
-                        <span className="text-gray-400">Đang tải thêm...</span>
-                      </div>
-                    )}
-                  </>
-                ) : tab === "user" ? (
-                  <>
-                    {usersTab.length === 0 ? (
-                      <div className="text-gray-400 text-lg py-8 bg-white rounded-[32px] shadow border-2 border-[#E3E3E3] text-center">Không có người dùng phù hợp.</div>
-                    ) : (
-                      usersTab.map((item) => {
-                        function stringToColor(str: string) {
-                          let hash = 0;
-                          for (let i = 0; i < str.length; i++) hash = str.charCodeAt(i) + ((hash << 5) - hash);
-                          const c = (hash & 0x00FFFFFF).toString(16).toUpperCase();
-                          return '#' + '00000'.substring(0, 6 - c.length) + c;
-                        }
-                        const isAnonymous = !item.name || item.name.toLowerCase().includes('ẩn danh');
-                        const avatarBg = isAnonymous ? '#E5E7EB' : stringToColor(item.id || item.name || 'user');
-                        const initials = item.name ? item.name.split(' ').map((w: string) => w[0]).join('').toUpperCase().slice(0,2) : 'U';
-                        return (
-                          <div
-                            key={item.id}
-                            className={`flex items-center gap-5 rounded-[32px] shadow px-8 py-4 border-2 border-[#E3E3E3] search-card mb-4 ${theme === 'reflective' ? 'bg-[#E9ECF1]' : 'bg-white'} ${theme === 'reflective' ? 'hover:bg-[#e3e3e3]' : 'hover:bg-blue-50'}`}
+                      ))}
+
+                      {/* Chỉ render div 'Mọi người' sau 2 post đầu nếu có user */}
+                      {allUsers.length > 0 && (
+                        <div className="w-full max-w-3xl mx-0 my-6 rounded-2xl shadow border-2 border-[#E3E3E3] bg-white p-4 sm:p-6">
+                          <div className="font-bold text-lg mb-4">Mọi người</div>
+                          {allUsers.slice(0, 3).map((item) => {
+                            function stringToColor(str: string) {
+                              let hash = 0;
+                              for (let i = 0; i < str.length; i++) hash = str.charCodeAt(i) + ((hash << 5) - hash);
+                              const c = (hash & 0x00FFFFFF).toString(16).toUpperCase();
+                              return '#' + '00000'.substring(0, 6 - c.length) + c;
+                            }
+                            const isAnonymous = !item.name || item.name.toLowerCase().includes('ẩn danh');
+                            const avatarBg = isAnonymous ? '#E5E7EB' : stringToColor(item.id || item.name || 'user');
+                            const initials = item.name ? item.name.split(' ').map((w: string) => w[0]).join('').toUpperCase().slice(0, 2) : 'U';
+                            return (
+                              <div
+                                key={item.id}
+                                className="flex items-center gap-5 rounded-[32px] px-4 py-3 mb-3 bg-[#F8FAFC] border border-gray-200 hover:bg-gray-50 transition-all duration-200"
+                              >
+                                <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-full flex items-center justify-center border" style={{ background: avatarBg }}>
+                                  {item.avatar ? (
+                                    <Image src={item.avatar} alt={item.name} width={40} height={40} className="rounded-full" />
+                                  ) : isAnonymous ? (
+                                    <span className="material-symbols-outlined text-gray-400 text-3xl">person</span>
+                                  ) : (
+                                    <span className="text-white font-bold text-xl">{initials}</span>
+                                  )}
+                                </div>
+                                <span className={`font-semibold text-base sm:text-lg flex-1 ${isAnonymous ? 'text-gray-600' : ''}`}>{item.name || 'Người dùng'}</span>
+                                {friendRequests[item.id] ? (
+                                  <button
+                                    className="friend-btn px-4 py-2 rounded-full bg-gray-400 text-white font-semibold shadow cursor-not-allowed text-sm sm:text-base"
+                                    disabled
+                                  >
+                                    Đã theo dõi
+                                  </button>
+                                ) : (
+                                  <button
+                                    className="friend-btn px-4 py-2 rounded-full bg-blue-500 text-white font-semibold shadow transition-all hover:bg-blue-600 hover:scale-105 text-sm sm:text-base"
+                                    onClick={() => {
+                                      if (!user) {
+                                        setShowAuthModal(true);
+                                        return;
+                                      }
+                                      setFriendRequests((prev) => ({ ...prev, [item.id]: true }));
+                                      // TODO: Gửi request follow lên server ở đây nếu muốn
+                                    }}
+                                  >
+                                    Follow
+                                  </button>
+                                )}
+                              </div>
+                            );
+                          })}
+                          <button
+                            className="mt-2 px-4 py-2 rounded-full bg-slate-100 text-blue-700 font-semibold hover:bg-blue-50 transition-all text-sm sm:text-base"
+                            onClick={() => setTab('user')}
                           >
-                            <div className="w-14 h-14 rounded-full flex items-center justify-center border" style={{ background: avatarBg }}>
-                              {item.avatar ? (
-                                <Image src={item.avatar} alt={item.name} width={40} height={40} className="rounded-full" />
-                              ) : isAnonymous ? (
-                                <span className="material-symbols-outlined text-gray-400 text-3xl">person</span>
-                              ) : (
-                                <span className="text-white font-bold text-xl">{initials}</span>
-                              )}
-                            </div>
-                            <span className={`font-semibold text-lg flex-1 ${isAnonymous ? 'text-gray-600' : ''}`}>{item.name || 'Người dùng'}</span>
-                            {friendRequests[item.id] ? (
-                              <button
-                                className="friend-btn px-5 py-2 rounded-full bg-gray-400 text-white font-semibold shadow cursor-not-allowed"
-                                disabled
-                              >
-                                Đã theo dõi
-                              </button>
+                            Xem tất cả
+                          </button>
+                        </div>
+                      )}
+
+                      {/* Render các post còn lại */}
+                      {allPosts.slice(2, combinedLimit).map((item) => (
+                        <Post
+                          key={item.id}
+                          id={item.id}
+                          userId={item.user_id}
+                          name={`${item.first_name || ''} ${item.last_name || ''}`.trim() || "Người dùng ẩn danh"}
+                          date={item.created_at || ''}
+                          content={item.content}
+                          likes={item.like_count || 0}
+                          comments={item.comment_count || 0}
+                          shares={item.shares || 0}
+                          images={item.images || []}
+                          avatar={item.avatar_url}
+                          feeling={item.feeling}
+                          location={item.location}
+                          onOpenDetail={() => setSelectedPost(item)}
+                          theme={theme}
+                        />
+                      ))}
+                    </>
+                  )}
+                  {(tab === 'all' && combinedLimit < results.length) && (
+                    <div ref={loaderRef} className="w-full flex justify-center py-4">
+                      <span className="text-gray-400">Đang tải thêm...</span>
+                    </div>
+                  )}
+                </>
+              ) : tab === "post" ? (
+                <>
+                  {postsTab.length === 0 ? (
+                    <div className="text-gray-400 text-lg py-8 bg-white rounded-[32px] shadow border-2 border-[#E3E3E3] text-center">Không có bài viết phù hợp.</div>
+                  ) : (
+                    postsTab.map((item) => (
+                      <Post
+                        key={item.id}
+                        id={item.id}
+                        userId={item.user_id}
+                        name={`${item.first_name || ''} ${item.last_name || ''}`.trim() || "Người dùng ẩn danh"}
+                        date={item.created_at || ''}
+                        content={item.content}
+                        likes={item.like_count || 0}
+                        comments={item.comment_count || 0}
+                        shares={item.shares || 0}
+                        images={item.images || []}
+                        avatar={item.avatar_url}
+                        feeling={item.feeling}
+                        location={item.location}
+                        onOpenDetail={() => setSelectedPost(item)}
+                        theme={theme}
+                      />
+                    ))
+                  )}
+                  {postsTab.length < allPosts.length && (
+                    <div ref={loaderRef} className="w-full flex justify-center py-4">
+                      <span className="text-gray-400">Đang tải thêm...</span>
+                    </div>
+                  )}
+                </>
+              ) : tab === "user" ? (
+                <>
+                  {usersTab.length === 0 ? (
+                    <div className="text-gray-400 text-lg py-8 bg-white rounded-[32px] shadow border-2 border-[#E3E3E3] text-center">Không có người dùng phù hợp.</div>
+                  ) : (
+                    usersTab.map((item) => {
+                      function stringToColor(str: string) {
+                        let hash = 0;
+                        for (let i = 0; i < str.length; i++) hash = str.charCodeAt(i) + ((hash << 5) - hash);
+                        const c = (hash & 0x00FFFFFF).toString(16).toUpperCase();
+                        return '#' + '00000'.substring(0, 6 - c.length) + c;
+                      }
+                      const isAnonymous = !item.name || item.name.toLowerCase().includes('ẩn danh');
+                      const avatarBg = isAnonymous ? '#E5E7EB' : stringToColor(item.id || item.name || 'user');
+                      const initials = item.name ? item.name.split(' ').map((w: string) => w[0]).join('').toUpperCase().slice(0,2) : 'U';
+                      return (
+                        <div
+                          key={item.id}
+                          className={`flex items-center gap-5 rounded-[32px] shadow px-8 py-4 border-2 border-[#E3E3E3] search-card mb-4 ${theme === 'reflective' ? 'bg-[#E9ECF1]' : 'bg-white'} ${theme === 'reflective' ? 'hover:bg-[#e3e3e3]' : 'hover:bg-blue-50'}`}
+                        >
+                          <div className="w-14 h-14 rounded-full flex items-center justify-center border" style={{ background: avatarBg }}>
+                            {item.avatar ? (
+                              <Image src={item.avatar} alt={item.name} width={40} height={40} className="rounded-full" />
+                            ) : isAnonymous ? (
+                              <span className="material-symbols-outlined text-gray-400 text-3xl">person</span>
                             ) : (
-                              <button
-                                className="friend-btn px-5 py-2 rounded-full bg-blue-500 text-white font-semibold shadow transition-all hover:bg-blue-600 hover:scale-105"
-                                onClick={() => {
-                                  if (!user) {
-                                    setShowAuthModal(true);
-                                    return;
-                                  }
-                                  setFriendRequests(prev => ({ ...prev, [item.id]: true }));
-                                  // TODO: Gửi request follow lên server ở đây nếu muốn
-                                }}
-                              >
-                                Follow
-                              </button>
+                              <span className="text-white font-bold text-xl">{initials}</span>
                             )}
                           </div>
-                        );
-                      })
-                    )}
-                    {usersTab.length < allUsers.length && (
-                      <div ref={loaderRef} className="w-full flex justify-center py-4">
-                        <span className="text-gray-400">Đang tải thêm...</span>
-                      </div>
-                    )}
-                  </>
-                ) : null}
-                {selectedPost && (
-                  <PostDetailPopup post={selectedPost} onClose={() => setSelectedPost(null)} theme={theme} />
-                )}
-              </div>
+                          <span className={`font-semibold text-lg flex-1 ${isAnonymous ? 'text-gray-600' : ''}`}>{item.name || 'Người dùng'}</span>
+                          {friendRequests[item.id] ? (
+                            <button
+                              className="friend-btn px-5 py-2 rounded-full bg-gray-400 text-white font-semibold shadow cursor-not-allowed"
+                              disabled
+                            >
+                              Đã theo dõi
+                            </button>
+                          ) : (
+                            <button
+                              className="friend-btn px-5 py-2 rounded-full bg-blue-500 text-white font-semibold shadow transition-all hover:bg-blue-600 hover:scale-105"
+                              onClick={() => {
+                                if (!user) {
+                                  setShowAuthModal(true);
+                                  return;
+                                }
+                                setFriendRequests(prev => ({ ...prev, [item.id]: true }));
+                                // TODO: Gửi request follow lên server ở đây nếu muốn
+                              }}
+                            >
+                              Follow
+                            </button>
+                          )}
+                        </div>
+                      );
+                    })
+                  )}
+                  {usersTab.length < allUsers.length && (
+                    <div ref={loaderRef} className="w-full flex justify-center py-4">
+                      <span className="text-gray-400">Đang tải thêm...</span>
+                    </div>
+                  )}
+                </>
+              ) : null}
+              {selectedPost && (
+                <PostDetailPopup post={selectedPost} onClose={() => setSelectedPost(null)} theme={theme} />
+              )}
             </div>
           </div>
-          {/* Sidebar phải cố định */}
-          <div className="fixed top-[80px] right-0 z-20">
-            <RightSidebar theme={theme} />
-          </div>
+        </div>
+        {/* Sidebar phải cố định - Ẩn trên mobile */}
+        <div className="hidden lg:block fixed top-[80px] right-0 z-20">
+          <RightSidebar theme={theme} />
         </div>
       </div>
-      {/* Thêm style động cho hiệu ứng đặc sắc */}
+      {/* Style động */}
       <style jsx global>{`
         @keyframes fadein {
           from { opacity: 0; transform: translateY(20px); }

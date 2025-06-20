@@ -29,7 +29,7 @@ const Tabs = ({ onTabChange }: TabsProps) => {
         <button
           onClick={() => handleTabClick(0)}
           className={clsx(
-            "px-8 py-2 text-lg font-bold font-[Inter] rounded-[16px] transition-all duration-150",
+            "px-4 sm:px-6 lg:px-8 py-2 text-base sm:text-lg font-bold font-[Inter] rounded-[16px] transition-all duration-150",
             active === 0
               ? "bg-[#B7CCEC] text-black shadow"
               : "bg-transparent text-black hover:bg-[#e1ecf7] hover:font-extrabold"
@@ -38,12 +38,12 @@ const Tabs = ({ onTabChange }: TabsProps) => {
           Inspiring
         </button>
         {/* Dấu phân cách */}
-        <span className="mx-4 text-2xl text-black select-none">|</span>
+        <span className="mx-2 sm:mx-4 text-xl sm:text-2xl text-black select-none">|</span>
         {/* Tab Reflective */}
         <button
           onClick={() => handleTabClick(1)}
           className={clsx(
-            "px-8 py-2 text-lg font-bold font-[Inter] rounded-[16px] transition-all duration-150",
+            "px-4 sm:px-6 lg:px-8 py-2 text-base sm:text-lg font-bold font-[Inter] rounded-[16px] transition-all duration-150",
             active === 1
               ? "bg-[#E3D5CA] text-black shadow"
               : "bg-transparent text-black hover:bg-[#e1ecf7] hover:font-extrabold"
@@ -54,7 +54,7 @@ const Tabs = ({ onTabChange }: TabsProps) => {
       </div>
       {/* Thanh gạch chân */}
       <div className="w-full flex justify-center">
-        <div className="h-1 w-[340px] bg-black rounded-full" />
+        <div className="h-1 w-full max-w-[240px] sm:max-w-[340px] bg-black rounded-full" />
       </div>
     </div>
   );
