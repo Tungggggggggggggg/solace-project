@@ -6,12 +6,40 @@ import Image from 'next/image';
 import { useUser } from '@/contexts/UserContext';
 import { socket } from '@/socket';
 import { Notification } from '@/types/notification';
+import { useRouter } from 'next/navigation';
+import PostDetailPopup from './PostDetailPopup';
 
 interface User {
   id: string;
   first_name: string;
   last_name: string;
   avatar_url: string;
+}
+
+interface PostDetail {
+  id: string;
+  name: string;
+  date: string;
+  content: string;
+  likes: number;
+  comments: number;
+  shares: number;
+  images?: string[];
+  avatar_url?: string;
+  shared_name?: string;
+  shared_avatar_url?: string;
+  shared_date?: string;
+  shared_post?: {
+    id: string;
+    name: string;
+    date: string;
+    content: string;
+    likes: number;
+    comments: number;
+    shares: number;
+    images?: string[];
+    avatar_url?: string;
+  };
 }
 
 const NotificationsPage = () => {
@@ -25,6 +53,9 @@ const NotificationsPage = () => {
   const NOTI_PAGE_SIZE = 10;
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const isFetchingRef = useRef(false);
+  const router = useRouter();
+  const [openPost, setOpenPost] = useState<PostDetail | null>(null);
+  const [showPostModal, setShowPostModal] = useState(false);
 
   useEffect(() => {
     setMounted(true);
@@ -154,6 +185,32 @@ const NotificationsPage = () => {
     }
   };
 
+  // Hàm lấy chi tiết bài viết
+  const handleOpenPostDetail = async (relatedId: string) => {
+    try {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/posts/${relatedId}`);
+      const data = await res.json();
+      setOpenPost({
+        id: data.id || data.post?.id || '',
+        name: `${data.first_name || data.post?.first_name || ''} ${data.last_name || data.post?.last_name || ''}`.trim(),
+        date: data.created_at || data.post?.created_at || '',
+        content: data.content || data.post?.content || '',
+        likes: data.likes || data.post?.likes || 0,
+        comments: data.comments || data.post?.comments || 0,
+        shares: data.shares || data.post?.shares || 0,
+        images: data.images || data.post?.images || [],
+        avatar_url: data.avatar_url || data.post?.avatar_url || '',
+        shared_name: data.shared_name || '',
+        shared_avatar_url: data.shared_avatar_url || '',
+        shared_date: data.shared_date || '',
+        shared_post: data.shared_post || undefined,
+      });
+      setShowPostModal(true);
+    } catch (err) {
+      alert('Không lấy được chi tiết bài viết!');
+    }
+  };
+
   if (!mounted) return null;
 
   const filteredNotifications = notifications.filter((noti) => {
@@ -232,7 +289,13 @@ const NotificationsPage = () => {
                   key={noti.id}
                   className={`p-5 bg-white rounded-xl shadow-sm hover:shadow-md transition-all duration-300 flex items-start ${
                     !noti.is_read ? 'bg-purple-50' : ''
-                  }`}
+                  } cursor-pointer`}
+                  onClick={() => {
+                    if (noti.related_id) {
+                      handleOpenPostDetail(noti.related_id);
+                    }
+                    if (!noti.is_read) markAsRead(noti.id);
+                  }}
                 >
                   {noti.type === 'system' ? (
                     <>
@@ -294,6 +357,13 @@ const NotificationsPage = () => {
             </div>
           )}
         </div>
+        {/* Modal chi tiết bài viết */}
+        {showPostModal && openPost && (
+          <PostDetailPopup
+            post={openPost}
+            onClose={() => setShowPostModal(false)}
+          />
+        )}
       </div>
     </div>
   );

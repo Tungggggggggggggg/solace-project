@@ -52,7 +52,7 @@ exports.createNotification = async (
 exports.createLikeNotification = async (postId, userId, postOwnerId) => {
   if (userId === postOwnerId) return;
 
-  await exports.createNotification( // Sử dụng exports.createNotification để gọi hàm nội bộ
+  await exports.createNotification(
     postOwnerId,
     'Bài viết được yêu thích',
     'đã thích bài viết của bạn',
@@ -83,7 +83,9 @@ exports.createFollowNotification = async (followerId, userId) => {
     'Người theo dõi mới',
     'đã bắt đầu theo dõi bạn',
     'follow',
-    followerId
+    followerId,
+    null,
+    null
   );
 };
 

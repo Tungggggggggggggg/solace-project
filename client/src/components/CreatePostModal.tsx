@@ -214,7 +214,7 @@ export default function CreatePostModal({ onClose, onPostCreated, theme, default
 
   return (
     <div
-      className="fixed inset-0 bg-black/40 flex items-center justify-center px-4 z-50 font-inter text-[#1c1e21]"
+      className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center px-4 z-50 font-inter text-[#1c1e21]"
       onClick={onClose}
     >
       <div
