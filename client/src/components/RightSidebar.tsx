@@ -1,8 +1,9 @@
 import { useUser } from "@/contexts/UserContext";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { socket } from "@/socket";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import gsap from "gsap";
 
 interface Friend {
   id: string;
@@ -23,9 +24,19 @@ const RightSidebar = ({ theme = 'inspiring' }: RightSidebarProps) => {
   const [open, setOpen] = useState(true);
   const [loading, setLoading] = useState(true);
   const [conversations, setConversations] = useState<any[]>([]);
+  const asideRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    // Lấy danh sách bạn bè mutual
+    if (!asideRef.current) return;
+    if (open) {
+      gsap.to(asideRef.current, { width: '16rem', opacity: 1, duration: 0.4, ease: 'power3.out' });
+    } else {
+      gsap.to(asideRef.current, { width: '4rem', opacity: 1, duration: 0.3, ease: 'power2.in' });
+    }
+  }, [open]);
+
+  // Lấy danh sách bạn bè mutual
+  useEffect(() => {
     const fetchFriends = async () => {
       if (!user || !accessToken) return;
       try {
@@ -80,15 +91,15 @@ const RightSidebar = ({ theme = 'inspiring' }: RightSidebarProps) => {
     <>
       {/* Sidebar */}
       <aside
+        ref={asideRef}
         className={`
-          hidden lg:flex
-          pb-2
           fixed z-20
           top-[5.5rem] right-0
           mt-8
           pt-4
+          pb-2
           transition-all duration-300
-          ${open ? "w-64" : "w-16"}
+          w-64
           max-w-xs
           h-auto max-h-[80vh]
           rounded-l-3xl
