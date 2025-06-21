@@ -623,13 +623,15 @@ const Header = memo<HeaderProps>(({
   const [messageDropdownHasMore, setMessageDropdownHasMore] = useState(true);
   const [messageDropdownLoading, setMessageDropdownLoading] = useState(false);
   const [recentConversations, setRecentConversations] = useState<any[]>([]);
+  // State cho tab dropdown notification
+  const [dropdownTab, setDropdownTab] = useState<'all' | 'unread' | 'system'>('all');
 
-  // Fetch notifications cho dropdown (có phân trang)
-  const fetchDropdownNotifications = useCallback(async (pageNum: number) => {
+  // Fetch notifications cho dropdown (có phân trang, theo tab)
+  const fetchDropdownNotifications = useCallback(async (pageNum: number, tab = dropdownTab) => {
     if (!user || !accessToken) return;
     try {
       setDropdownLoading(true);
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/notifications?page=${pageNum}&limit=${DROPDOWN_PAGE_SIZE}`, {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/notifications?page=${pageNum}&limit=${DROPDOWN_PAGE_SIZE}&tab=${tab}`, {
         headers: { Authorization: `Bearer ${accessToken}` },
       });
       const data = await res.json();
@@ -640,7 +642,6 @@ const Header = memo<HeaderProps>(({
         } else {
           setDropdownHasMore(true);
         }
-        // Tính unread count cho trang đầu
         setUnreadNotifications(data.notifications.filter((n: Notification) => !n.is_read).length);
       } else {
         setRecentNotifications(prev => {
@@ -650,7 +651,6 @@ const Header = memo<HeaderProps>(({
           } else {
             setDropdownHasMore(true);
           }
-          // Tính unread count cho tất cả notifications sau khi merge
           const totalUnread = merged.filter((n: Notification) => !n.is_read).length;
           setUnreadNotifications(totalUnread);
           return merged.slice(0, DROPDOWN_MAX);
@@ -661,7 +661,7 @@ const Header = memo<HeaderProps>(({
     } finally {
       setDropdownLoading(false);
     }
-  }, [user, accessToken]);
+  }, [user, accessToken, dropdownTab]);
 
   // Fetch conversations cho message dropdown (có phân trang)
   const fetchDropdownConversations = useCallback(async (pageNum: number) => {
@@ -703,15 +703,15 @@ const Header = memo<HeaderProps>(({
     }
   }, [user, accessToken]);
 
-  // Khi mở dropdown, reset state và fetch trang đầu
+  // Khi mở dropdown, reset state và fetch trang đầu với tab hiện tại
   useEffect(() => {
     if (showNotificationDropdown && user && accessToken) {
       setRecentNotifications([]);
       setDropdownPage(1);
       setDropdownHasMore(true);
-      fetchDropdownNotifications(1);
+      fetchDropdownNotifications(1, dropdownTab);
     }
-  }, [showNotificationDropdown, user, accessToken, fetchDropdownNotifications]);
+  }, [showNotificationDropdown, user, accessToken, fetchDropdownNotifications, dropdownTab]);
 
   // Khi mở message dropdown, reset state và fetch trang đầu
   useEffect(() => {
@@ -758,9 +758,9 @@ const Header = memo<HeaderProps>(({
   // Khi dropdownPage thay đổi (và > 1), fetch thêm
   useEffect(() => {
     if (dropdownPage > 1 && dropdownHasMore && !dropdownLoading) {
-      fetchDropdownNotifications(dropdownPage);
+      fetchDropdownNotifications(dropdownPage, dropdownTab);
     }
-  }, [dropdownPage, dropdownHasMore, dropdownLoading, fetchDropdownNotifications]);
+  }, [dropdownPage, dropdownHasMore, dropdownLoading, fetchDropdownNotifications, dropdownTab]);
 
   // Khi messageDropdownPage thay đổi (và > 1), fetch thêm
   useEffect(() => {
@@ -838,12 +838,14 @@ const Header = memo<HeaderProps>(({
   useEffect(() => {
     if (!user) return;
     const handleNewNotification = (notification: Notification) => {
-      // Chỉ thêm vào dropdown nếu đang mở
-      if (showNotificationDropdown) {
-        setRecentNotifications(prev => [notification, ...prev].slice(0, 30));
+      if (notification.type === 'report_new' || notification.type === 'post_approval') {
+        // Chỉ thêm vào dropdown nếu đang mở
+        if (showNotificationDropdown) {
+          setRecentNotifications(prev => [notification, ...prev].slice(0, 30));
+        }
+        // Tăng số lượng thông báo chưa đọc
+        setUnreadNotifications(prev => prev + 1);
       }
-      // Tăng số lượng thông báo chưa đọc
-      setUnreadNotifications(prev => prev + 1);
     };
     socket.on('newNotification', handleNewNotification);
     return () => {
@@ -923,6 +925,14 @@ const Header = memo<HeaderProps>(({
     } catch (e) {
       showToast('Không thể follow người dùng này!', 'error');
     }
+  };
+
+  // Khi đổi tab trong dropdown
+  const handleDropdownTabChange = (tab: 'all' | 'unread' | 'system') => {
+    setDropdownTab(tab);
+    setDropdownPage(1);
+    setDropdownHasMore(true);
+    fetchDropdownNotifications(1, tab);
   };
 
   return (
@@ -1279,6 +1289,12 @@ const Header = memo<HeaderProps>(({
                           </button>
                         </div>
                       </div>
+                      {/* Tabs filter */}
+                      <div className="flex border-b border-orange-100 mb-2 px-3 sm:px-4 gap-2">
+                        <button onClick={() => handleDropdownTabChange('all')} className={`px-2 py-1 rounded font-semibold text-xs sm:text-sm transition ${dropdownTab === 'all' ? 'text-orange-600 bg-orange-50' : 'text-gray-600 hover:bg-gray-50'}`}>Tất cả</button>
+                        <button onClick={() => handleDropdownTabChange('unread')} className={`px-2 py-1 rounded font-semibold text-xs sm:text-sm transition ${dropdownTab === 'unread' ? 'text-orange-600 bg-orange-50' : 'text-gray-600 hover:bg-gray-50'}`}>Chưa đọc</button>
+                        <button onClick={() => handleDropdownTabChange('system')} className={`px-2 py-1 rounded font-semibold text-xs sm:text-sm transition ${dropdownTab === 'system' ? 'text-orange-600 bg-orange-50' : 'text-gray-600 hover:bg-gray-50'}`}>Hệ thống</button>
+                      </div>
                       {/* Danh sách thông báo */}
                       <div 
                         ref={notificationScrollContainerRef}
@@ -1335,7 +1351,7 @@ const Header = memo<HeaderProps>(({
                                       </span>}
                                 </div>
                                 <div className="text-xs sm:text-sm text-gray-700 truncate">{noti.content}</div>
-                                <div className="text-xs text-gray-400 mt-1">{new Date(noti.created_at).toLocaleString('vi-VN')}</div>
+                                <div className="text-xs text-gray-400 mt-1">{formatDate(noti.created_at)}</div>
                               </div>
                               {/* Nhóm icon thao tác góc phải trên - luôn hiển thị trên mobile, chỉ hover trên desktop */}
                               <div className="absolute top-1 sm:top-2 right-1 sm:right-2 flex gap-1 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition">

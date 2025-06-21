@@ -1,5 +1,6 @@
 const express = require('express');
 const pool = require('../db');
+const notificationUtils = require('../utils/notification');
 const router = express.Router();
 
 // Lấy danh sách báo cáo
@@ -14,8 +15,8 @@ router.get('/', async (req, res) => {
         r.reason,
         r.description,
         r.status,
-        r.reporter_id,         -- Thêm dòng này
-        r.reported_user_id,    -- Thêm dòng này
+        r.reporter_id,
+        r.reported_user_id,
         u1.first_name AS reporter_first_name,
         u1.last_name AS reporter_last_name,
         u2.first_name AS reported_first_name,
@@ -48,8 +49,8 @@ router.get('/', async (req, res) => {
     const reports = rows.map((report, index) => ({
       stt: index + 1,
       report_id: report.id,
-      reporter_id: report.reporter_id,           // Thêm dòng này
-      reported_user_id: report.reported_user_id, // Thêm dòng này
+      reporter_id: report.reporter_id,
+      reported_user_id: report.reported_user_id,
       date_reported: new Date(report.created_at).toLocaleDateString('en-US'),
       reported_by: ((report.reporter_first_name || '') + ' ' + (report.reporter_last_name || '')).trim() || 'Không xác định',
       reported_account: ((report.reported_first_name || '') + ' ' + (report.reported_last_name || '')).trim() || 'Không xác định',
@@ -100,6 +101,14 @@ router.post('/', async (req, res) => {
       reporter_email: reporterEmail,
       reported_user_email: reportedUserEmail,
     };
+
+    // Gửi thông báo cho admin về báo cáo mới
+    await notificationUtils.createReportNotificationForAdmin(
+      post_id,
+      reporter_id,
+      reported_user_id,
+      reason
+    );
 
     res.status(201).json({ success: true, report });
   } catch (err) {

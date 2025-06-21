@@ -17,16 +17,6 @@ const emitUnreadTotalUpdate = async (userId) => {
   }
 };
 
-// Helper function để emit thông báo mới
-const emitNewNotification = (userId, notification) => {
-  try {
-    const io = getIO();
-    io.to(`user:${userId}`).emit('newNotification', notification);
-  } catch (err) {
-    console.error('Error emitting new notification:', err);
-  }
-};
-
 // Lấy danh sách thông báo với phân trang, lọc, search
 exports.getNotifications = async (req, res) => {
   try {
@@ -45,7 +35,8 @@ exports.getNotifications = async (req, res) => {
       FROM notifications n
       LEFT JOIN users u ON n.sender_id = u.id
       WHERE n.user_id = $1
-      AND n.type != 'admin'
+      AND n.type != 'report_new'
+      AND n.type != 'post_approval'
     `;
     const params = [userId];
     if (tab === 'unread') {
@@ -62,6 +53,8 @@ exports.getNotifications = async (req, res) => {
       SELECT COUNT(*) 
       FROM notifications n
       WHERE user_id = $1
+      AND n.type != 'report_new'
+      AND n.type != 'post_approval'
       ${tab === 'unread' ? 'AND n.is_read = false' : tab === 'system' ? "AND type = 'system'" : ''}
     `;
     const countParams = [userId];
@@ -108,7 +101,11 @@ exports.markAsRead = async (req, res) => {
 exports.markAllAsRead = async (req, res) => {
   try {
     const userId = req.user.id;
-    await pool.query('UPDATE notifications SET is_read = true WHERE user_id = $1', [userId]);
+    await pool.query(`
+      UPDATE notifications SET is_read = true 
+      WHERE user_id = $1
+      AND n.type != 'report_new' AND n.type != 'post_approval'
+    `, [userId]);
     
     // Emit socket event để cập nhật số lượng thông báo chưa đọc
     await emitUnreadTotalUpdate(userId);
@@ -125,7 +122,10 @@ exports.getUnreadTotal = async (req, res) => {
   try {
     const userId = req.user.id;
     const { rows: [{ count }] } = await pool.query(
-      'SELECT COUNT(*) FROM notifications WHERE user_id = $1 AND is_read = false',
+      `SELECT COUNT(*) 
+      FROM notifications n
+      WHERE user_id = $1 AND is_read = false 
+      AND n.type != 'report_new' AND n.type != 'post_approval' `,
       [userId]
     );
     res.json({ total: parseInt(count) });
@@ -155,7 +155,10 @@ exports.deleteNotification = async (req, res) => {
     
     // Xóa thông báo
     await pool.query(
-      'DELETE FROM notifications WHERE id = $1 AND user_id = $2',
+      `DELETE FROM notifications 
+      WHERE id = $1 AND user_id = $2
+      AND n.type != 'report_new'
+      AND n.type != 'post_approval'`,
       [id, userId]
     );
     

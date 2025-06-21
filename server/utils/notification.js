@@ -138,7 +138,7 @@ exports.createPostForFollowersNotification = async (postId, postAuthorId) => {
     const authorRes = await pool.query('SELECT first_name, last_name FROM users WHERE id = $1', [postAuthorId]);
     const author = authorRes.rows[0];
     if (!author) {
-      console.warn(`Không tìn thấy bài viết ${postAuthorId}. Không thể gửi thông báo đến followers.`);
+      console.warn(`Không tìm thấy bài viết ${postAuthorId}. Không thể gửi thông báo đến followers.`);
       return;
     }
 
@@ -167,10 +167,63 @@ exports.createPostForFollowersNotification = async (postId, postAuthorId) => {
     });
 
     await Promise.allSettled(notificationPromises);
-    console.log(`Sent new post notifications to ${followerIds.length} followers for post ${postId} by user ${postAuthorId}.`);
 
   } catch (error) {
-    console.error('Error creating new post notification for followers:', error);
+    throw error;
+  }
+};
+
+exports.createReportNotificationForAdmin = async (postId, reporterId, reportedUserId, reason) => {
+  try {
+    const usersRes = await pool.query(
+      'SELECT id, first_name, last_name FROM users WHERE id IN ($1, $2)',
+      [reporterId, reportedUserId]
+    );
+    const reporter = usersRes.rows.find(u => u.id === reporterId);
+    const reportedUser = usersRes.rows.find(u => u.id === reportedUserId);
+
+    const reporterName = reporter ? `${reporter.first_name} ${reporter.last_name}`.trim() : 'Không xác định';
+    const reportedUserName = reportedUser ? `${reportedUser.first_name} ${reportedUser.last_name}`.trim() : 'Không xác định';
+
+    const adminTitle = 'Báo cáo mới cần xem xét';
+    const adminContent = `Bài viết ID ${postId} của ${reportedUserName} đã bị ${reporterName} báo cáo vì: "${reason}".`;
+
+    const adminsRes = await pool.query("SELECT id FROM users WHERE role = 'admin'");
+    const adminIds = adminsRes.rows.map(row => row.id);
+
+    const notifyAdminsPromises = adminIds.map(adminId =>
+      exports.createNotification(
+        adminId,
+        adminTitle,
+        adminContent,
+        'report_new',
+        reporterId,
+        'post',
+        postId
+      )
+    );
+    await Promise.allSettled(notifyAdminsPromises);
+  } catch (error) {
+    throw error;
+  }
+};
+
+exports.createReportNotificationForUser = async (reporterId, reportId, status, postId) => {
+  try {
+    const title = 'Báo cáo của bạn đã được xử lý';
+    const content = `Báo cáo của bạn về bài viết ID ${postId} đã được xử lý với trạng thái: "${status === 'processed' ? 'Đã xử lý' : status}". Cảm ơn bạn đã đóng góp!`;
+
+    await exports.createNotification(
+      reporterId,
+      title,
+      content,
+      'system',
+      null,
+      'report',
+      reportId
+    );
+
+  } catch (error) {
     throw error;
   }
 };
