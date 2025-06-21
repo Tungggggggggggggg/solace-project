@@ -8,6 +8,8 @@ import { socket } from '@/socket';
 import { Notification } from '@/types/notification';
 import { useRouter } from 'next/navigation';
 import PostDetailPopup from './PostDetailPopup';
+import { formatDate } from '../lib/dateUtils';
+import Toast from "./Toast";
 
 interface User {
   id: string;
@@ -56,6 +58,8 @@ const NotificationsPage = () => {
   const router = useRouter();
   const [openPost, setOpenPost] = useState<PostDetail | null>(null);
   const [showPostModal, setShowPostModal] = useState(false);
+  const [followedUserIds, setFollowedUserIds] = useState<string[]>([]);
+  const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
 
   useEffect(() => {
     setMounted(true);
@@ -211,6 +215,50 @@ const NotificationsPage = () => {
     }
   };
 
+  // Hàm xóa 1 thông báo
+  const deleteNotification = async (id: string) => {
+    if (!user || !accessToken) return;
+    try {
+      await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/notifications/${id}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${accessToken}` },
+      });
+      setNotifications((prev) => prev.filter((n) => n.id !== id));
+    } catch (e) {
+      console.error('Error deleting notification:', e);
+    }
+  };
+
+  // Hàm xóa tất cả thông báo
+  const deleteAllNotifications = async () => {
+    if (!user || !accessToken) return;
+    try {
+      await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/notifications/all`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${accessToken}` },
+      });
+      setNotifications([]);
+    } catch (e) {
+      console.error('Error deleting all notifications:', e);
+    }
+  };
+
+  const handleFollow = async (senderId: string) => {
+    if (!user || !accessToken) return;
+    try {
+      await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/users/${senderId}/follow`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${accessToken}` },
+      });
+      setFollowedUserIds(prev => [...prev, senderId]);
+      setToast({ message: 'Đã follow người dùng!', type: 'success' });
+      setTimeout(() => setToast(null), 3000);
+    } catch (e) {
+      setToast({ message: 'Không thể follow người dùng này!', type: 'error' });
+      setTimeout(() => setToast(null), 3000);
+    }
+  };
+
   if (!mounted) return null;
 
   const filteredNotifications = notifications.filter((noti) => {
@@ -222,74 +270,80 @@ const NotificationsPage = () => {
 
   return (
     <div className="h-full bg-gray-50 text-gray-800">
-      <div className="max-w-3xl mx-auto p-5 h-full flex flex-col">
-        <div className="flex justify-between items-center mb-8">
-          <h1 className="text-2xl font-bold text-purple-600">Thông báo</h1>
+      <div className="max-w-3xl mx-auto p-3 sm:p-5 h-full flex flex-col">
+        <div className="flex justify-between items-center mb-6 sm:mb-8">
+          <h1 className="text-xl sm:text-2xl font-bold text-orange-600">Thông báo</h1>
           <div className="flex gap-2">
-            <button className="w-9 h-9 rounded-full flex items-center justify-center bg-gray-100 hover:bg-purple-600 hover:text-white transition-all duration-300">
+            <button className="w-9 h-9 rounded-full flex items-center justify-center bg-gray-100 hover:bg-orange-600 hover:text-white transition-all duration-300 touch-manipulation">
               <MaterialIcon icon="settings" />
             </button>
           </div>
         </div>
 
-        <div className="text-right">
+        <div className="text-right flex flex-col sm:flex-row justify-end gap-2 sm:gap-4 items-end sm:items-center mb-4">
           <button
             onClick={markAllAsRead}
-            className="text-purple-600 font-semibold inline-flex items-center gap-1 hover:underline"
+            className="inline-flex items-center gap-1 px-3 py-2 rounded-lg border border-orange-200 bg-white text-orange-600 font-semibold hover:bg-orange-50 transition-all duration-200 shadow-sm"
           >
-            <MaterialIcon icon="done_all" />
+            <MaterialIcon icon="done_all" className="text-orange-600" />
             <span>Đánh dấu tất cả đã đọc</span>
+          </button>
+          <button
+            onClick={deleteAllNotifications}
+            className="inline-flex items-center gap-1 px-3 py-2 rounded-lg border border-red-200 bg-white text-red-500 font-semibold hover:bg-red-50 transition-all duration-200 shadow-sm"
+          >
+            <MaterialIcon icon="delete_sweep" className="text-red-500" />
+            <span>Xóa tất cả</span>
           </button>
         </div>
 
-        <div className="flex border-b border-gray-200 mb-6">
+        <div className="flex border-b border-gray-200 mb-6 overflow-x-auto">
           <button
             onClick={() => setActiveTab('all')}
-            className={`px-6 py-3 font-semibold relative ${activeTab === 'all' ? 'text-purple-600' : ''}`}
+            className={`px-4 sm:px-6 py-3 font-semibold relative whitespace-nowrap touch-manipulation ${activeTab === 'all' ? 'text-orange-600' : ''}`}
           >
             Tất cả
             {activeTab === 'all' && (
-              <span className="absolute bottom-0 left-1/4 w-1/2 h-0.5 bg-purple-600 rounded-t"></span>
+              <span className="absolute bottom-0 left-1/4 w-1/2 h-0.5 bg-orange-600 rounded-t"></span>
             )}
           </button>
           <button
             onClick={() => setActiveTab('unread')}
-            className={`px-6 py-3 font-semibold relative ${activeTab === 'unread' ? 'text-purple-600' : ''}`}
+            className={`px-4 sm:px-6 py-3 font-semibold relative whitespace-nowrap touch-manipulation ${activeTab === 'unread' ? 'text-orange-600' : ''}`}
           >
             Chưa đọc
             {activeTab === 'unread' && (
-              <span className="absolute bottom-0 left-1/4 w-1/2 h-0.5 bg-purple-600 rounded-t"></span>
+              <span className="absolute bottom-0 left-1/4 w-1/2 h-0.5 bg-orange-600 rounded-t"></span>
             )}
           </button>
           <button
             onClick={() => setActiveTab('system')}
-            className={`px-6 py-3 font-semibold relative ${activeTab === 'system' ? 'text-purple-600' : ''}`}
+            className={`px-4 sm:px-6 py-3 font-semibold relative whitespace-nowrap touch-manipulation ${activeTab === 'system' ? 'text-orange-600' : ''}`}
           >
             Hệ thống
             {activeTab === 'system' && (
-              <span className="absolute bottom-0 left-1/4 w-1/2 h-0.5 bg-purple-600 rounded-t"></span>
+              <span className="absolute bottom-0 left-1/4 w-1/2 h-0.5 bg-orange-600 rounded-t"></span>
             )}
           </button>
         </div>
 
-        <div className="flex-1 overflow-y-auto" ref={scrollContainerRef}>
+        <div className="flex-1 overflow-y-auto scrollbar-mobile" ref={scrollContainerRef}>
           {loading && page === 1 ? (
             <div className="text-center py-10">
-              <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-purple-600 mx-auto"></div>
+              <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-orange-600 mx-auto"></div>
             </div>
           ) : filteredNotifications.length === 0 ? (
             <div className="text-center py-10 text-gray-500">
-              <MaterialIcon icon="notifications_off" className="text-4xl mb-2" />
-              <p>Không có thông báo nào</p>
+              <MaterialIcon icon="notifications_off" className="text-3xl sm:text-4xl mb-2" />
+              <p className="text-sm sm:text-base">Không có thông báo nào</p>
             </div>
           ) : (
-            <div className="space-y-4">
+            <div className="space-y-3 sm:space-y-4">
               {filteredNotifications.map((noti) => (
                 <div
                   key={noti.id}
-                  className={`p-5 bg-white rounded-xl shadow-sm hover:shadow-md transition-all duration-300 flex items-start ${
-                    !noti.is_read ? 'bg-purple-50' : ''
-                  } cursor-pointer`}
+                  className={`group p-4 sm:p-5 bg-white rounded-xl shadow-sm hover:shadow-md transition-all duration-300 flex items-start relative ${!noti.is_read ? 'bg-orange-50' : ''} cursor-pointer touch-manipulation`}
+                  style={{ minHeight: 64 }}
                   onClick={() => {
                     if (noti.related_id) {
                       handleOpenPostDetail(noti.related_id);
@@ -299,59 +353,87 @@ const NotificationsPage = () => {
                 >
                   {noti.type === 'system' ? (
                     <>
-                      <MaterialIcon icon="info" className="text-purple-600 mr-4 text-2xl" />
+                      <MaterialIcon icon="info" className="text-orange-600 mr-3 sm:mr-4 text-xl sm:text-2xl" />
                       <div className="flex-1">
-                        <div className="font-semibold">{noti.title}</div>
-                        <div className="mb-1">{noti.content}</div>
-                        <div className="text-sm text-gray-500">
-                          {new Date(noti.created_at).toLocaleString()}
+                        <div className="font-semibold text-sm sm:text-base">{noti.title}</div>
+                        <div className="mb-1 text-sm sm:text-base">{noti.content}</div>
+                        <div className="text-xs sm:text-sm text-gray-500">
+                          {formatDate(noti.created_at)}
                         </div>
                       </div>
-                      {!noti.is_read && <div className="w-2 h-2 bg-purple-600 rounded-full"></div>}
+                      {!noti.is_read && <div className="w-2 h-2 bg-orange-600 rounded-full"></div>}
                     </>
                   ) : (
                     <>
                       <Image
-                        src={noti.sender?.avatar_url || '/logo.png'}
+                        src={noti.sender?.avatar_url || '/default-avatar.png'}
                         width={48}
                         height={48}
-                        className="w-12 h-12 rounded-full mr-4 object-cover"
+                        className="w-10 h-10 sm:w-12 sm:h-12 rounded-full mr-3 sm:mr-4 object-cover cursor-pointer"
                         alt={`${noti.sender?.first_name || ''} ${noti.sender?.last_name || ''}`}
                         unoptimized
+                        onClick={e => {
+                          e.stopPropagation();
+                          if (noti.sender?.id) router.push(`/profile/${noti.sender.id}`);
+                        }}
                       />
                       <div className="flex-1">
-                        <div className="mb-1">
-                          <strong className="text-purple-600">
+                        <div className="mb-1 text-sm sm:text-base">
+                          <strong
+                            className="text-orange-600 cursor-pointer hover:underline"
+                            onClick={e => {
+                              e.stopPropagation();
+                              if (noti.sender?.id) router.push(`/profile/${noti.sender.id}`);
+                            }}
+                          >
                             {noti.sender?.first_name} {noti.sender?.last_name}
                           </strong>{' '}
                           {noti.content}
                         </div>
-                        <div className="text-sm text-gray-500">
-                          {new Date(noti.created_at).toLocaleString()}
+                        <div className="text-xs sm:text-sm text-gray-500">
+                          {formatDate(noti.created_at)}
                         </div>
-                      </div>
-                      <div className="flex gap-2">
-                        {noti.type === 'follow' && (
-                          <button className="w-9 h-9 rounded-full flex items-center justify-center bg-gray-100 hover:bg-purple-600 hover:text-white transition-all duration-300">
-                            <MaterialIcon icon="person_add" />
-                          </button>
-                        )}
-                        {!noti.is_read &&
-                          <button
-                            onClick={() => markAsRead(noti.id)}
-                            className="w-9 h-9 rounded-full flex items-center justify-center bg-gray-100 hover:bg-purple-600 hover:text-white transition-all duration-300"
-                          >
-                            <MaterialIcon icon="done" />
-                          </button>
-                        }
                       </div>
                     </>
                   )}
+                  {/* Nhóm icon thao tác góc phải trên - luôn hiển thị trên mobile, chỉ hover trên desktop */}
+                  <div className="absolute top-2 sm:top-3 right-2 sm:right-3 flex gap-1 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition z-10">
+                    {noti.type === 'follow' && noti.sender && noti.sender.id && !followedUserIds.includes(noti.sender.id) && (
+                      <button
+                        className="w-8 h-8 sm:w-9 sm:h-9 rounded-full flex items-center justify-center bg-gray-100 hover:bg-orange-100 active:bg-orange-200 transition-all duration-300"
+                        title="Follow lại"
+                        onClick={e => {
+                          e.stopPropagation();
+                          if (noti.sender && noti.sender.id) handleFollow(noti.sender.id);
+                        }}
+                      >
+                        <MaterialIcon icon="person_add" className="text-orange-500" />
+                      </button>
+                    )}
+                    {/* Nút đánh dấu đã đọc nếu chưa đọc */}
+                    {!noti.is_read && (
+                      <button
+                        className="w-8 h-8 sm:w-9 sm:h-9 rounded-full flex items-center justify-center bg-gray-100 hover:bg-orange-100 active:bg-orange-200 transition-all duration-300"
+                        title="Đánh dấu đã đọc"
+                        onClick={e => { e.stopPropagation(); markAsRead(noti.id); }}
+                      >
+                        <MaterialIcon icon="done" className="text-orange-500" />
+                      </button>
+                    )}
+                    {/* Nút xóa */}
+                    <button
+                      className="w-8 h-8 sm:w-9 sm:h-9 rounded-full flex items-center justify-center bg-gray-100 hover:bg-red-100 active:bg-red-200 transition-all duration-300"
+                      title="Xóa thông báo"
+                      onClick={e => { e.stopPropagation(); deleteNotification(noti.id); }}
+                    >
+                      <MaterialIcon icon="delete" className="text-red-500" />
+                    </button>
+                  </div>
                 </div>
               ))}
               {loading && page > 1 && (
                 <div className="text-center py-4">
-                  <div className="animate-spin rounded-full h-6 w-6 border-t-2 border-b-2 border-purple-600 mx-auto"></div>
+                  <div className="animate-spin rounded-full h-6 w-6 border-t-2 border-b-2 border-orange-600 mx-auto"></div>
                 </div>
               )}
             </div>
@@ -364,6 +446,7 @@ const NotificationsPage = () => {
             onClose={() => setShowPostModal(false)}
           />
         )}
+        {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
       </div>
     </div>
   );

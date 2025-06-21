@@ -1,5 +1,31 @@
 const { pool } = require('../db');
-const { getIO, userSockets } = require('../socket');
+const { getIO } = require('../socket');
+
+// Helper function để emit socket event cập nhật số lượng thông báo chưa đọc
+const emitUnreadTotalUpdate = async (userId) => {
+  try {
+    const { rows: [{ count }] } = await pool.query(
+      'SELECT COUNT(*) FROM notifications WHERE user_id = $1 AND is_read = false',
+      [userId]
+    );
+    
+    const io = getIO();
+    // Sử dụng room system thay vì userSockets
+    io.to(`user:${userId}`).emit('notificationUnreadTotalUpdated', { total: parseInt(count) });
+  } catch (err) {
+    console.error('Error emitting unread total update:', err);
+  }
+};
+
+// Helper function để emit thông báo mới
+const emitNewNotification = (userId, notification) => {
+  try {
+    const io = getIO();
+    io.to(`user:${userId}`).emit('newNotification', notification);
+  } catch (err) {
+    console.error('Error emitting new notification:', err);
+  }
+};
 
 // Lấy danh sách thông báo với phân trang, lọc, search
 exports.getNotifications = async (req, res) => {
@@ -67,6 +93,10 @@ exports.markAsRead = async (req, res) => {
     const userId = req.user.id;
     const { id } = req.params;
     await pool.query('UPDATE notifications SET is_read = true WHERE id = $1 AND user_id = $2', [id, userId]);
+    
+    // Emit socket event để cập nhật số lượng thông báo chưa đọc
+    await emitUnreadTotalUpdate(userId);
+    
     res.json({ success: true });
   } catch (err) {
     console.error('Error mark notification as read:', err);
@@ -79,9 +109,80 @@ exports.markAllAsRead = async (req, res) => {
   try {
     const userId = req.user.id;
     await pool.query('UPDATE notifications SET is_read = true WHERE user_id = $1', [userId]);
+    
+    // Emit socket event để cập nhật số lượng thông báo chưa đọc
+    await emitUnreadTotalUpdate(userId);
+    
     res.json({ success: true });
   } catch (err) {
     console.error('Error mark all notifications as read:', err);
+    res.status(500).json({ error: 'Lỗi server', detail: err.message });
+  }
+};
+
+// Lấy tổng số thông báo chưa đọc
+exports.getUnreadTotal = async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const { rows: [{ count }] } = await pool.query(
+      'SELECT COUNT(*) FROM notifications WHERE user_id = $1 AND is_read = false',
+      [userId]
+    );
+    res.json({ total: parseInt(count) });
+  } catch (err) {
+    console.error('Error getting unread total:', err);
+    res.status(500).json({ error: 'Lỗi server', detail: err.message });
+  }
+};
+
+// Xóa 1 thông báo
+exports.deleteNotification = async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const { id } = req.params;
+    
+    // Kiểm tra xem thông báo có tồn tại và thuộc về user không
+    const { rows } = await pool.query(
+      'SELECT is_read FROM notifications WHERE id = $1 AND user_id = $2',
+      [id, userId]
+    );
+    
+    if (rows.length === 0) {
+      return res.status(404).json({ error: 'Thông báo không tồn tại' });
+    }
+    
+    const wasUnread = !rows[0].is_read;
+    
+    // Xóa thông báo
+    await pool.query(
+      'DELETE FROM notifications WHERE id = $1 AND user_id = $2',
+      [id, userId]
+    );
+    
+    // Nếu thông báo bị xóa chưa đọc, emit socket event để cập nhật số lượng
+    if (wasUnread) {
+      await emitUnreadTotalUpdate(userId);
+    }
+    
+    res.json({ success: true });
+  } catch (err) {
+    console.error('Error deleting notification:', err);
+    res.status(500).json({ error: 'Lỗi server', detail: err.message });
+  }
+};
+
+// Xóa tất cả thông báo
+exports.deleteAllNotifications = async (req, res) => {
+  try {
+    const userId = req.user.id;
+    await pool.query('DELETE FROM notifications WHERE user_id = $1', [userId]);
+    
+    // Emit socket event để cập nhật số lượng thông báo chưa đọc
+    await emitUnreadTotalUpdate(userId);
+    
+    res.json({ success: true });
+  } catch (err) {
+    console.error('Error deleting all notifications:', err);
     res.status(500).json({ error: 'Lỗi server', detail: err.message });
   }
 }; 

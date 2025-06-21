@@ -11,9 +11,9 @@ export interface Notification {
   sender_id?: string;
   title: string;
   content: string;
-  type: 'like' | 'comment' | 'follow' | 'system' | 'message';
+  type: string;
   is_read: boolean;
-  related_type?: 'post' | 'comment' | 'message';
+  related_type?: string;
   related_id?: string;
   created_at: string;
   sender?: User;

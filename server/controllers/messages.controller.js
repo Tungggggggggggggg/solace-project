@@ -1,5 +1,5 @@
 const { query, pool, transaction } = require('../db');
-const { getIO, userSockets } = require('../socket');
+const { getIO, isUserInRoom } = require('../socket');
 
 
 const getUnreadTotal = async (userId) => {
@@ -455,22 +455,12 @@ exports.sendMessage = async (req, res) => {
     );
     const targetUsers = membersRes.rows.map((row) => row.user_id);
 
-    // Lấy user đang ở trong phòng
-    const socketsInRoom = await io.in(conversationId).allSockets();
-    const usersInRoom = new Set();
-    for (const socketId of socketsInRoom) {
-      const socket = io.sockets.sockets.get(socketId);
-      if (socket?.userId) {
-        usersInRoom.add(socket.userId);
-      }
-    }
-
-    // Cập nhật tin nhắn chưa được và gửi thông báo đến user khong ở trong phòng
+    // Cập nhật tin nhắn chưa được và gửi thông báo đến user không ở trong phòng
     await Promise.all(
       targetUsers.map(async (targetUserId) => {
-        const isUserInRoom = usersInRoom.has(targetUserId);
+        const isUserInRoomResult = await isUserInRoom(targetUserId, conversationId);
 
-        if (!isUserInRoom) {
+        if (!isUserInRoomResult) {
           // Tăng tin nhắn chưa đọc
           await pool.query(
             `UPDATE conversation_members 

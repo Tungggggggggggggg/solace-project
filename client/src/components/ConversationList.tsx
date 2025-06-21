@@ -111,15 +111,22 @@ export const ConversationList: FC<ConversationListProps> = ({
                   transform: `translateY(${virtualRow.start}px)`,
                 }}
               >
-                <div className="relative">
+                <div className="relative mr-3 w-10 h-10 flex-shrink-0">
                   <img
                     src={conv.other_user?.avatar || '/default-avatar.png'}
                     alt={conv.other_user?.name || 'User'}
-                    className="w-10 h-10 rounded-full object-cover mr-3"
+                    className="w-10 h-10 rounded-full object-cover"
                   />
-                  {onlineUsers.has(conv.other_user?.id || '') && (
-                    <span className="absolute bottom-0 right-0 w-3 h-3 rounded-full bg-green-500 border-2 border-white"></span>
-                  )}
+                  <span
+                    className={clsx(
+                      "absolute",
+                      "bottom-0 right-0",
+                      "w-3.5 h-3.5 rounded-full border-2 border-white shadow",
+                      onlineUsers.has(conv.other_user?.id || '') ? 'bg-green-500 animate-pulse' : 'bg-gray-400'
+                    )}
+                    style={{ zIndex: 2 }}
+                    title={onlineUsers.has(conv.other_user?.id || '') ? 'Online' : 'Offline'}
+                  />
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="font-semibold text-sm truncate">

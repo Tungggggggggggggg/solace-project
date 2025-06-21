@@ -22,16 +22,20 @@ function init(server) {
         return;
       }
       userId = id;
+      socket.userId = id;
       socket.join(`user:${userId}`);
       onlineUsers.add(userId);
       io.emit('onlineUsers', Array.from(onlineUsers));
-      console.log(`User ${userId} joined room user:${userId}`);
     });
 
     socket.on('joinConversation', async ({ userId, conversationId }) => {
       if (!userId || !conversationId) {
         socket.emit('error', { message: 'Missing userId or conversationId' });
         return;
+      }
+
+      if (!socket.userId) {
+        socket.userId = userId;
       }
 
       try {
@@ -84,15 +88,13 @@ function init(server) {
       if (userId) {
         socket.leave(`user:${userId}`);
         try {
-          // Check if any sockets remain in the user:${userId} room
           const socketsInRoom = await io.in(`user:${userId}`).allSockets();
           if (socketsInRoom.size === 0) {
             onlineUsers.delete(userId);
             io.emit('onlineUsers', Array.from(onlineUsers));
-            console.log(`User ${userId} is now offline`);
           }
         } catch (error) {
-          console.error('Error checking room membership on disconnect:', error);
+          console.error('Lỗi khi kiểm tra thành viên không kết nối:', error);
         }
       }
     });
@@ -104,4 +106,23 @@ function getIO() {
   return io;
 }
 
-module.exports = { init, getIO };
+async function isUserInRoom(userId, roomId) {
+  if (!io) return false;
+  
+  try {
+    const socketsInRoom = await io.in(roomId).allSockets();
+    
+    for (const socketId of socketsInRoom) {
+      const socket = io.sockets.sockets.get(socketId);
+      if (socket && socket.userId === userId) {
+        return true;
+      }
+    }
+    return false;
+  } catch (error) {
+    console.error('Error checking if user is in room:', error);
+    return false;
+  }
+}
+
+module.exports = { init, getIO, isUserInRoom };

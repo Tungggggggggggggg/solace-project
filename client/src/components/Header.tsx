@@ -6,12 +6,14 @@ import { useRouter, usePathname } from "next/navigation";
 import { useUser } from "@/contexts/UserContext";
 import Toast, { ToastProps } from "./Toast";
 import Link from "next/link";
-import gsap, { Power3 } from "gsap";
+import gsap from "gsap";
 import FilteredInput from "@/components/FilteredInput";
 import { debounce } from 'lodash';
 import { socket } from '@/socket';
-import { access } from "fs";
 import axios from 'axios';
+import { Notification } from "@/types/notification";
+import { formatDate } from "@/lib/dateUtils";
+import PostDetailPopup from "./PostDetailPopup";
 
 
 // Định nghĩa kiểu props cho Header
@@ -43,7 +45,7 @@ const Header = memo<HeaderProps>(({
 }) => {
   const router = useRouter();
   const pathname = usePathname();
-  const { user, loading, logout, accessToken } = useUser();
+  const { user, loading, logout, accessToken, setCurrentConversationId } = useUser();
   console.log("Header rendered with user:", user);
 
   // State declarations
@@ -55,12 +57,37 @@ const Header = memo<HeaderProps>(({
   // Tổng số tin nhắn chưa đọc
   const [unreadCount, setUnreadCount] = useState(0);
   //Tổng số thông báo chưa đọc
-  const [unreadNotifications, setUnreadNotifications] = useState(5);
+  const [unreadNotifications, setUnreadNotifications] = useState(0);
   // State kiểm soát hiển thị biểu tượng tin nhắn và thông báo
   const [showMessageIcon, setShowMessageIcon] = useState(true);
   const [showNotificationIcon, setShowNotificationIcon] = useState(true);
   const [searchHistory, setSearchHistory] = useState<{ id: string; keyword: string }[]>([]);
   const [showHistory, setShowHistory] = useState(false);
+  // State kiểm soát hiển thị dropdown thông báo
+  const [showNotificationDropdown, setShowNotificationDropdown] = useState(false);
+  const notificationDropdownRef = useRef<HTMLDivElement>(null);
+  const notificationScrollContainerRef = useRef<HTMLDivElement>(null);
+  // State kiểm soát hiển thị dropdown tin nhắn
+  const [showMessageDropdown, setShowMessageDropdown] = useState(false);
+  const messageDropdownRef = useRef<HTMLDivElement>(null);
+  const messageScrollContainerRef = useRef<HTMLDivElement>(null);
+  // State cho popup chi tiết bài post
+  const [openPost, setOpenPost] = useState<any>(null);
+  const [showPostModal, setShowPostModal] = useState(false);
+  const [followedUserIds, setFollowedUserIds] = useState<string[]>([]);
+  // Online users for dropdown message
+  const [onlineUsers, setOnlineUsers] = useState<Set<string>>(new Set());
+  useEffect(() => {
+    const handleOnline = (users: string[]) => setOnlineUsers(new Set(users));
+    socket.on('onlineUsers', handleOnline);
+    return () => { socket.off('onlineUsers', handleOnline); };
+  }, []);
+
+  useEffect(() => {
+    if (user?.id && socket.connected) {
+      socket.emit('register', user.id);
+    }
+  }, [user?.id]);
 
   // Refs
   const inputWrapperRef = useRef<HTMLDivElement>(null);
@@ -135,6 +162,26 @@ const Header = memo<HeaderProps>(({
         setShowSuggestions(false);
         setShowHistory(false);
       }
+      
+      // Đóng dropdown thông báo khi click ra ngoài
+      if (
+        notificationDropdownRef.current &&
+        !notificationDropdownRef.current.contains(event.target as Node) &&
+        notificationBtnRef.current &&
+        !notificationBtnRef.current.contains(event.target as Node)
+      ) {
+        setShowNotificationDropdown(false);
+      }
+
+      // Đóng dropdown tin nhắn khi click ra ngoài
+      if (
+        messageDropdownRef.current &&
+        !messageDropdownRef.current.contains(event.target as Node) &&
+        messageBtnRef.current &&
+        !messageBtnRef.current.contains(event.target as Node)
+      ) {
+        setShowMessageDropdown(false);
+      }
     }
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
@@ -143,7 +190,9 @@ const Header = memo<HeaderProps>(({
   // Đóng menu người dùng khi click ra ngoài
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      if (userMenuRef.current && !userMenuRef.current.contains(event.target as Node)) setShowUserMenu(false);
+      if (userMenuRef.current && !userMenuRef.current.contains(event.target as Node)) {
+        setShowUserMenu(false);
+      }
     };
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
@@ -248,6 +297,22 @@ const Header = memo<HeaderProps>(({
       });
   }, [user, accessToken]);
 
+  // Fetch tổng số thông báo chưa đọc khi user thay đổi
+  useEffect(() => {
+    if (!user) return;
+    
+    fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/notifications/unread-total`, {
+      headers: { Authorization: `Bearer ${accessToken}` }
+    })
+      .then(res => res.json())
+      .then(data => {
+        setUnreadNotifications(data.total || 0);
+      })
+      .catch(error => {
+        console.error('Error fetching unread notifications count:', error);
+      });
+  }, [user, accessToken]);
+
   // Realtime cập nhật khi có unread tăng
   useEffect(() => {
     if (!user) return;
@@ -263,6 +328,21 @@ const Header = memo<HeaderProps>(({
       debouncedUpdate.cancel();
     };
   }, [user, debouncedUpdate]);
+
+  // Realtime cập nhật thông báo chưa đọc
+  useEffect(() => {
+    if (!user) return;
+
+    const handleNotificationUpdate = (data: { total: number }) => {
+      setUnreadNotifications(data.total);
+    };
+
+    socket.on("notificationUnreadTotalUpdated", handleNotificationUpdate);
+    
+    return () => {
+      socket.off("notificationUnreadTotalUpdated", handleNotificationUpdate);
+    };
+  }, [user]);
 
   // Functions
   const showToast = (message: string, type: ToastProps["type"]) => {
@@ -362,14 +442,52 @@ const Header = memo<HeaderProps>(({
 
   // Xử lý click vào nút tin nhắn
   const handleMessageClick = () => {
-    setShowMessageIcon(false);
-    router.push("/messages");
+    if (pathname === "/messages") {
+      setShowMessageIcon(false);
+      router.push("/messages");
+    } else {
+      const newDropdownState = !showMessageDropdown;
+      setShowMessageDropdown(newDropdownState);
+      
+      // Nếu mở dropdown, fetch lại số lượng tin nhắn chưa đọc
+      if (newDropdownState && user && accessToken) {
+        fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/messages/unread-total`, {
+          headers: { Authorization: `Bearer ${accessToken}` }
+        })
+          .then(res => res.json())
+          .then(data => {
+            setUnreadCount(data.total);
+          })
+          .catch(error => {
+            console.error('Error fetching unread count:', error);
+          });
+      }
+    }
   };
 
   // Xử lý click vào nút thông báo
   const handleNotificationClick = () => {
-    setShowNotificationIcon(false);
-    router.push("/notifications");
+    if (pathname === "/notifications") {
+      setShowNotificationIcon(false);
+      router.push("/notifications");
+    } else {
+      const newDropdownState = !showNotificationDropdown;
+      setShowNotificationDropdown(newDropdownState);
+      
+      // Nếu mở dropdown, fetch lại số lượng thông báo chưa đọc
+      if (newDropdownState && user && accessToken) {
+        fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/notifications/unread-total`, {
+          headers: { Authorization: `Bearer ${accessToken}` }
+        })
+          .then(res => res.json())
+          .then(data => {
+            setUnreadNotifications(data.total || 0);
+          })
+          .catch(error => {
+            console.error('Error fetching unread notifications count:', error);
+          });
+      }
+    }
   };
 
   // Hiển thị lại các biểu tượng dựa trên route hiện tại
@@ -493,13 +611,330 @@ const Header = memo<HeaderProps>(({
     }, 1000);
   };
 
+  // Định nghĩa các biến state và hằng số trước khi dùng trong các hook
+  const DROPDOWN_PAGE_SIZE = 10;
+  const DROPDOWN_MAX = 30;
+  const [dropdownPage, setDropdownPage] = useState(1);
+  const [dropdownHasMore, setDropdownHasMore] = useState(true);
+  const [dropdownLoading, setDropdownLoading] = useState(false);
+  const [recentNotifications, setRecentNotifications] = useState<Notification[]>([]);
+  // State cho message dropdown
+  const [messageDropdownPage, setMessageDropdownPage] = useState(1);
+  const [messageDropdownHasMore, setMessageDropdownHasMore] = useState(true);
+  const [messageDropdownLoading, setMessageDropdownLoading] = useState(false);
+  const [recentConversations, setRecentConversations] = useState<any[]>([]);
+
+  // Fetch notifications cho dropdown (có phân trang)
+  const fetchDropdownNotifications = useCallback(async (pageNum: number) => {
+    if (!user || !accessToken) return;
+    try {
+      setDropdownLoading(true);
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/notifications?page=${pageNum}&limit=${DROPDOWN_PAGE_SIZE}`, {
+        headers: { Authorization: `Bearer ${accessToken}` },
+      });
+      const data = await res.json();
+      if (pageNum === 1) {
+        setRecentNotifications(data.notifications);
+        if (data.notifications.length < DROPDOWN_PAGE_SIZE || data.notifications.length >= DROPDOWN_MAX) {
+          setDropdownHasMore(false);
+        } else {
+          setDropdownHasMore(true);
+        }
+        // Tính unread count cho trang đầu
+        setUnreadNotifications(data.notifications.filter((n: Notification) => !n.is_read).length);
+      } else {
+        setRecentNotifications(prev => {
+          const merged = [...prev, ...data.notifications];
+          if (merged.length >= DROPDOWN_MAX || data.notifications.length < DROPDOWN_PAGE_SIZE) {
+            setDropdownHasMore(false);
+          } else {
+            setDropdownHasMore(true);
+          }
+          // Tính unread count cho tất cả notifications sau khi merge
+          const totalUnread = merged.filter((n: Notification) => !n.is_read).length;
+          setUnreadNotifications(totalUnread);
+          return merged.slice(0, DROPDOWN_MAX);
+        });
+      }
+    } catch (err) {
+      console.error('Error fetching notifications:', err);
+    } finally {
+      setDropdownLoading(false);
+    }
+  }, [user, accessToken]);
+
+  // Fetch conversations cho message dropdown (có phân trang)
+  const fetchDropdownConversations = useCallback(async (pageNum: number) => {
+    if (!user || !accessToken) return;
+    try {
+      setMessageDropdownLoading(true);
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/messages?page=${pageNum}&limit=${DROPDOWN_PAGE_SIZE}`, {
+        headers: { Authorization: `Bearer ${accessToken}` },
+      });
+      const data = await res.json();
+      if (pageNum === 1) {
+        setRecentConversations(data.conversations || []);
+        if ((data.conversations?.length || 0) < DROPDOWN_PAGE_SIZE || (data.conversations?.length || 0) >= DROPDOWN_MAX) {
+          setMessageDropdownHasMore(false);
+        } else {
+          setMessageDropdownHasMore(true);
+        }
+        // Tính unread count cho trang đầu
+        const totalUnread = (data.conversations || []).reduce((sum: number, conv: any) => sum + (conv.unread_count || 0), 0);
+        setUnreadCount(totalUnread);
+      } else {
+        setRecentConversations(prev => {
+          const merged = [...prev, ...(data.conversations || [])];
+          if (merged.length >= DROPDOWN_MAX || (data.conversations?.length || 0) < DROPDOWN_PAGE_SIZE) {
+            setMessageDropdownHasMore(false);
+          } else {
+            setMessageDropdownHasMore(true);
+          }
+          // Tính unread count cho tất cả conversations sau khi merge
+          const totalUnread = merged.reduce((sum: number, conv: any) => sum + (conv.unread_count || 0), 0);
+          setUnreadCount(totalUnread);
+          return merged.slice(0, DROPDOWN_MAX);
+        });
+      }
+    } catch (err) {
+      console.error('Error fetching conversations:', err);
+    } finally {
+      setMessageDropdownLoading(false);
+    }
+  }, [user, accessToken]);
+
+  // Khi mở dropdown, reset state và fetch trang đầu
+  useEffect(() => {
+    if (showNotificationDropdown && user && accessToken) {
+      setRecentNotifications([]);
+      setDropdownPage(1);
+      setDropdownHasMore(true);
+      fetchDropdownNotifications(1);
+    }
+  }, [showNotificationDropdown, user, accessToken, fetchDropdownNotifications]);
+
+  // Khi mở message dropdown, reset state và fetch trang đầu
+  useEffect(() => {
+    if (showMessageDropdown && user && accessToken) {
+      setRecentConversations([]);
+      setMessageDropdownPage(1);
+      setMessageDropdownHasMore(true);
+      fetchDropdownConversations(1);
+    }
+  }, [showMessageDropdown, user, accessToken, fetchDropdownConversations]);
+
+  // Infinite scroll handler: chỉ tăng page, fetch ở useEffect khác
+  useEffect(() => {
+    const container = notificationScrollContainerRef.current;
+    if (!container) return;
+    const handleScroll = () => {
+      if (
+        container.scrollTop + container.clientHeight >= container.scrollHeight - 80 &&
+        dropdownHasMore && !dropdownLoading && recentNotifications.length < DROPDOWN_MAX
+      ) {
+        setDropdownPage(prev => prev + 1);
+      }
+    };
+    container.addEventListener('scroll', handleScroll);
+    return () => container.removeEventListener('scroll', handleScroll);
+  }, [dropdownHasMore, dropdownLoading, recentNotifications.length, dropdownPage]);
+
+  // Infinite scroll handler cho message dropdown
+  useEffect(() => {
+    const container = messageScrollContainerRef.current;
+    if (!container) return;
+    const handleScroll = () => {
+      if (
+        container.scrollTop + container.clientHeight >= container.scrollHeight - 80 &&
+        messageDropdownHasMore && !messageDropdownLoading && recentConversations.length < DROPDOWN_MAX
+      ) {
+        setMessageDropdownPage(prev => prev + 1);
+      }
+    };
+    container.addEventListener('scroll', handleScroll);
+    return () => container.removeEventListener('scroll', handleScroll);
+  }, [messageDropdownHasMore, messageDropdownLoading, recentConversations.length, messageDropdownPage]);
+
+  // Khi dropdownPage thay đổi (và > 1), fetch thêm
+  useEffect(() => {
+    if (dropdownPage > 1 && dropdownHasMore && !dropdownLoading) {
+      fetchDropdownNotifications(dropdownPage);
+    }
+  }, [dropdownPage, dropdownHasMore, dropdownLoading, fetchDropdownNotifications]);
+
+  // Khi messageDropdownPage thay đổi (và > 1), fetch thêm
+  useEffect(() => {
+    if (messageDropdownPage > 1 && messageDropdownHasMore && !messageDropdownLoading) {
+      fetchDropdownConversations(messageDropdownPage);
+    }
+  }, [messageDropdownPage, messageDropdownHasMore, messageDropdownLoading, fetchDropdownConversations]);
+
+  // Đánh dấu đã đọc cho từng thông báo
+  const markDropdownAsRead = async (id: string) => {
+    if (!user || !accessToken) return;
+    try {
+      await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/notifications/${id}/read`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${accessToken}` },
+      });
+      setRecentNotifications(prev => prev.map(n => n.id === id ? { ...n, is_read: true } : n));
+      // Giảm số lượng thông báo chưa đọc
+      setUnreadNotifications(prev => Math.max(0, prev - 1));
+    } catch (e) {
+      console.error('Error marking notification as read:', e);
+    }
+  };
+
+  // Hàm đánh dấu tất cả đã đọc trong dropdown
+  const markAllDropdownAsRead = async () => {
+    if (!user || !accessToken) return;
+    try {
+      await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/notifications/read-all`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${accessToken}` },
+      });
+      setRecentNotifications((prev) => prev.map((n) => ({ ...n, is_read: true })));
+      // Đặt số lượng thông báo chưa đọc về 0
+      setUnreadNotifications(0);
+    } catch (e) {
+      console.error('Error marking all as read:', e);
+    }
+  };
+  // Hàm xóa tất cả thông báo trong dropdown
+  const deleteAllDropdownNotifications = async () => {
+    if (!user || !accessToken) return;
+    try {
+      await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/notifications/all`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${accessToken}` },
+      });
+      setRecentNotifications([]);
+      // Đặt số lượng thông báo chưa đọc về 0
+      setUnreadNotifications(0);
+    } catch (e) {
+      console.error('Error deleting all notifications:', e);
+    }
+  };
+  // Hàm xóa 1 thông báo
+  const deleteDropdownNotification = async (id: string) => {
+    if (!user || !accessToken) return;
+    try {
+      await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/notifications/${id}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${accessToken}` },
+      });
+      const notificationToDelete = recentNotifications.find(n => n.id === id);
+      setRecentNotifications((prev) => prev.filter((n) => n.id !== id));
+      // Giảm số lượng thông báo chưa đọc nếu thông báo bị xóa chưa đọc
+      if (notificationToDelete && !notificationToDelete.is_read) {
+        setUnreadNotifications((prev) => Math.max(0, prev - 1));
+      }
+    } catch (e) {
+      console.error('Error deleting notification:', e);
+    }
+  };
+
+  // Real-time: prepend notification vào dropdown khi có newNotification
+  useEffect(() => {
+    if (!user) return;
+    const handleNewNotification = (notification: Notification) => {
+      // Chỉ thêm vào dropdown nếu đang mở
+      if (showNotificationDropdown) {
+        setRecentNotifications(prev => [notification, ...prev].slice(0, 30));
+      }
+      // Tăng số lượng thông báo chưa đọc
+      setUnreadNotifications(prev => prev + 1);
+    };
+    socket.on('newNotification', handleNewNotification);
+    return () => {
+      socket.off('newNotification', handleNewNotification);
+    };
+  }, [user, showNotificationDropdown]);
+
+  // Real-time: cập nhật conversations khi có tin nhắn mới
+  useEffect(() => {
+    if (!user) return;
+    const handleNewMessage = (message: any) => {
+      // Cập nhật unread count
+      setUnreadCount(prev => prev + 1);
+      
+      // Cập nhật conversations trong dropdown nếu đang mở
+      if (showMessageDropdown) {
+        setRecentConversations(prev => {
+          const existingIndex = prev.findIndex(conv => conv.id === message.conversation_id);
+          if (existingIndex !== -1) {
+            // Cập nhật conversation hiện có
+            const updated = [...prev];
+            updated[existingIndex] = {
+              ...updated[existingIndex],
+              last_message: message.content || '[Hình ảnh]',
+              last_message_at: message.created_at,
+              unread_count: (updated[existingIndex].unread_count || 0) + 1
+            };
+            // Di chuyển lên đầu
+            const [moved] = updated.splice(existingIndex, 1);
+            return [moved, ...updated];
+          } else {
+            // Thêm conversation mới (nếu có thể fetch được)
+            // Có thể cần fetch conversation details
+            return prev;
+          }
+        });
+      }
+    };
+    socket.on('newMessage', handleNewMessage);
+    return () => {
+      socket.off('newMessage', handleNewMessage);
+    };
+  }, [user, showMessageDropdown]);
+
+  // Hàm lấy chi tiết bài viết
+  const handleOpenPostDetail = async (postId: string) => {
+    try {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/posts/${postId}`);
+      const data = await res.json();
+      setOpenPost({
+        id: data.id || data.post?.id || '',
+        name: `${data.first_name || data.post?.first_name || ''} ${data.last_name || data.post?.last_name || ''}`.trim(),
+        date: data.created_at || data.post?.created_at || '',
+        content: data.content || data.post?.content || '',
+        likes: data.likes || data.post?.likes || 0,
+        comments: data.comments || data.post?.comments || 0,
+        shares: data.shares || data.post?.shares || 0,
+        images: data.images || data.post?.images || [],
+        avatar_url: data.avatar_url || data.post?.avatar_url || '',
+        shared_post: data.shared_post || undefined,
+      });
+      setShowPostModal(true);
+    } catch (err) {
+      alert('Không lấy được chi tiết bài viết!');
+    }
+  };
+
+  const handleFollow = async (senderId: string) => {
+    if (!user || !accessToken) return;
+    try {
+      await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/users/${senderId}/follow`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${accessToken}` },
+      });
+      setFollowedUserIds(prev => [...prev, senderId]);
+      showToast('Đã follow người dùng!', 'success');
+    } catch (e) {
+      showToast('Không thể follow người dùng này!', 'error');
+    }
+  };
+
   return (
     <>
-      <header className="flex items-center justify-between w-full h-16 sm:h-20 px-4 sm:px-8 lg:px-16" style={{ backgroundColor: headerBg }}>
-        <Link href="/" className="flex items-center h-10 w-24 sm:h-12 sm:w-32 hover:opacity-80 transition-opacity duration-200 cursor-pointer">
-          <Image src="/logo.png" alt="Solace Logo" width={96} height={36} className="object-contain sm:w-128 sm:h-48" priority />
+      <header className="flex items-center justify-between w-full h-14 sm:h-16 md:h-20 px-3 sm:px-4 md:px-6 lg:px-8 xl:px-16" style={{ backgroundColor: headerBg }}>
+        {/* Logo */}
+        <Link href="/" className="flex items-center h-12 w-28 sm:h-14 sm:w-32 md:h-16 md:w-40 lg:h-18 lg:w-44 xl:h-20 xl:w-48 hover:opacity-80 transition-opacity duration-200 cursor-pointer flex-shrink-0">
+          <Image src="/logo.png" alt="Solace Logo" width={192} height={80} className="object-contain w-full h-full" priority />
         </Link>
-        <div className="flex-1 max-w-md sm:max-w-xl mx-4 sm:mx-8 relative">
+        
+        {/* Search Bar */}
+        <div className="flex-1 max-w-xs sm:max-w-sm md:max-w-md lg:max-w-xl mx-2 sm:mx-4 md:mx-6 lg:mx-8 relative">
           <div className="flex w-full rounded-full border border-black bg-white overflow-hidden" ref={inputWrapperRef}>
             <FilteredInput
               ref={inputRef}
@@ -513,37 +948,38 @@ const Header = memo<HeaderProps>(({
                 else memoizedHandleKeyDown(e);
               }}
               placeholder="Tìm kiếm..."
-              className="flex-1 px-3 sm:px-5 py-2 bg-white text-sm sm:text-base font-normal placeholder:text-gray-400 focus:outline-none border-none rounded-none text-black"
+              className="flex-1 px-2 sm:px-3 md:px-4 lg:px-5 py-1.5 sm:py-2 bg-white text-xs sm:text-sm md:text-base font-normal placeholder:text-gray-400 focus:outline-none border-none rounded-none text-black"
             />
             <div 
-              className="flex items-center justify-center px-3 sm:px-5 border-l border-black cursor-pointer" 
-              style={{ minHeight: "36px", backgroundColor: headerBg }} 
+              className="flex items-center justify-center px-2 sm:px-3 md:px-4 lg:px-5 border-l border-black cursor-pointer flex-shrink-0" 
+              style={{ minHeight: "32px", backgroundColor: headerBg }} 
               onClick={memoizedHandleClick}
             >
-              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="black" className="w-5 h-5 sm:w-6 sm:h-6">
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="black" className="w-4 h-4 sm:w-5 sm:h-5 md:w-6 md:h-6">
                 <circle cx="11" cy="11" r="7" />
                 <line x1="16.5" y1="16.5" x2="21" y2="21" stroke="black" strokeWidth={2} strokeLinecap="round" />
               </svg>
             </div>
           </div>
+          {/* Search Dropdown */}
           <div className="dropdown-wrapper absolute left-0 right-0 top-full z-50">
             {showSuggestions && suggestions.length > 0 ? (
-              <div ref={dropdownRef} className="bg-white border border-gray-200 rounded-xl shadow-lg max-h-60 overflow-y-auto mt-1">
+              <div ref={dropdownRef} className="bg-white border border-gray-200 rounded-xl shadow-lg max-h-48 sm:max-h-60 overflow-y-auto mt-1">
                 {suggestions.filter(s => s.type === 'user' && s.avatar).map((s, idx) => (
                   <div
                     key={s.id}
-                    className="flex items-center gap-3 px-4 py-2 cursor-pointer hover:bg-gradient-to-r from-blue-50 to-white text-gray-800 text-sm group suggestion-item transition-all duration-200"
+                    className="flex items-center gap-2 sm:gap-3 px-3 sm:px-4 py-2 cursor-pointer hover:bg-gradient-to-r from-blue-50 to-white text-gray-800 text-xs sm:text-sm group suggestion-item transition-all duration-200"
                     onMouseEnter={e => gsap.to(e.currentTarget, { background: 'linear-gradient(to right, #e6f0fa, #ffffff)', duration: 0.2 })}
                     onMouseLeave={e => gsap.to(e.currentTarget, { background: 'transparent', duration: 0.2 })}
                     onMouseDown={() => handleSuggestionClick(s)}
                   >
-                    <Image src={typeof s.avatar === 'string' && s.avatar ? s.avatar : '/default-avatar.png'} alt={s.name} width={32} height={32} className="rounded-full object-cover" />
+                    <Image src={typeof s.avatar === 'string' && s.avatar ? s.avatar : '/default-avatar.png'} alt={s.name} width={28} height={28} className="w-7 h-7 sm:w-8 sm:h-8 rounded-full object-cover" />
                     <span className="font-medium text-gray-900 truncate">{s.name}</span>
                   </div>
                 ))}
               </div>
             ) : showHistory && searchHistory.length > 0 ? (
-              <div ref={dropdownRef} className="bg-white border border-gray-200 rounded-xl shadow-lg max-h-72 overflow-y-auto mt-1">
+              <div ref={dropdownRef} className="bg-white border border-gray-200 rounded-xl shadow-lg max-h-56 sm:max-h-72 overflow-y-auto mt-1">
                 <div className="flex flex-col divide-y divide-gray-100">
                   {searchHistory.slice(0, 8).map((item, idx) => (
                     <div
@@ -552,7 +988,7 @@ const Header = memo<HeaderProps>(({
                       role="option"
                       aria-selected="false"
                       tabIndex={0}
-                      className="flex items-center justify-between px-4 py-2 hover:bg-gradient-to-r from-blue-50 to-white cursor-pointer text-gray-700 group bg-white history-item transition-all duration-200"
+                      className="flex items-center justify-between px-3 sm:px-4 py-2 hover:bg-gradient-to-r from-blue-50 to-white cursor-pointer text-gray-700 group bg-white history-item transition-all duration-200"
                       onMouseEnter={e => {
                         if (!e.currentTarget.classList.contains('being-removed')) {
                           gsap.to(e.currentTarget, { background: 'linear-gradient(to right, #e6f0fa, #ffffff)', duration: 0.2 });
@@ -575,27 +1011,27 @@ const Header = memo<HeaderProps>(({
                           router.push(`/search?query=${encodeURIComponent(item.keyword)}`);
                         }}
                       >
-                        <span className="inline-flex items-center justify-center w-7 h-7 text-gray-500">
-                          <svg viewBox="0 0 21 21" aria-hidden="true" width="20" height="20">
+                        <span className="inline-flex items-center justify-center w-6 h-6 sm:w-7 sm:h-7 text-gray-500">
+                          <svg viewBox="0 0 21 21" aria-hidden="true" width="16" height="16" className="sm:w-5 sm:h-5">
                             <g>
                               <path d="M9.094 3.095c-3.314 0-6 2.686-6 6s2.686 6 6 6c1.657 0 3.155-.67 4.243-1.757 1.087-1.088 1.757-2.586 1.757-4.243 0-3.314-2.686-6-6-6zm-9 6c0-4.971 4.029-9 9-9s9 4.029 9 9c0 1.943-.617 3.744-1.664 5.215l4.475 4.474-2.122 2.122-4.474-4.475c-1.471 1.047-3.272 1.664-5.215 1.664-4.97-.001-8.999-4.03-9-9z"></path>
                             </g>
                           </svg>
                         </span>
-                        <span className="truncate text-sm font-medium text-gray-900">{item.keyword}</span>
+                        <span className="truncate text-xs sm:text-sm font-medium text-gray-900">{item.keyword}</span>
                       </div>
                       <button
                         aria-label="Xóa"
                         type="button"
-                        className="ml-2 p-1 rounded-full hover:bg-red-100 text-red-500 opacity-0 group-hover:opacity-100 focus:opacity-100 transition-opacity duration-200"
+                        className="ml-1 sm:ml-2 p-1 rounded-full hover:bg-red-100 text-red-500 opacity-0 group-hover:opacity-100 focus:opacity-100 transition-opacity duration-200"
                         onMouseDown={(e) => {
                           e.preventDefault();
                           e.stopPropagation();
                           handleDeleteKeywordByIndex(idx);
                         }}
                       >
-                        <span className="inline-flex items-center justify-center w-6 h-6">
-                          <svg viewBox="0 0 24 24" aria-hidden="true" width="16" height="16">
+                        <span className="inline-flex items-center justify-center w-5 h-5 sm:w-6 sm:h-6">
+                          <svg viewBox="0 0 24 24" aria-hidden="true" width="14" height="14" className="sm:w-4 sm:h-4">
                             <g>
                               <path d="M10.59 12L4.54 5.96l1.42-1.42L12 10.59l6.04-6.05 1.42 1.42L13.41 12l6.05 6.04-1.42 1.42L12 13.41l-6.04 6.05-1.42-1.42L10.59 12z"></path>
                             </g>
@@ -609,18 +1045,20 @@ const Header = memo<HeaderProps>(({
             ) : null}
           </div>
         </div>
-        <div className="flex items-center gap-2 sm:gap-3 justify-end">
+        
+        {/* Right Side Actions */}
+        <div className="flex items-center gap-1 sm:gap-2 md:gap-3 justify-end flex-shrink-0 min-w-0">
           {loading ? (
-            <div className="flex items-center gap-2 p-2">
-              <div className="bg-gray-200 rounded-full w-6 h-6 sm:w-8 sm:h-8 animate-pulse" />
-              <div className="bg-gray-200 rounded-full w-16 sm:w-20 h-4 animate-pulse" />
+            <div className="flex items-center gap-1 sm:gap-2 p-1 sm:p-2">
+              <div className="bg-gray-200 rounded-full w-5 h-5 sm:w-6 sm:h-6 md:w-8 md:h-8 animate-pulse" />
+              <div className="bg-gray-200 rounded-full w-12 sm:w-16 md:w-20 h-3 sm:h-4 animate-pulse" />
             </div>
           ) : !user ? (
             <>
               <button
                 ref={loginBtnRef}
                 onClick={() => onOpenAuth?.("login")}
-                className="hidden sm:inline-flex items-center justify-center min-w-[90px] h-10 sm:h-11 px-4 sm:px-6 text-sm sm:text-base font-semibold rounded-full border-2 border-[#8CA9D5] bg-white text-[#3B4252] shadow-sm transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#8CA9D5]"
+                className="hidden sm:inline-flex items-center justify-center min-w-[70px] sm:min-w-[80px] md:min-w-[90px] h-8 sm:h-9 md:h-10 lg:h-11 px-2 sm:px-3 md:px-4 lg:px-6 text-xs sm:text-sm md:text-base font-semibold rounded-full border-2 border-[#8CA9D5] bg-white text-[#3B4252] shadow-sm transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#8CA9D5]"
                 aria-label="Log in"
                 onMouseEnter={() => handleBtnHover(loginBtnRef)}
                 onMouseLeave={() => handleBtnLeave(loginBtnRef)}
@@ -633,7 +1071,7 @@ const Header = memo<HeaderProps>(({
               <button
                 ref={signupBtnRef}
                 onClick={() => onOpenAuth?.("signup")}
-                className="inline-flex items-center justify-center min-w-[90px] h-10 sm:h-11 px-4 sm:px-6 text-sm sm:text-base font-bold rounded-full bg-gradient-to-r from-[#8CA9D5] to-blue-600 text-white shadow-lg transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-400"
+                className="inline-flex items-center justify-center min-w-[70px] sm:min-w-[80px] md:min-w-[90px] h-8 sm:h-9 md:h-10 lg:h-11 px-2 sm:px-3 md:px-4 lg:px-6 text-xs sm:text-sm md:text-base font-bold rounded-full bg-gradient-to-r from-[#8CA9D5] to-blue-600 text-white shadow-lg transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-400"
                 aria-label="Sign up"
                 onMouseEnter={() => handleBtnHover(signupBtnRef)}
                 onMouseLeave={() => handleBtnLeave(signupBtnRef)}
@@ -647,67 +1085,353 @@ const Header = memo<HeaderProps>(({
           ) : (
             <>
               {showMessageIcon && (
-                <button
-                  ref={messageBtnRef}
-                  onClick={handleMessageClick}
-                  className="relative flex items-center justify-center w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-white border border-[#8CA9D5] hover:bg-[#E1ECF7] transition-all duration-200"
-                  aria-label="Messages"
-                  onMouseEnter={() => handleBtnHover(messageBtnRef, 1.1)}
-                  onMouseLeave={() => handleBtnLeave(messageBtnRef)}
-                  onFocus={() => handleBtnHover(messageBtnRef, 1.1)}
-                  onBlur={() => handleBtnLeave(messageBtnRef)}
-                  type="button"
-                >
-                  <span className="material-symbols-outlined text-[#3B4252] text-lg sm:text-[20px]">mail</span>
-                  {unreadCount > 0 && (
-                    <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs font-bold rounded-full w-4 h-4 sm:w-5 sm:h-5 flex items-center justify-center">
-                      {unreadCount}
-                    </span>
+                <div className="relative flex-shrink-0">
+                  <button
+                    ref={messageBtnRef}
+                    onClick={handleMessageClick}
+                    className="relative flex items-center justify-center w-8 h-8 sm:w-9 sm:h-9 md:w-10 md:h-10 rounded-full bg-white border border-blue-300 hover:bg-blue-50 transition-all duration-200"
+                    aria-label="Messages"
+                    onMouseEnter={() => handleBtnHover(messageBtnRef, 1.1)}
+                    onMouseLeave={() => handleBtnLeave(messageBtnRef)}
+                    onFocus={() => handleBtnHover(messageBtnRef, 1.1)}
+                    onBlur={() => handleBtnLeave(messageBtnRef)}
+                    type="button"
+                  >
+                    <span className="material-symbols-outlined text-base sm:text-lg md:text-[20px]" style={{ color: '#2563eb' }}>mail</span>
+                    {unreadCount > 0 && (
+                      <span className="absolute -top-0.5 -right-0.5 sm:-top-1 sm:-right-1 bg-blue-500 text-white text-[10px] sm:text-xs font-bold rounded-full w-3.5 h-3.5 sm:w-4 sm:h-4 md:w-5 md:h-5 flex items-center justify-center animate-pulse transition-all duration-300 transform scale-100 hover:scale-110 z-10">
+                        {unreadCount > 99 ? '99+' : unreadCount}
+                      </span>
+                    )}
+                  </button>
+                  {/* Dropdown tin nhắn */}
+                  {showMessageDropdown && (
+                    <div
+                      ref={messageDropdownRef}
+                      className="absolute right-0 mt-2 w-72 sm:w-80 md:w-96 max-w-[calc(100vw-2rem)] bg-white rounded-xl shadow-lg py-2 z-50 border border-gray-100 animate-fade-in notification-dropdown-mobile"
+                      style={{ 
+                        minWidth: '260px',
+                        maxWidth: 'calc(100vw - 1rem)',
+                        right: '0',
+                        left: 'auto'
+                      }}
+                    >
+                      {/* Header dropdown */}
+                      <div className="flex items-center justify-between px-3 sm:px-4 py-2 border-b border-gray-100">
+                        <span className="font-bold text-blue-600 text-sm sm:text-base md:text-lg">Tin nhắn</span>
+                        <div className="flex gap-1 sm:gap-2">
+                          <button
+                            className="w-7 h-7 sm:w-8 sm:h-8 md:w-9 md:h-9 flex items-center justify-center rounded-full hover:bg-blue-100 active:bg-blue-200 transition relative group touch-manipulation touch-target-mobile"
+                            onClick={() => {
+                              setShowMessageDropdown(false);
+                              setCurrentConversationId(null);
+                              router.push('/messages');
+                            }}
+                            title="Xem tất cả cuộc trò chuyện"
+                          >
+                            <span className="material-symbols-outlined text-sm sm:text-lg md:text-xl" style={{ color: '#2563eb' }}>list</span>
+                            <span className="absolute left-1/2 -bottom-8 -translate-x-1/2 bg-gray-800 text-white text-xs rounded px-2 py-1 opacity-0 group-hover:opacity-100 pointer-events-none transition hidden sm:block whitespace-nowrap z-50">Xem tất cả cuộc trò chuyện</span>
+                          </button>
+                        </div>
+                      </div>
+                      {/* Danh sách tin nhắn */}
+                      <div 
+                        ref={messageScrollContainerRef}
+                        className="max-h-64 sm:max-h-80 md:max-h-96 overflow-y-auto divide-y divide-gray-50 scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-gray-100 scrollbar-mobile" 
+                        style={{ maxHeight: '50vh' }}
+                      >
+                        {recentConversations.length === 0 ? (
+                          <div className="text-center text-gray-500 py-4 sm:py-6">
+                            <span className="material-symbols-outlined text-xl sm:text-2xl md:text-3xl mb-2" style={{ color: '#9ca3af' }}>mail</span>
+                            <div className="text-xs sm:text-sm md:text-base">Không có tin nhắn nào</div>
+                          </div>
+                        ) : (
+                          recentConversations.map((conv) => (
+                            <div
+                              key={conv.id}
+                              className={`group flex items-start gap-2 sm:gap-3 px-2 sm:px-3 md:px-4 py-2 sm:py-3 md:py-4 rounded-lg my-1 sm:my-2 mx-1 sm:mx-2 cursor-pointer transition-all duration-200 relative touch-manipulation ${conv.unread_count > 0 ? 'bg-blue-50 border border-blue-200 shadow' : 'hover:bg-gray-50 active:bg-gray-100'}`}
+                              onClick={() => {
+                                setShowMessageDropdown(false);
+                                setCurrentConversationId(conv.id);
+                                router.push('/messages');
+                              }}
+                            >
+                              <div className="relative mr-2">
+                                <Image
+                                  src={conv.other_user?.avatar || '/default-avatar.png'}
+                                  width={40}
+                                  height={40}
+                                  className="w-8 h-8 sm:w-10 sm:h-10 md:w-11 md:h-11 rounded-full object-cover mt-1 border border-gray-200"
+                                  alt={conv.other_user?.name || ''}
+                                  unoptimized
+                                />
+                                <span className={
+                                  `absolute bottom-0 right-0 w-3 h-3 rounded-full border-2 border-white ` +
+                                  (onlineUsers.has(conv.other_user?.id) ? 'bg-green-500' : 'bg-gray-400')
+                                } />
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <div className="font-semibold text-xs sm:text-sm truncate">
+                                  <span className="text-blue-600">{conv.other_user?.name || conv.name}</span>
+                                </div>
+                                <div className="text-xs sm:text-sm text-gray-700 truncate">{conv.last_message || 'Chưa có tin nhắn'}</div>
+                                <div className="text-xs text-gray-400 mt-1">
+                                  {conv.last_message_at ? formatDate(conv.last_message_at) : ''}
+                                </div>
+                              </div>
+                              {/* Badge unread count */}
+                              {conv.unread_count > 0 && (
+                                <div className="absolute top-1 sm:top-2 right-1 sm:right-2">
+                                  <span className="bg-blue-500 text-white text-[10px] sm:text-xs font-bold rounded-full w-4 h-4 sm:w-5 sm:h-5 flex items-center justify-center">
+                                    {conv.unread_count > 9 ? '9+' : conv.unread_count}
+                                  </span>
+                                </div>
+                              )}
+                            </div>
+                          ))
+                        )}
+                        {/* Spinner chỉ hiện khi đang loading và còn hasMore */}
+                        {messageDropdownLoading && messageDropdownHasMore && (
+                          <div className="flex justify-center py-2">
+                            <span className="animate-spin rounded-full h-5 w-5 sm:h-6 sm:w-6 border-t-2 border-b-2 border-blue-600"></span>
+                          </div>
+                        )}
+                      </div>
+                      {/* Nút xem tất cả ở cuối */}
+                      <div className="px-3 sm:px-4 py-2 border-t border-gray-100 text-center">
+                        <button
+                          className="text-blue-600 font-semibold hover:underline text-xs sm:text-sm md:text-base px-2 sm:px-3 md:px-4 py-1.5 sm:py-2 rounded-lg hover:bg-blue-50 active:bg-blue-100 transition touch-manipulation touch-target-mobile"
+                          onClick={() => {
+                            setShowMessageDropdown(false);
+                            setCurrentConversationId(null);
+                            router.push('/messages');
+                          }}
+                        >
+                          Xem tất cả
+                        </button>
+                      </div>
+                    </div>
                   )}
-                </button>
+                </div>
               )}
               {showNotificationIcon && (
-                <button
-                  ref={notificationBtnRef}
-                  onClick={handleNotificationClick}
-                  className="relative flex items-center justify-center w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-white border border-[#8CA9D5] hover:bg-[#E1ECF7] transition-all duration-200"
-                  aria-label="Notifications"
-                  onMouseEnter={() => handleBtnHover(notificationBtnRef, 1.1)}
-                  onMouseLeave={() => handleBtnLeave(notificationBtnRef)}
-                  onFocus={() => handleBtnHover(notificationBtnRef, 1.1)}
-                  onBlur={() => handleBtnLeave(notificationBtnRef)}
-                  type="button"
-                >
-                  <span className="material-symbols-outlined text-[#3B4252] text-lg sm:text-[20px]">notifications</span>
-                  {unreadNotifications > 0 && (
-                    <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs font-bold rounded-full w-4 h-4 sm:w-5 sm:h-5 flex items-center justify-center">
-                      {unreadNotifications}
-                    </span>
+                <div className="relative flex-shrink-0">
+                  <button
+                    ref={notificationBtnRef}
+                    onClick={handleNotificationClick}
+                    className="relative flex items-center justify-center w-8 h-8 sm:w-9 sm:h-9 md:w-10 md:h-10 rounded-full bg-white border border-orange-300 hover:bg-orange-50 transition-all duration-200"
+                    aria-label="Notifications"
+                    onMouseEnter={() => handleBtnHover(notificationBtnRef, 1.1)}
+                    onMouseLeave={() => handleBtnLeave(notificationBtnRef)}
+                    onFocus={() => handleBtnHover(notificationBtnRef, 1.1)}
+                    onBlur={() => handleBtnLeave(notificationBtnRef)}
+                    type="button"
+                  >
+                    <span className="material-symbols-outlined text-base sm:text-lg md:text-[20px]" style={{ color: '#ea580c' }}>notifications</span>
+                    {unreadNotifications > 0 && (
+                      <span className="absolute -top-0.5 -right-0.5 sm:-top-1 sm:-right-1 bg-orange-500 text-white text-[10px] sm:text-xs font-bold rounded-full w-3.5 h-3.5 sm:w-4 sm:h-4 md:w-5 md:h-5 flex items-center justify-center animate-pulse transition-all duration-300 transform scale-100 hover:scale-110 z-10">
+                        {unreadNotifications > 99 ? '99+' : unreadNotifications}
+                      </span>
+                    )}
+                  </button>
+                  {/* Dropdown thông báo */}
+                  {showNotificationDropdown && (
+                    <div
+                      ref={notificationDropdownRef}
+                      className="absolute right-0 mt-2 w-72 sm:w-80 md:w-96 max-w-[calc(100vw-2rem)] bg-white rounded-xl shadow-lg py-2 z-50 border border-gray-100 animate-fade-in notification-dropdown-mobile"
+                      style={{ 
+                        minWidth: '260px',
+                        maxWidth: 'calc(100vw - 1rem)',
+                        right: '0',
+                        left: 'auto'
+                      }}
+                    >
+                      {/* Header dropdown */}
+                      <div className="flex items-center justify-between px-3 sm:px-4 py-2 border-b border-gray-100">
+                        <span className="font-bold text-orange-600 text-sm sm:text-base md:text-lg">Thông báo</span>
+                        <div className="flex gap-1 sm:gap-2">
+                          <button
+                            className="w-7 h-7 sm:w-8 sm:h-8 md:w-9 md:h-9 flex items-center justify-center rounded-full hover:bg-orange-100 active:bg-orange-200 transition relative group touch-manipulation touch-target-mobile"
+                            onClick={markAllDropdownAsRead}
+                            title="Đánh dấu tất cả thông báo đã đọc"
+                          >
+                            <span className="material-symbols-outlined text-sm sm:text-lg md:text-xl" style={{ color: '#ea580c' }}>done_all</span>
+                            <span className="absolute left-1/2 -bottom-8 -translate-x-1/2 bg-gray-800 text-white text-xs rounded px-2 py-1 opacity-0 group-hover:opacity-100 pointer-events-none transition hidden sm:block whitespace-nowrap z-50">Đánh dấu tất cả đã đọc</span>
+                          </button>
+                          <button
+                            className="w-7 h-7 sm:w-8 sm:h-8 md:w-9 md:h-9 flex items-center justify-center rounded-full hover:bg-red-100 active:bg-red-200 transition relative group touch-manipulation touch-target-mobile"
+                            onClick={deleteAllDropdownNotifications}
+                            title="Xóa tất cả thông báo"
+                          >
+                            <span className="material-symbols-outlined text-sm sm:text-lg md:text-xl" style={{ color: '#ef4444' }}>delete_sweep</span>
+                            <span className="absolute left-1/2 -bottom-8 -translate-x-1/2 bg-gray-800 text-white text-xs rounded px-2 py-1 opacity-0 group-hover:opacity-100 pointer-events-none transition hidden sm:block whitespace-nowrap z-50">Xóa tất cả thông báo</span>
+                          </button>
+                          <button
+                            className="w-7 h-7 sm:w-8 sm:h-8 md:w-9 md:h-9 flex items-center justify-center rounded-full hover:bg-blue-100 active:bg-blue-200 transition relative group touch-manipulation touch-target-mobile"
+                            onClick={() => {
+                              setShowNotificationDropdown(false);
+                              router.push('/notifications');
+                            }}
+                            title="Xem tất cả thông báo"
+                          >
+                            <span className="material-symbols-outlined text-sm sm:text-lg md:text-xl" style={{ color: '#2563eb' }}>list</span>
+                            <span className="absolute left-1/2 -bottom-8 -translate-x-1/2 bg-gray-800 text-white text-xs rounded px-2 py-1 opacity-0 group-hover:opacity-100 pointer-events-none transition hidden sm:block whitespace-nowrap z-50">Xem tất cả thông báo</span>
+                          </button>
+                        </div>
+                      </div>
+                      {/* Danh sách thông báo */}
+                      <div 
+                        ref={notificationScrollContainerRef}
+                        className="max-h-64 sm:max-h-80 md:max-h-96 overflow-y-auto divide-y divide-gray-50 scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-gray-100 scrollbar-mobile" 
+                        style={{ maxHeight: '50vh' }}
+                      >
+                        {recentNotifications.length === 0 ? (
+                          <div className="text-center text-gray-500 py-4 sm:py-6">
+                            <span className="material-symbols-outlined text-xl sm:text-2xl md:text-3xl mb-2" style={{ color: '#9ca3af' }}>notifications_off</span>
+                            <div className="text-xs sm:text-sm md:text-base">Không có thông báo nào</div>
+                          </div>
+                        ) : (
+                          recentNotifications.map((noti) => (
+                            <div
+                              key={noti.id}
+                              className={`group flex items-start gap-2 sm:gap-3 px-2 sm:px-3 md:px-4 py-2 sm:py-3 md:py-4 rounded-lg my-1 sm:my-2 mx-1 sm:mx-2 cursor-pointer transition-all duration-200 relative touch-manipulation ${!noti.is_read ? 'bg-orange-50 border border-orange-200 shadow' : 'hover:bg-gray-50 active:bg-gray-100'}`}
+                              onClick={() => {
+                                setShowNotificationDropdown(false);
+                                if (noti.related_type === 'post' && noti.related_id) {
+                                  handleOpenPostDetail(noti.related_id);
+                                } else if (noti.related_id) {
+                                  router.push(`/profile/${noti.related_id}`);
+                                }
+                              }}
+                            >
+                              {noti.type === 'system' ? (
+                                <span className="material-symbols-outlined text-lg sm:text-xl md:text-2xl mt-1" style={{ color: '#ea580c' }}>info</span>
+                              ) : (
+                                <Image
+                                  src={noti.sender?.avatar_url || '/default-avatar.png'}
+                                  width={40}
+                                  height={40}
+                                  className="w-8 h-8 sm:w-10 sm:h-10 md:w-11 md:h-11 rounded-full object-cover mt-1 border border-gray-200 cursor-pointer"
+                                  alt={noti.sender?.first_name || ''}
+                                  unoptimized
+                                  onClick={e => {
+                                    e.stopPropagation();
+                                    if (noti.sender && noti.sender.id) router.push(`/profile/${noti.sender.id}`);
+                                  }}
+                                />
+                              )}
+                              <div className="flex-1 min-w-0">
+                                <div className="font-semibold text-xs sm:text-sm truncate">
+                                  {noti.type === 'system'
+                                    ? noti.title
+                                    : <span
+                                        className="text-orange-600 cursor-pointer hover:underline"
+                                        onClick={e => {
+                                          e.stopPropagation();
+                                          if (noti.sender && noti.sender.id) router.push(`/profile/${noti.sender.id}`);
+                                        }}
+                                      >
+                                        {noti.sender?.first_name} {noti.sender?.last_name}
+                                      </span>}
+                                </div>
+                                <div className="text-xs sm:text-sm text-gray-700 truncate">{noti.content}</div>
+                                <div className="text-xs text-gray-400 mt-1">{new Date(noti.created_at).toLocaleString('vi-VN')}</div>
+                              </div>
+                              {/* Nhóm icon thao tác góc phải trên - luôn hiển thị trên mobile, chỉ hover trên desktop */}
+                              <div className="absolute top-1 sm:top-2 right-1 sm:right-2 flex gap-1 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition">
+                                {/* Nút follow lại */}
+                                {noti.type === 'follow' && noti.sender && noti.sender.id && !followedUserIds.includes(noti.sender.id) && (
+                                  <button
+                                    className="w-6 h-6 sm:w-7 sm:h-7 md:w-8 md-8 flex items-center justify-center rounded-full hover:bg-orange-100 active:bg-orange-200 transition-colors touch-manipulation touch-target-mobile relative group"
+                                    title="Follow lại"
+                                    onClick={e => {
+                                      e.stopPropagation();
+                                      if (noti.sender && noti.sender.id) handleFollow(noti.sender.id);
+                                    }}
+                                  >
+                                    <span className="material-symbols-outlined text-sm sm:text-base" style={{ color: '#ea580c' }}>person_add</span>
+                                  </button>
+                                )}
+                                {/* Nút đánh dấu đã đọc, chỉ hiện nếu chưa đọc */}
+                                {!noti.is_read && (
+                                  <button
+                                    className="w-6 h-6 sm:w-7 sm:h-7 md:w-8 md-8 flex items-center justify-center rounded-full hover:bg-orange-100 active:bg-orange-200 transition-colors touch-manipulation touch-target-mobile relative group"
+                                    title="Đánh dấu thông báo đã đọc"
+                                    onClick={e => { e.stopPropagation(); markDropdownAsRead(noti.id); }}
+                                  >
+                                    <span className="material-symbols-outlined text-sm sm:text-base" style={{ color: '#ea580c' }}>done</span>
+                                  </button>
+                                )}
+                                {/* Nút xóa */}
+                                <button
+                                  className="w-6 h-6 sm:w-7 sm:h-7 md:w-8 md-8 flex items-center justify-center rounded-full hover:bg-red-100 active:bg-red-200 transition-colors touch-manipulation touch-target-mobile relative group"
+                                  title="Xóa thông báo này"
+                                  onClick={e => { e.stopPropagation(); deleteDropdownNotification(noti.id); }}
+                                >
+                                  <span className="material-symbols-outlined text-sm sm:text-base" style={{ color: '#ef4444' }}>delete</span>
+                                </button>
+                              </div>
+                            </div>
+                          ))
+                        )}
+                        {/* Spinner chỉ hiện khi đang loading và còn hasMore */}
+                        {dropdownLoading && dropdownHasMore && (
+                          <div className="flex justify-center py-2">
+                            <span className="animate-spin rounded-full h-5 w-5 sm:h-6 sm:w-6 border-t-2 border-b-2 border-orange-600"></span>
+                          </div>
+                        )}
+                      </div>
+                      {/* Nút xem tất cả ở cuối */}
+                      <div className="px-3 sm:px-4 py-2 border-t border-gray-100 text-center">
+                        <button
+                          className="text-orange-600 font-semibold hover:underline text-xs sm:text-sm md:text-base px-2 sm:px-3 md:px-4 py-1.5 sm:py-2 rounded-lg hover:bg-orange-50 active:bg-orange-100 transition touch-manipulation touch-target-mobile"
+                          onClick={() => {
+                            setShowNotificationDropdown(false);
+                            router.push('/notifications');
+                          }}
+                        >
+                          Xem tất cả
+                        </button>
+                      </div>
+                    </div>
                   )}
-                </button>
+                </div>
               )}
-              <div className="relative" ref={userMenuRef}>
+              <div className="relative flex-shrink-0 user-menu-container" ref={userMenuRef}>
                 <button
-                  className="flex items-center gap-1 sm:gap-2 hover:bg-gray-50 rounded-full p-1 sm:p-2 transition-all duration-300 ease-in-out group"
+                  className="flex items-center gap-1 sm:gap-2 hover:bg-gray-50 rounded-full p-1 sm:p-2 transition-all duration-300 ease-in-out group touch-manipulation"
                   onClick={() => setShowUserMenu(!showUserMenu)}
+                  aria-label="User menu"
+                  aria-expanded={showUserMenu}
+                  aria-haspopup="true"
                 >
                   <Image src={user.avatar_url || "/default-avatar.png"} 
-                    alt="User Avatar" width={32} height={32} className="rounded-full ring-2 ring-offset-2 ring-[#8CA9D5] group-hover:ring-blue-600 transition-all" />
-                  <span className="hidden sm:inline text-sm font-medium text-gray-700 group-hover:text-blue-600">{user.last_name} {user.first_name}</span>
+                    alt="User Avatar" width={28} height={28} className="w-7 h-7 sm:w-8 sm:h-8 md:w-8 md:h-8 rounded-full ring-2 ring-offset-2 ring-[#8CA9D5] group-hover:ring-blue-600 transition-all" />
+                  <span className="hidden sm:inline text-xs sm:text-sm font-medium text-gray-700 group-hover:text-blue-600 truncate">{user.last_name} {user.first_name}</span>
                 </button>
                 {showUserMenu && (
-                  <div className="absolute right-0 mt-2 w-40 sm:w-48 bg-white rounded-xl shadow-lg py-1 z-50 transform transition-all duration-200 ease-out border border-gray-100">
+                  <div className="absolute right-0 mt-2 w-40 sm:w-44 md:w-48 bg-white rounded-xl shadow-lg py-1 z-50 transform transition-all duration-200 ease-out border border-gray-100 user-menu-dropdown user-menu-mobile"
+                       style={{
+                         minWidth: '160px',
+                         maxWidth: 'calc(100vw - 2rem)',
+                         right: '0',
+                         left: 'auto',
+                         top: '100%',
+                         position: 'absolute'
+                       }}>
                     <button
                       onClick={() => router.push("/profile")}
-                      className="flex items-center gap-2 w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-600 transition-colors duration-200"
+                      className="flex items-center gap-2 w-full text-left px-3 sm:px-4 py-2.5 text-xs sm:text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-600 transition-colors duration-200 touch-manipulation"
                     >
-                      <span className="material-symbols-outlined text-lg sm:text-[20px]">person</span>Profile
+                      <span className="material-symbols-outlined text-base sm:text-lg md:text-[20px] flex-shrink-0" style={{ color: '#6b7280' }}>person</span>
+                      <span className="truncate">Profile</span>
                     </button>
                     <button
                       onClick={handleLogout}
-                      className="flex items-center gap-2 w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 transition-colors duration-200"
+                      className="flex items-center gap-2 w-full text-left px-3 sm:px-4 py-2.5 text-xs sm:text-sm text-red-600 hover:bg-red-50 transition-colors duration-200 touch-manipulation"
                     >
-                      <span className="material-symbols-outlined text-lg sm:text-[20px]">logout</span>Sign out
+                      <span className="material-symbols-outlined text-base sm:text-lg md:text-[20px] flex-shrink-0" style={{ color: '#dc2626' }}>logout</span>
+                      <span className="truncate">Sign out</span>
                     </button>
                   </div>
                 )}
@@ -717,6 +1441,9 @@ const Header = memo<HeaderProps>(({
         </div>
       </header>
       {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
+      {showPostModal && openPost && (
+        <PostDetailPopup post={openPost} onClose={() => setShowPostModal(false)} />
+      )}
     </>
   );
 });

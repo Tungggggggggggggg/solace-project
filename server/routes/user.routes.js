@@ -457,4 +457,29 @@ router.get("/:id/post-stats", async (req, res) => {
     }
 });
 
+// API lấy danh sách bạn bè (mình follow và được follow lại)
+router.get('/:id/friends', isAuthenticated, async (req, res) => {
+    try {
+        const userId = req.params.id;
+        const result = await pool.query(
+            `
+      SELECT u.id, u.first_name, u.last_name, u.avatar_url
+      FROM users u
+      WHERE u.id IN (
+        SELECT ur1.user_id
+        FROM user_relationships ur1
+        JOIN user_relationships ur2
+          ON ur1.user_id = ur2.follower_id
+        WHERE ur1.follower_id = $1 AND ur2.user_id = $1
+      )
+      `,
+      [userId]
+    );
+    res.json({ friends: result.rows });
+  } catch (err) {
+    console.error("Lỗi khi lấy friends:", err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
 module.exports = router;

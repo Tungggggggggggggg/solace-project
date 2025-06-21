@@ -31,16 +31,10 @@ exports.createNotification = async (
 
     // Gửi thông báo qua Socket.IO
     const io = getIO(); 
-    if (userId) {
-      io.to(`user:${userId}`).emit('newNotification', {
-        ...notification,
-        sender
-      });
-    } else {
-        io.to(`admin`).emit('newNotification', {
-        ...notification
-      });
-    }
+    io.to(`user:${userId}`).emit('newNotification', {
+      ...notification,
+      sender
+    });
 
     return notification;
   } catch (error) {
@@ -105,19 +99,28 @@ exports.createPostApprovedNotification = async (postId, postAuthorId) => {
 };
 
 exports.createPostNotification = async (postId, postAuthorId, postContent) => {
-  const adminId = null;
+  // Lấy danh sách tất cả admin
+  const adminsRes = await pool.query(
+    "SELECT id FROM users WHERE role = 'admin'"
+  );
+  const adminIds = adminsRes.rows.map(row => row.id);
+
   const adminTitle = 'Bài viết mới cần duyệt';
   const adminContent = `Bài viết của user ${postAuthorId} "${postContent.substring(0, 100)}..." cần được duyệt.`;
 
-  await exports.createNotification(
-    adminId,   
-    adminTitle, 
-    adminContent, 
-    'post_approval',
-    postAuthorId,
-    'post',
-    postId
+  // Gửi thông báo đến từng admin
+  const notifyAdmins = adminIds.map(adminId =>
+    exports.createNotification(
+      adminId,
+      adminTitle,
+      adminContent,
+      'post_approval',
+      postAuthorId,
+      'post',
+      postId
+    )
   );
+  await Promise.allSettled(notifyAdmins);
 
   await exports.createNotification(
     postAuthorId,
@@ -135,12 +138,12 @@ exports.createPostForFollowersNotification = async (postId, postAuthorId) => {
     const authorRes = await pool.query('SELECT first_name, last_name FROM users WHERE id = $1', [postAuthorId]);
     const author = authorRes.rows[0];
     if (!author) {
-      console.warn(`Author with ID ${postAuthorId} not found. Cannot send new post notifications to followers.`);
+      console.warn(`Không tìn thấy bài viết ${postAuthorId}. Không thể gửi thông báo đến followers.`);
       return;
     }
 
     const notificationTitle = 'Có bài viết mới từ người bạn theo dõi';
-    const notificationContent = `${author.first_name} ${author.last_name} đã đăng một bài viết mới.`;
+    const notificationContent = `${author.last_name} ${author.first_name} đã đăng một bài viết mới.`;
 
     const followersRes = await pool.query(
       'SELECT follower_id FROM user_relationships WHERE user_id = $1',

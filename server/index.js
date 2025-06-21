@@ -17,7 +17,7 @@ const likesRouter = require('./routes/likes');
 const dashboardRoutes = require('./routes/dashboard.routes');
 const visitsRoutes = require('./routes/visits.routes'); 
 const messagesRoutes = require('./routes/messages.routes');
-const adminNotificationRoutes = require("./routes/adminNotification"); // Thêm dòng này
+const adminNotificationRoutes = require("./routes/adminNotification");
 const searchHistoryRoutes = require('./routes/search_history');
 const notificationRoutes = require('./routes/notification.routes');
 const pool = require("./db");
@@ -68,7 +68,7 @@ app.use("/api/forbidden_words", forbiddenWordsRoutes);
 app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/visits', visitsRoutes);
 app.use('/api/messages', messagesRoutes);
-app.use('/api/admin', adminNotificationRoutes); // Thêm dòng này
+app.use('/api/admin', adminNotificationRoutes);
 app.use('/api/search_history', searchHistoryRoutes);
 app.use('/api/notifications', notificationRoutes);
 

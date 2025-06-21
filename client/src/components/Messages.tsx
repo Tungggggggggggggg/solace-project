@@ -15,6 +15,7 @@ import { NewMessageModal } from './NewMessageModal';
 import { ImageUploadModal } from './ImageUploadModal';
 import { debounce } from 'lodash';
 import { SearchInput } from './SearchInput';
+import { useRouter } from 'next/navigation';
 
 const MessagePage: FC = () => {
   // State
@@ -41,6 +42,7 @@ const MessagePage: FC = () => {
   const [replyingTo, setReplyingTo] = useState<Message | null>(null);
   const [pendingImageUrl, setPendingImageUrl] = useState<string | undefined>(undefined);
   const [searchQuery, setSearchQuery] = useState('');
+  const router = useRouter();
 
 
   // State quản lý trạng thái và nội dung của Toast thông báo
@@ -714,7 +716,7 @@ const MessagePage: FC = () => {
             className="w-8 h-8 bg-indigo-600 text-white rounded-full flex items-center justify-center hover:bg-indigo-700 transition-all"
             aria-label="New conversation"
           >
-            <MaterialIcon icon="edit" />
+            <MaterialIcon icon="edit" color='white'/>
           </button>
         </div>
         
@@ -754,42 +756,44 @@ const MessagePage: FC = () => {
                   </button>
                 )}
                 <div className="flex items-center">
-                  <div className="relative mr-3">
+                  <div className="relative mr-3 cursor-pointer"
+                    onClick={() => {
+                      if (currentConversation.type === 'direct' && currentConversation.other_user && currentConversation.other_user.id) {
+                        router.push(`/profile/${currentConversation.other_user.id}`);
+                      }
+                    }}
+                  >
                     <img
-                      src={currentConversation.other_user?.avatar || '/default-avatar.png'}
-                      alt={currentConversation.other_user?.name || 'User'}
+                      src={currentConversation.other_user && currentConversation.other_user.avatar ? currentConversation.other_user.avatar : '/default-avatar.png'}
+                      alt={currentConversation.other_user && currentConversation.other_user.name ? currentConversation.other_user.name : 'User'}
                       className="w-10 h-10 rounded-full object-cover"
                     />
                     <span className={clsx(
                       "absolute bottom-0 right-0 w-3 h-3 rounded-full border-2 border-white",
-                      onlineUsers.has(currentConversation.other_user?.id || '') 
-                        ? 'bg-green-500' 
+                      currentConversation.other_user && onlineUsers.has(currentConversation.other_user.id)
+                        ? 'bg-green-500'
                         : 'bg-gray-400'
                     )}></span>
                   </div>
                   <div>
-                    <div className="font-semibold text-sm">
-                      {currentConversation.type === 'direct' 
-                        ? currentConversation.other_user?.name 
+                    <div className="font-semibold text-sm flex items-center gap-2 cursor-pointer"
+                      onClick={() => {
+                        if (currentConversation.type === 'direct' && currentConversation.other_user && currentConversation.other_user.id) {
+                          router.push(`/profile/${currentConversation.other_user.id}`);
+                        }
+                      }}
+                    >
+                      {currentConversation.type === 'direct'
+                        ? (currentConversation.other_user?.name || 'Người dùng')
                         : currentConversation.name}
                     </div>
                     <div className="text-xs text-gray-500">
-                      {onlineUsers.has(currentConversation.other_user?.id || '') 
-                        ? 'Online' 
+                      {currentConversation.other_user && onlineUsers.has(currentConversation.other_user.id)
+                        ? 'Online'
                         : 'Offline'}
                     </div>
                   </div>
                 </div>
-              </div>
-              
-              <div className="flex gap-2">
-                <button 
-                  key="info"
-                  className="w-8 h-8 bg-gray-100 rounded-full flex items-center justify-center hover:bg-indigo-100 transition-colors"
-                  aria-label="Conversation info"
-                >
-                  <MaterialIcon icon="info" />
-                </button>
               </div>
             </div>
             
