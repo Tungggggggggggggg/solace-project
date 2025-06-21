@@ -50,8 +50,6 @@ export default function ReportsPage(): ReactElement {
   const [mailReport, setMailReport] = useState<Report | null>(null);
   const [deleteReportId, setDeleteReportId] = useState<string | null>(null);
 
-
-  // Lấy danh sách báo cáo từ API dựa vào trạng thái và từ khóa tìm kiếm
   const fetchReports = async () => {
     const params = new URLSearchParams();
     if (status !== 'all') params.set('status', status);
@@ -62,28 +60,22 @@ export default function ReportsPage(): ReactElement {
     else setReports([]);
   };
 
-  // Khi thay đổi trạng thái lọc, tự động lấy lại danh sách báo cáo
   useEffect(() => {
     fetchReports();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [status]);
 
-  // Khi xóa hết từ khóa tìm kiếm, tự động lấy lại danh sách báo cáo
   useEffect(() => {
     if (search.trim() === '') fetchReports();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [search]);
 
-  // Đánh dấu báo cáo đã xử lý
   const handleProcess = async (id: string) => {
     await fetch(`/api/reports/${id}/process`, { method: 'PUT' });
     toast.success('Đã xử lý báo cáo!');
     fetchReports();
   };
 
-  // Xóa báo cáo
   const handleDelete = (id: string) => {
-    setDeleteReportId(id); // Mở modal xác nhận
+    setDeleteReportId(id);
   };
 
   const confirmDelete = async () => {
@@ -95,22 +87,20 @@ export default function ReportsPage(): ReactElement {
     }
   };
 
-  // Xem chi tiết báo cáo (và bài đăng bị báo cáo)
   const handleViewReport = async (report: Report) => {
     const res = await fetch(`/api/reports/${report.report_id}`);
     const result = await res.json();
     if (result.success) {
       setSelectedReport(result.report);
       setReportedPost(result.post);
-      setSharedPost(result.shared_post || null); // <-- thêm dòng này
+      setSharedPost(result.shared_post || null);
     } else {
       toast.error(result.error || 'Không lấy được chi tiết báo cáo');
     }
   };
 
-  // Khi bấm icon thư, mở dialog gửi thông báo và chọn mặc định người nhận
   const handleOpenMailDialog = (report: Report, target: 'reporter' | 'reported') => {
-    setMailReport(report); // Lưu report cho dialog gửi thư
+    setMailReport(report);
     setMailTarget(target);
     setShowMailDialog(true);
     setMailTitle('');
@@ -118,12 +108,10 @@ export default function ReportsPage(): ReactElement {
     setMailType('system');
     const userId = target === 'reporter' ? report.reporter_id : report.reported_user_id;
     setMailUserId(userId);
-
-    setSelectedReport(null); // Đóng dialog xem chi tiết nếu đang mở
+    setSelectedReport(null);
     setReportedPost(null);
   };
 
-  // Gửi thông báo (notification) đến user đã chọn
   const handleSendNotification = async () => {
     if (!mailTitle.trim() || !mailContent.trim()) {
       toast.error('Vui lòng nhập tiêu đề và nội dung!');
@@ -151,13 +139,15 @@ export default function ReportsPage(): ReactElement {
       toast.error(result.message || 'Gửi thông báo thất bại!');
     }
   };
+
   return (
     <AdminGuard>
       <AdminLayout onOpenAuth={() => {}}>
-        <main className="p-6">
-          <h1 className="text-3xl font-bold mb-6 text-gray-900">Quản lý báo cáo</h1>
-          {/* Filters */}
-          <div className="flex gap-4 mb-6">
+        <main className="p-4 sm:p-6 max-w-7xl mx-auto">
+          <h1 className="text-2xl sm:text-3xl font-bold mb-4 sm:mb-6 text-gray-900">Quản lý báo cáo</h1>
+
+          {/* Bộ lọc */}
+          <div className="flex flex-col sm:flex-row gap-2 sm:gap-4 mb-4 sm:mb-6">
             <div className="relative flex-1">
               <FiSearch
                 className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500 cursor-pointer"
@@ -169,7 +159,7 @@ export default function ReportsPage(): ReactElement {
                 onChange={(e) => setSearch(e.target.value)}
                 onKeyDown={(e) => e.key === 'Enter' && fetchReports()}
                 placeholder="Tìm theo người báo cáo hoặc người bị báo cáo..."
-                className="pl-10 pr-4 py-2 bg-[#F5F0E5] rounded-xl text-gray-800 w-full outline-none"
+                className="pl-10 pr-4 py-2 bg-[#F5F0E5] rounded-xl text-gray-800 w-full outline-none text-sm sm:text-base"
               />
             </div>
             <div className="relative">
@@ -181,11 +171,11 @@ export default function ReportsPage(): ReactElement {
                     const rect = dropdownRef.current.getBoundingClientRect();
                     setDropdownPos({
                       top: rect.bottom + window.scrollY + 4,
-                      left: rect.left + window.scrollX
+                      left: rect.left + window.scrollX,
                     });
                   }
                 }}
-                className="px-4 py-2 text-gray-800 border rounded-xl bg-white flex items-center gap-2"
+                className="px-4 py-2 text-gray-800 border rounded-xl bg-white flex items-center gap-2 text-sm sm:text-base w-full sm:w-auto"
               >
                 {status === 'all' ? 'Tất cả trạng thái' : status === 'processed' ? 'Đã xử lý' : 'Chưa xử lý'}
                 <FiChevronDown />
@@ -198,7 +188,7 @@ export default function ReportsPage(): ReactElement {
                   {['all', 'processed', 'pending'].map((s) => (
                     <li
                       key={s}
-                      className="px-4 py-2 text-gray-800 hover:bg-gray-100 cursor-pointer"
+                      className="px-4 py-2 text-gray-800 hover:bg-gray-100 cursor-pointer text-sm"
                       onClick={() => {
                         setStatus(s as 'all' | 'processed' | 'pending');
                         setShowDropdown(false);
@@ -211,335 +201,411 @@ export default function ReportsPage(): ReactElement {
               )}
             </div>
           </div>
-          {/* Reports Table */}
-          <div className="border border-[#DBE0E5] rounded-xl overflow-hidden">
-            <div className="max-h-[500px] overflow-y-auto">
-              <table className="w-full">
-                <thead className="bg-white border-b border-[#DBE0E5] sticky top-0 z-10">
-                  <tr className="text-left">
-                    <th className="p-4 text-gray-800 bg-white">Mã báo cáo</th>
-                    <th className="p-4 text-gray-800 bg-white">Ngày báo cáo</th>
-                    <th className="p-4 text-gray-800 bg-white">Người báo cáo</th>
-                    <th className="p-4 text-gray-800 bg-white">Tài khoản bị báo cáo</th>
-                    <th className="p-4 text-gray-800 bg-white">Nội dung</th>
-                    <th className="p-4 text-gray-800 bg-white">Trạng thái</th>
-                    <th className="p-4 text-gray-800 bg-white">Hành động</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {reports.length === 0 ? (
-                    <tr>
-                      <td colSpan={7} className="p-6 text-center text-gray-500 bg-white">
-                        {search.trim()
-                          ? 'Không có kết quả nào phù hợp với từ khóa tìm kiếm.'
-                          : 'Không có báo cáo nào phù hợp với bộ lọc hiện tại.'}
-                      </td>
-                    </tr>
-                  ) : (
-                    reports.map((report) => (
-                      <tr key={report.report_id} className="bg-white border-b border-[#E5E8EB]">
-                        <td className="p-4 text-gray-800">{report.report_id}</td>
-                        <td className="p-4 text-gray-800">{report.date_reported}</td>
-                        <td className="p-4 text-gray-800">{report.reported_by}</td>
-                        <td className="p-4 text-gray-800">{report.reported_account}</td>
-                        <td className="p-4 text-gray-800 max-w-[300px] truncate" title={report.content}>{report.content}</td>
-                        <td className="p-4 text-gray-800">
-                          {report.status === 'Đã xử lý' ? (
-                            <span className="px-2 py-1 bg-blue-200 rounded-full text-sm">Đã xử lý</span>
-                          ) : (
-                            <span className="px-2 py-1 bg-yellow-200 rounded-full text-sm">Chưa xử lý</span>
-                          )}
-                        </td>
-                        <td className="p-4 flex gap-2">
-                          <button className="text-blue-500 hover:underline" onClick={() => handleViewReport(report)}>
-                            <FiEye />
-                          </button>
-                          {report.status !== 'Đã xử lý' && (
-                            <button onClick={() => handleProcess(report.report_id)} className="text-green-600 hover:underline">
-                              <FiCheck />
-                            </button>
-                          )}
-                          <button onClick={() => handleDelete(report.report_id)} className="text-red-500 hover:underline">
-                            <FiTrash2 />
-                          </button>
-                           {/* Icon gửi thư */}
-                          <button
-                            className="text-orange-500 hover:underline"
-                            title="Gửi thông báo"
-                            onClick={() => {
-                              setSelectedReport(null); // Đóng dialog xem chi tiết nếu đang mở
-                              setReportedPost(null);
-                              handleOpenMailDialog(report, 'reporter');
-                            }}
-                          >
-                            <FiMail />
-                          </button>
-                        </td>
-                      </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        </main>
-        <ToastContainer position="top-right" autoClose={3000} aria-label="Thông báo hệ thống" />
-        
-           {/* Dialog gửi thông báo */}
-        {showMailDialog && (
-          <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-[9999]" onClick={() => setShowMailDialog(false)}>
-            <div
-              className="bg-white rounded-2xl shadow-xl p-6 w-full max-w-md animate-fadeIn"
-              onClick={e => e.stopPropagation()}
-            >
-              <h2 className="text-xl font-bold mb-4">Gửi thông báo</h2>
-              <div className="mb-3">
-                <label className="block font-medium mb-1">Gửi cho:</label>
-                <select
-                  className="w-full p-2 border rounded mb-2"
-                  value={mailTarget}
-                  onChange={e => {
-                    setMailTarget(e.target.value as 'reporter' | 'reported');
-                    if (mailReport) {
-                      const userId =
-                        e.target.value === 'reporter'
-                          ? mailReport.reporter_id
-                          : mailReport.reported_user_id;
-                      setMailUserId(userId);
-                    }
-                  }}
-                >
-                  <option value="reporter">Người báo cáo</option>
-                  <option value="reported">Người bị báo cáo</option>
-                </select>
+
+          {/* Danh sách báo cáo trên di động */}
+          <div className="block sm:hidden">
+            {reports.length === 0 ? (
+              <div className="p-6 text-center text-gray-500 bg-white rounded-xl border">
+                {search.trim()
+                  ? 'Không có kết quả nào phù hợp với từ khóa tìm kiếm.'
+                  : 'Không có báo cáo nào phù hợp với bộ lọc hiện tại.'}
               </div>
-              <div className="mb-3">
-                <label className="block font-medium mb-1">Tiêu đề</label>
-                <FilteredInput
-                  className="w-full p-2 border rounded"
-                  value={mailTitle}
-                  onChange={e => setMailTitle(e.target.value)}
-                  placeholder="Nhập tiêu đề..."
-                />
-              </div>
-              <div className="mb-3">
-                <label className="block font-medium mb-1">Nội dung</label>
-                <textarea
-                  className="w-full p-2 border rounded"
-                  value={mailContent}
-                  onChange={e => setMailContent(e.target.value)}
-                  placeholder="Nhập nội dung..."
-                  rows={4}
-                />
-              </div>
-              <div className="mb-3">
-                <label className="block font-medium mb-1">Loại thông báo</label>
-                <FilteredInput
-                  className="w-full p-2 border rounded"
-                  value={mailType}
-                  disabled 
-                />
-              </div>
-              <div className="flex justify-end gap-2">
-                <button
-                  className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600"
-                  onClick={handleSendNotification}
-                >
-                  Gửi
-                </button>
-                <button
-                  className="px-4 py-2 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300"
-                  onClick={() => setShowMailDialog(false)}
-                >
-                  Hủy
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
-        {selectedReport && (
-          <div
-            className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-[9999]"
-            onClick={() => { setSelectedReport(null); setReportedPost(null); }}
-          >
-            <div
-              className="bg-white rounded-2xl shadow-xl p-6 max-w-2xl w-full max-h-[90vh] overflow-y-auto animate-fadeIn"
-              onClick={(e) => e.stopPropagation()}
-            >
-              {/* Thông tin báo cáo */}
-              <div className="mb-4">
-                <h3 className="text-lg font-semibold text-gray-800 mb-2">
-                  Báo cáo #{selectedReport.report_id}
-                </h3>
-                <p className="text-sm text-gray-500 mb-1">
-                  Ngày báo cáo: {selectedReport.date_reported}
-                </p>
-                <p className="text-sm text-gray-500 mb-1">
-                  Người báo cáo: {selectedReport.reported_by}
-                </p>
-                <p className="text-sm text-gray-500 mb-1">
-                  Tài khoản bị báo cáo: {selectedReport.reported_account}
-                </p>
-                <p className="text-sm text-gray-500 mb-1">
-                  Trạng thái: {selectedReport.status}
-                </p>
-              </div>
-                {/* Thông tin bài đăng bị báo cáo */}
-              {reportedPost && (
-                <div className="mb-4">
-                  <h4 className="font-semibold text-gray-700 mb-2">Bài đăng bị báo cáo</h4>
-                  <div className="bg-white rounded-xl shadow border p-4 flex flex-col gap-2">
-                    {/* Header: Avatar, tên, trạng thái share, thời gian */}
-                    <div className="flex items-center gap-3">
-                      {reportedPost.avatar_url && (
-                        <Image
-                          src={reportedPost.avatar_url}
-                          alt="avatar"
-                          width={40}
-                          height={40}
-                          className="w-10 h-10 rounded-full object-cover border"
-                        />
+            ) : (
+              reports.map((report) => (
+                <div key={report.report_id} className="bg-white border rounded-xl p-4 mb-4 shadow-sm hover:shadow-md transition">
+                  <div className="flex flex-col gap-2">
+                    <p className="text-gray-600 text-sm">
+                      <span className="font-medium">Mã báo cáo:</span>{' '}
+                      <span className="text-gray-700">{report.report_id}</span>
+                    </p>
+                    <p className="text-gray-600 text-sm">
+                      <span className="font-medium">Ngày báo cáo:</span>{' '}
+                      <span className="text-gray-700">{report.date_reported}</span>
+                    </p>
+                    <p className="text-gray-600 text-sm">
+                      <span className="font-medium">Người báo cáo:</span>{' '}
+                      <span className="text-gray-700">{report.reported_by}</span>
+                    </p>
+                    <p className="text-gray-600 text-sm">
+                      <span className="font-medium">Tài khoản bị báo cáo:</span>{' '}
+                      <span className="text-gray-700">{report.reported_account}</span>
+                    </p>
+                    <p className="text-gray-600 text-sm">
+                      <span className="font-medium">Nội dung:</span>{' '}
+                      <span className="text-gray-700 whitespace-pre-line">
+                        {report.content.length > 100 ? report.content.slice(0, 100) + '...' : report.content}
+                      </span>
+                    </p>
+                    <p className="text-gray-600 text-sm">
+                      <span className="font-medium">Trạng thái:</span>{' '}
+                      <span
+                        className={`px-2 py-1 rounded-full text-xs ${
+                          report.status === 'Đã xử lý' ? 'bg-blue-200' : 'bg-yellow-200'
+                        }`}
+                      >
+                        {report.status}
+                      </span>
+                    </p>
+                    <div className="flex gap-2 mt-2">
+                      <button className="text-blue-500 hover:text-blue-600" onClick={() => handleViewReport(report)}>
+                        <FiEye size={18} />
+                      </button>
+                      {report.status !== 'Đã xử lý' && (
+                        <button onClick={() => handleProcess(report.report_id)} className="text-green-600 hover:text-green-700">
+                          <FiCheck size={18} />
+                        </button>
                       )}
-                      <div>
-                        <div className="font-semibold text-gray-900">
-                          {(reportedPost.first_name || '') + ' ' + (reportedPost.last_name || '')}
-                        </div>
-                        {/* Nếu là bài share thì hiển thị trạng thái chia sẻ */}
-                        {sharedPost && (
-                          <div className="text-xs text-gray-500">
-                            đã chia sẻ bài viết của {(sharedPost.first_name || '') + ' ' + (sharedPost.last_name || '')}
-                          </div>
-                        )}
-                        <div className="text-xs text-gray-500">
-                          {reportedPost.created_at
-                            ? new Date(reportedPost.created_at).toLocaleString('vi-VN')
-                            : ''}
-                        </div>
-                      </div>
+                      <button onClick={() => handleDelete(report.report_id)} className="text-red-500 hover:text-red-600">
+                        <FiTrash2 size={18} />
+                      </button>
+                      <button
+                        className="text-orange-500 hover:text-orange-600"
+                        title="Gửi thông báo"
+                        onClick={() => handleOpenMailDialog(report, 'reporter')}
+                      >
+                        <FiMail size={18} />
+                      </button>
                     </div>
-                    {/* Nội dung bài chia sẻ */}
-                    <div className="text-gray-800 whitespace-pre-line">{reportedPost.content}</div>
-                    {/* Ảnh bài chia sẻ nếu có */}
-                    {reportedPost.images && (() => {
-                      let imgs: string[] = [];
-                      try {
-                        imgs = JSON.parse(reportedPost.images);
-                      } catch {}
-                      return Array.isArray(imgs) && imgs.length > 0 ? (
-                        <div className="flex flex-wrap gap-2 mt-2">
-                          {imgs.map((img, idx) => (
-                            <Image
-                              key={idx}
-                              src={img}
-                              alt={`Ảnh ${idx + 1}`}
-                              width={128}
-                              height={128}
-                              className="w-32 h-32 object-cover rounded border"
-                              unoptimized
-                            />
-                          ))}
-                        </div>
-                      ) : null;
-                    })()}
-                    {/* Nếu là bài share thì hiển thị bài gốc trong khung bo viền */}
-                    {sharedPost && (
-                      <div className="border rounded-lg bg-gray-50 p-3 mt-2">
-                        <div className="flex items-center gap-3 mb-1">
-                          {sharedPost.avatar_url && (
-                            <Image
-                              src={sharedPost.avatar_url}
-                              alt="avatar"
-                              width={32}
-                              height={32}
-                              className="w-8 h-8 rounded-full object-cover border"
-                            />
-                          )}
-                          <div>
-                            <div className="font-semibold text-gray-900 text-sm">
-                              {(sharedPost.first_name || '') + ' ' + (sharedPost.last_name || '')}
-                            </div>
-                            <div className="text-xs text-gray-500">
-                              {sharedPost.created_at
-                                ? new Date(sharedPost.created_at).toLocaleString('vi-VN')
-                                : ''}
-                            </div>
-                          </div>
-                        </div>
-                        <div className="text-gray-800 text-sm whitespace-pre-line">{sharedPost.content}</div>
-                        {sharedPost.images && (() => {
-                          let imgs: string[] = [];
-                          try {
-                            imgs = JSON.parse(sharedPost.images);
-                          } catch {}
-                          return Array.isArray(imgs) && imgs.length > 0 ? (
-                            <div className="flex flex-wrap gap-2 mt-2">
-                              {imgs.map((img, idx) => (
-                                <Image
-                                  key={idx}
-                                  src={img}
-                                  alt={`Ảnh ${idx + 1}`}
-                                  width={96}
-                                  height={96}
-                                  className="w-24 h-24 object-cover rounded border"
-                                  unoptimized
-                                />
-                              ))}
-                            </div>
-                          ) : null;
-                        })()}
-                      </div>
-                    )}
                   </div>
                 </div>
-              )}
-              
-              <div className="mb-4">
-                <h4 className="font-semibold text-gray-700 mb-2">Nội dung báo cáo</h4>
-                <div className="bg-gray-100 rounded-lg p-4 text-gray-800">
-                  {selectedReport.content}
+              ))
+            )}
+          </div>
+
+          {/* Bảng cho màn hình lớn */}
+          <div className="hidden sm:block border border-[#DBE0E5] rounded-xl overflow-x-auto bg-white">
+            <table className="w-full min-w-[800px] text-sm">
+              <thead className="bg-white border-b border-[#DBE0E5] sticky top-0 z-10">
+                <tr className="text-left">
+                  <th className="p-3 text-gray-800 bg-white">Mã báo cáo</th>
+                  <th className="p-3 text-gray-800 bg-white">Ngày báo cáo</th>
+                  <th className="p-3 text-gray-800 bg-white">Người báo cáo</th>
+                  <th className="p-3 text-gray-800 bg-white">Tài khoản bị báo cáo</th>
+                  <th className="p-3 text-gray-800 bg-white">Nội dung</th>
+                  <th className="p-3 text-gray-800 bg-white min-w-[110px]">Trạng thái</th>
+                  <th className="p-3 text-gray-800 bg-white">Hành động</th>
+                </tr>
+              </thead>
+              <tbody>
+                {reports.length === 0 ? (
+                  <tr>
+                    <td colSpan={7} className="p-6 text-center text-gray-500 bg-white">
+                      {search.trim()
+                        ? 'Không có kết quả nào phù hợp với từ khóa tìm kiếm.'
+                        : 'Không có báo cáo nào phù hợp với bộ lọc hiện tại.'}
+                    </td>
+                  </tr>
+                ) : (
+                  reports.map((report) => (
+                    <tr key={report.report_id} className="bg-white border-b border-[#E5E8EB] hover:bg-gray-50 transition">
+                      <td className="p-3 break-words whitespace-pre-line">{report.report_id}</td>
+                      <td className="p-3 whitespace-nowrap">{report.date_reported}</td>
+                      <td className="p-3 break-words whitespace-pre-line">{report.reported_by}</td>
+                      <td className="p-3 break-words whitespace-pre-line">{report.reported_account}</td>
+                      <td className="p-3 break-words whitespace-pre-line" title={report.content}>
+                        {report.content.length > 40 ? report.content.slice(0, 40) + '...' : report.content}
+                      </td>
+                      <td className="p-3 min-w-[110px] whitespace-nowrap">
+                        {report.status === 'Đã xử lý' ? (
+                          <span className="px-2 py-1 bg-blue-200 rounded-full text-xs">Đã xử lý</span>
+                        ) : (
+                          <span className="px-2 py-1 bg-yellow-200 rounded-full text-xs">Chưa xử lý</span>
+                        )}
+                      </td>
+                      <td className="p-3 flex gap-2">
+                        <button className="text-blue-500 hover:text-blue-600" onClick={() => handleViewReport(report)}>
+                          <FiEye />
+                        </button>
+                        {report.status !== 'Đã xử lý' && (
+                          <button onClick={() => handleProcess(report.report_id)} className="text-green-600 hover:text-green-700">
+                            <FiCheck />
+                          </button>
+                        )}
+                        <button onClick={() => handleDelete(report.report_id)} className="text-red-500 hover:text-red-600">
+                          <FiTrash2 />
+                        </button>
+                        <button
+                          className="text-orange-500 hover:text-orange-600"
+                          title="Gửi thông báo"
+                          onClick={() => handleOpenMailDialog(report, 'reporter')}
+                        >
+                          <FiMail />
+                        </button>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+
+          <ToastContainer position="top-right" autoClose={3000} aria-label="Thông báo hệ thống" />
+
+          {/* Dialog gửi thông báo */}
+          {showMailDialog && (
+            <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-[9999] p-4" onClick={() => setShowMailDialog(false)}>
+              <div
+                className="bg-white rounded-2xl shadow-xl p-4 sm:p-6 w-full max-w-sm animate-fadeIn"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <h2 className="text-lg sm:text-xl font-bold mb-4 text-gray-800">Gửi thông báo</h2>
+                <div className="mb-3">
+                  <label className="block font-medium mb-1 text-sm sm:text-base">Gửi cho:</label>
+                  <select
+                    className="w-full p-2 border rounded mb-2 text-sm sm:text-base"
+                    value={mailTarget}
+                    onChange={(e) => {
+                      setMailTarget(e.target.value as 'reporter' | 'reported');
+                      if (mailReport) {
+                        const userId =
+                          e.target.value === 'reporter'
+                            ? mailReport.reporter_id
+                            : mailReport.reported_user_id;
+                        setMailUserId(userId);
+                      }
+                    }}
+                  >
+                    <option value="reporter">Người báo cáo</option>
+                    <option value="reported">Người bị báo cáo</option>
+                  </select>
+                </div>
+                <div className="mb-3">
+                  <label className="block font-medium mb-1 text-sm sm:text-base">Tiêu đề</label>
+                  <FilteredInput
+                    className="w-full p-2 border rounded text-sm sm:text-base"
+                    value={mailTitle}
+                    onChange={(e) => setMailTitle(e.target.value)}
+                    placeholder="Nhập tiêu đề..."
+                  />
+                </div>
+                <div className="mb-3">
+                  <label className="block font-medium mb-1 text-sm sm:text-base">Nội dung</label>
+                  <textarea
+                    className="w-full p-2 border rounded text-sm sm:text-base"
+                    value={mailContent}
+                    onChange={(e) => setMailContent(e.target.value)}
+                    placeholder="Nhập nội dung..."
+                    rows={4}
+                  />
+                </div>
+                <div className="mb-3">
+                  <label className="block font-medium mb-1 text-sm sm:text-base">Loại thông báo</label>
+                  <FilteredInput
+                    className="w-full p-2 border rounded text-sm sm:text-base"
+                    value={mailType}
+                    disabled
+                  />
+                </div>
+                <div className="flex justify-end gap-2">
+                  <button
+                    className="px-3 sm:px-4 py-2 bg-blue-500 text-white rounded-xl hover:bg-blue-600 text-sm sm:text-base"
+                    onClick={handleSendNotification}
+                  >
+                    Gửi
+                  </button>
+                  <button
+                    className="px-3 sm:px-4 py-2 bg-gray-200 text-gray-800 rounded-xl hover:bg-gray-300 text-sm sm:text-base"
+                    onClick={() => setShowMailDialog(false)}
+                  >
+                    Hủy
+                  </button>
                 </div>
               </div>
-              <div className="flex justify-end gap-2">
-                {selectedReport.status !== 'Đã xử lý' && (
-                  <button
-                    className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600"
-                    onClick={() => { handleProcess(selectedReport.report_id); setSelectedReport(null); }}
-                  >
-                    Đánh dấu đã xử lý
-                  </button>
+            </div>
+          )}
+
+          {/* Modal xem chi tiết báo cáo */}
+          {selectedReport && (
+            <div
+              className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-[9999] p-4"
+              onClick={() => {
+                setSelectedReport(null);
+                setReportedPost(null);
+                setSharedPost(null);
+              }}
+            >
+              <div
+                className="bg-white rounded-2xl shadow-xl p-4 sm:p-6 max-w-lg w-full max-h-[90vh] overflow-y-auto animate-fadeIn"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <div className="mb-4">
+                  <h3 className="text-base sm:text-lg font-semibold text-gray-800 mb-2">
+                    Báo cáo #{selectedReport.report_id}
+                  </h3>
+                  <p className="text-xs sm:text-sm text-gray-500 mb-1">
+                    Ngày báo cáo: {selectedReport.date_reported}
+                  </p>
+                  <p className="text-xs sm:text-sm text-gray-500 mb-1">
+                    Người báo cáo: {selectedReport.reported_by}
+                  </p>
+                  <p className="text-xs sm:text-sm text-gray-500 mb-1">
+                    Tài khoản bị báo cáo: {selectedReport.reported_account}
+                  </p>
+                  <p className="text-xs sm:text-sm text-gray-500 mb-1">
+                    Trạng thái: {selectedReport.status}
+                  </p>
+                </div>
+                {reportedPost && (
+                  <div className="mb-4">
+                    <h4 className="font-semibold text-gray-700 mb-2 text-sm sm:text-base">Bài đăng bị báo cáo</h4>
+                    <div className="bg-white rounded-xl shadow border p-4 flex flex-col gap-2">
+                      <div className="flex items-center gap-3">
+                        {reportedPost.avatar_url && (
+                          <Image
+                            src={reportedPost.avatar_url}
+                            alt="avatar"
+                            width={40}
+                            height={40}
+                            className="w-10 h-10 rounded-full object-cover border"
+                            unoptimized
+                          />
+                        )}
+                        <div>
+                          <div className="font-semibold text-gray-900 text-sm sm:text-base">
+                            {(reportedPost.first_name || '') + ' ' + (reportedPost.last_name || '')}
+                          </div>
+                          {sharedPost && (
+                            <div className="text-xs text-gray-500">
+                              đã chia sẻ bài viết của {(sharedPost.first_name || '') + ' ' + (sharedPost.last_name || '')}
+                            </div>
+                          )}
+                          <div className="text-xs text-gray-500">
+                            {reportedPost.created_at
+                              ? new Date(reportedPost.created_at).toLocaleString('vi-VN')
+                              : ''}
+                          </div>
+                        </div>
+                      </div>
+                      <div className="text-gray-800 text-sm sm:text-base whitespace-pre-line">{reportedPost.content}</div>
+                      {reportedPost.images && (() => {
+                        let imgs: string[] = [];
+                        try {
+                          imgs = JSON.parse(reportedPost.images);
+                        } catch {}
+                        return Array.isArray(imgs) && imgs.length > 0 ? (
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-2">
+                            {imgs.map((img, idx) => (
+                              <Image
+                                key={idx}
+                                src={img}
+                                alt={`Ảnh ${idx + 1}`}
+                                width={128}
+                                height={128}
+                                className="w-full h-32 object-cover rounded border"
+                                unoptimized
+                              />
+                            ))}
+                          </div>
+                        ) : null;
+                      })()}
+                      {sharedPost && (
+                        <div className="border rounded-lg bg-gray-50 p-3 mt-2">
+                          <div className="flex items-center gap-2 sm:gap-3 mb-1">
+                            {sharedPost.avatar_url && (
+                              <Image
+                                src={sharedPost.avatar_url}
+                                alt="avatar"
+                                width={32}
+                                height={32}
+                                className="w-8 h-8 rounded-full object-cover border"
+                                unoptimized
+                              />
+                            )}
+                            <div>
+                              <div className="font-semibold text-gray-900 text-sm">
+                                {(sharedPost.first_name || '') + ' ' + (sharedPost.last_name || '')}
+                              </div>
+                              <div className="text-xs text-gray-500">
+                                {sharedPost.created_at
+                                  ? new Date(sharedPost.created_at).toLocaleString('vi-VN')
+                                  : ''}
+                              </div>
+                            </div>
+                          </div>
+                          <div className="text-gray-800 text-sm whitespace-pre-line">{sharedPost.content}</div>
+                          {sharedPost.images && (() => {
+                            let imgs: string[] = [];
+                            try {
+                              imgs = JSON.parse(sharedPost.images);
+                            } catch {}
+                            return Array.isArray(imgs) && imgs.length > 0 ? (
+                              <div className="flex flex-wrap gap-2 mt-2">
+                                {imgs.map((img, idx) => (
+                                  <Image
+                                    key={idx}
+                                    src={img}
+                                    alt={`Ảnh ${idx + 1}`}
+                                    width={96}
+                                    height={96}
+                                    className="w-20 h-20 sm:w-24 sm:h-24 object-cover rounded border"
+                                    unoptimized
+                                  />
+                                ))}
+                              </div>
+                            ) : null;
+                          })()}
+                        </div>
+                      )}
+                    </div>
+                  </div>
                 )}
-                <button
-                  className="px-4 py-2 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300"
-                  onClick={() => setSelectedReport(null)}
-                >
-                  Đóng
-                </button>
+                <div className="mb-4">
+                  <h4 className="font-semibold text-gray-700 mb-2 text-sm sm:text-base">Nội dung báo cáo</h4>
+                  <div className="bg-gray-100 rounded-lg p-4 text-gray-800 text-sm sm:text-base">
+                    {selectedReport.content}
+                  </div>
+                </div>
+                <div className="flex justify-end gap-2">
+                  {selectedReport.status !== 'Đã xử lý' && (
+                    <button
+                      className="px-3 sm:px-4 py-2 bg-blue-500 text-white rounded-xl hover:bg-blue-600 text-sm sm:text-base"
+                      onClick={() => {
+                        handleProcess(selectedReport.report_id);
+                        setSelectedReport(null);
+                      }}
+                    >
+                      Đánh dấu đã xử lý
+                    </button>
+                  )}
+                  <button
+                    className="px-3 sm:px-4 py-2 bg-gray-200 text-gray-800 rounded-xl hover:bg-gray-300 text-sm sm:text-base"
+                    onClick={() => {
+                      setSelectedReport(null);
+                      setReportedPost(null);
+                      setSharedPost(null);
+                    }}
+                  >
+                    Đóng
+                  </button>
+                </div>
               </div>
             </div>
-          </div>
-        )}
-        {deleteReportId && (
-          <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-[9999]" onClick={() => setDeleteReportId(null)}>
-            <div className="bg-white rounded-2xl shadow-xl p-6 max-w-sm w-full" onClick={e => e.stopPropagation()}>
-              <h2 className="text-lg font-bold mb-4 text-center">Xác nhận xóa</h2>
-              <p className="mb-6 text-center">Bạn có chắc chắn muốn xóa báo cáo này?</p>
-              <div className="flex justify-end gap-2">
-                <button
-                  className="px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600"
-                  onClick={confirmDelete}
-                >
-                  Xóa
-                </button>
-                <button
-                  className="px-4 py-2 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300"
-                  onClick={() => setDeleteReportId(null)}
-                >
-                  Hủy
-                </button>
+          )}
+
+          {/* Modal xác nhận xóa */}
+          {deleteReportId && (
+            <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-[9999] p-4" onClick={() => setDeleteReportId(null)}>
+              <div className="bg-white rounded-2xl shadow-xl p-4 sm:p-6 w-full max-w-sm animate-fadeIn" onClick={(e) => e.stopPropagation()}>
+                <h2 className="text-lg sm:text-xl font-bold mb-4 text-center text-gray-800">Xác nhận xóa</h2>
+                <p className="mb-4 sm:mb-6 text-center text-gray-600 text-sm sm:text-base">Bạn có chắc chắn muốn xóa báo cáo này?</p>
+                <div className="flex justify-end gap-2">
+                  <button
+                    className="px-3 sm:px-4 py-2 bg-red-500 text-white rounded-xl hover:bg-red-600 text-sm sm:text-base"
+                    onClick={confirmDelete}
+                  >
+                    Xóa
+                  </button>
+                  <button
+                    className="px-3 sm:px 4 py-2 bg-gray-200 text-gray-800 rounded-xl hover:bg-gray-300 text-sm sm:text-base"
+                    onClick={() => setDeleteReportId(null)}
+                  >
+                    Hủy
+                  </button>
+                </div>
               </div>
             </div>
-          </div>
-        )}
+          )}
+        </main>
       </AdminLayout>
     </AdminGuard>
   );
