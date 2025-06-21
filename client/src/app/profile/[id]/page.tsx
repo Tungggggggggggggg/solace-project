@@ -309,8 +309,32 @@ export default function UserProfilePage({
         if (unwrappedParams.id && accessToken) {
             fetchUserPosts(0);
         }
-        socket.on('postApproved', () => fetchUserPosts(0));
-        return () => { socket.off('postApproved', () => fetchUserPosts(0)); };
+
+        const handlePostApproved = (data: { post: PostType }) => {
+            // Chỉ thêm bài viết nếu nó thuộc về profile đang xem
+            if (data.post.user_id === unwrappedParams.id) {
+                setUserPosts((prevPosts) => [data.post, ...prevPosts]);
+                setTotalPosts((prev) => (prev !== null ? prev + 1 : 1));
+            }
+        };
+
+        const handlePostDeleted = (data: { postId: string }) => {
+            setUserPosts((prevPosts) => {
+                const postExists = prevPosts.some(p => p.id === data.postId);
+                if (postExists) {
+                    setTotalPosts((prev) => (prev !== null ? prev - 1 : 0));
+                }
+                return prevPosts.filter((p) => p.id !== data.postId);
+            });
+        };
+
+        socket.on('postApproved', handlePostApproved);
+        socket.on('postDeleted', handlePostDeleted);
+
+        return () => {
+            socket.off('postApproved', handlePostApproved);
+            socket.off('postDeleted', handlePostDeleted);
+        };
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [unwrappedParams.id, activeTab, accessToken]);
 

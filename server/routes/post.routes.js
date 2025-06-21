@@ -63,18 +63,43 @@ router.put('/:id/approve', async (req, res) => {
     const { id } = req.params;
     await pool.query('UPDATE posts SET is_approved = true WHERE id = $1', [id]);
 
-    const postResult = await pool.query('SELECT user_id FROM posts WHERE id = $1', [id]);
-    const postAuthorId = postResult.rows[0]?.user_id;
-    
-    await createPostApprovedNotification(id, postAuthorId);
-    await createPostForFollowersNotification(id, postAuthorId);
+    // Lấy thông tin đầy đủ của bài viết vừa duyệt để gửi qua socket
+    const postRes = await pool.query(
+      `SELECT p.*, u.first_name, u.last_name, u.avatar_url,
+              (SELECT COUNT(*) FROM comments c WHERE c.post_id = p.id) AS comment_count,
+              (SELECT COUNT(*) FROM post_likes pl WHERE pl.post_id = p.id) as likes
+       FROM posts p
+       JOIN users u ON p.user_id = u.id
+       WHERE p.id = $1`, [id]
+    );
 
-    // Emit event cho tất cả client khi bài được duyệt
+    if (postRes.rows.length === 0) {
+      // Dù không tìm thấy, vẫn trả về success vì post đã được approve
+      return res.json({ success: true });
+    }
+    const approvedPost = postRes.rows[0];
+
+    // Parse images and feeling
+    if (approvedPost.images && typeof approvedPost.images === 'string') {
+        try { approvedPost.images = JSON.parse(approvedPost.images); } catch(e) { approvedPost.images = [] }
+    }
+    if (approvedPost.feeling && typeof approvedPost.feeling === 'string') {
+        try { approvedPost.feeling = JSON.parse(approvedPost.feeling); } catch(e) { approvedPost.feeling = null }
+    }
+
+
+    await createPostApprovedNotification(id, approvedPost.user_id);
+    await createPostForFollowersNotification(id, approvedPost.user_id);
+
+    // Emit event với dữ liệu bài viết đầy đủ
     try {
       const io = getIO();
-      io.emit('postApproved', { postId: id });
+      // Đổi tên payload thành post để nhất quán
+      io.emit('postApproved', { post: approvedPost });
     } catch (e) { console.error('Socket emit postApproved error:', e); }
-    res.json({ success: true });
+    
+    // Trả về luôn post đã được duyệt để client có thể dùng nếu cần
+    res.json({ success: true, post: approvedPost });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -85,6 +110,13 @@ router.delete('/:id', async (req, res) => {
   try {
     const { id } = req.params;
     await pool.query('DELETE FROM posts WHERE id = $1', [id]);
+    
+    // Emit sự kiện xóa bài viết
+    try {
+        const io = getIO();
+        io.emit('postDeleted', { postId: id });
+    } catch (e) { console.error('Socket emit postDeleted error:', e); }
+
     res.json({ success: true });
   } catch (err) {
     res.status(500).json({ error: err.message });

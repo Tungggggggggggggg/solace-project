@@ -136,6 +136,16 @@ router.post('/', async (req, res) => {
     if (fullPost.images && typeof fullPost.images === 'string') {
       try { fullPost.images = JSON.parse(fullPost.images); } catch {}
     }
+    
+    // Emit sự kiện có bài viết mới cho admin
+    try {
+      const { getIO } = require('../socket');
+      const io = getIO();
+      io.emit('newPost', { post: fullPost });
+    } catch (e) {
+      console.error('Socket emit newPost error:', e);
+    }
+
     res.status(201).json(fullPost);
   } catch (err) {
     console.error('Post creation error:', err);

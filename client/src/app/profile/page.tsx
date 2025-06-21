@@ -158,8 +158,37 @@ export default function ProfilePage() {
         if (!userLoading && user?.id && accessToken) {
             fetchUserTabData("posts", true);
         }
-        socket.on('postApproved', () => fetchUserTabData('posts', true));
-        return () => { socket.off('postApproved', () => fetchUserTabData('posts', true)); };
+
+        const handlePostApproved = (data: { post: PostType }) => {
+            // Chỉ cập nhật nếu bài viết đó là của user hiện tại
+            if (data.post.user_id === user?.id) {
+                setPostsData((prevPosts) => {
+                    if (!prevPosts) return null;
+                    return prevPosts.map((p) =>
+                        p.id === data.post.id ? { ...p, is_approved: true } : p
+                    );
+                });
+            }
+        };
+
+        const handlePostDeleted = (data: { postId: string }) => {
+            setPostsData((prevPosts) => {
+                if (!prevPosts) return null;
+                const postExists = prevPosts.some(p => p.id === data.postId);
+                if (postExists) {
+                    setTotalPosts(prev => prev - 1); // Giảm count
+                }
+                return prevPosts.filter((p) => p.id !== data.postId);
+            });
+        };
+
+        socket.on('postApproved', handlePostApproved);
+        socket.on('postDeleted', handlePostDeleted);
+
+        return () => {
+            socket.off('postApproved', handlePostApproved);
+            socket.off('postDeleted', handlePostDeleted);
+        };
     }, [fetchUserTabData, user?.id, userLoading, accessToken]);
 
     // Fetch follow stats

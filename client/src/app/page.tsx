@@ -93,8 +93,25 @@ export default function Home() {
       }
     };
     fetchPosts();
-    socket.on('postApproved', fetchPosts);
-    return () => { socket.off('postApproved', fetchPosts); };
+
+    // Lắng nghe sự kiện post được duyệt
+    const handlePostApproved = (data: { post: PostType }) => {
+      // Thêm bài viết mới vào đầu danh sách
+      setPosts((prevPosts) => [data.post, ...prevPosts]);
+    };
+
+    // Lắng nghe sự kiện post bị xóa
+    const handlePostDeleted = (data: { postId: string }) => {
+      setPosts((prevPosts) => prevPosts.filter((p) => p.id !== data.postId));
+    };
+    
+    socket.on('postApproved', handlePostApproved);
+    socket.on('postDeleted', handlePostDeleted);
+
+    return () => {
+      socket.off('postApproved', handlePostApproved);
+      socket.off('postDeleted', handlePostDeleted);
+    };
   }, []);
 
   // Lọc bài viết theo tab

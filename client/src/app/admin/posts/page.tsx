@@ -46,8 +46,30 @@ export default function PostManagementPage() {
 
   useEffect(() => {
     fetchPosts();
-    socket.on('newPost', fetchPosts);
-    return () => { socket.off('newPost', fetchPosts); };
+
+    const handleNewPost = (data: { post: Post }) => {
+      setPosts((prev) => [data.post, ...prev]);
+    };
+    
+    const handlePostApproved = (data: { post: Post }) => {
+      setPosts((prev) =>
+        prev.map((p) => (p.id === data.post.id ? { ...p, is_approved: true } : p))
+      );
+    };
+
+    const handlePostDeleted = (data: { postId: string }) => {
+      setPosts((prev) => prev.filter((p) => p.id !== data.postId));
+    };
+
+    socket.on('newPost', handleNewPost);
+    socket.on('postApproved', handlePostApproved);
+    socket.on('postDeleted', handlePostDeleted);
+    
+    return () => {
+      socket.off('newPost', handleNewPost);
+      socket.off('postApproved', handlePostApproved);
+      socket.off('postDeleted', handlePostDeleted);
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [type, status]);
 
