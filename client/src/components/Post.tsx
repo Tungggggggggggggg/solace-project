@@ -1,54 +1,41 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { useUser } from '../contexts/UserContext';
-import ReportPostModal from './ReportPostModal';
-import axios from 'axios';
-import LikeListModal from './LikeListModal';
-import gsap from 'gsap';
-import { fetchForbiddenWords, filterForbiddenWords } from '../lib/forbiddenWords';
-import { formatDate } from '../lib/dateUtils';
-import Image from 'next/image';
-import Link from 'next/link';
-import SharePostModal from './SharePostModal';
-import SkeletonPost from './SkeletonPost';
-import { ToastContainer, toast } from 'react-toastify';
-import 'react-toastify/dist/ReactToastify.css';
-
-interface Author {
-  name: string;
-  avatar?: string;
-  username?: string;
-}
+import React, { useState, useEffect } from "react";
+import { useUser } from "../contexts/UserContext";
+import ReportPostModal from "./ReportPostModal";
+import axios from "axios";
+import LikeListModal from "./LikeListModal";
+import {
+    fetchForbiddenWords,
+    filterForbiddenWords,
+} from "../lib/forbiddenWords";
+import { formatDate } from "../lib/dateUtils";
+import Image from "next/image";
+import Link from "next/link";
+import SharePostModal from "./SharePostModal";
+import SkeletonPost from "./SkeletonPost";
+import { ToastContainer, toast } from "react-toastify";
+import "react-toastify/dist/ReactToastify.css";
+import { useImageModalStore } from "@/store/useImageModalStore";
+import { PostType, SharedPostType } from "@/types/Post";
 
 // Định nghĩa interface cho props của Post
 interface PostProps {
-  id: string;
-  userId: string;  // Thêm userId
-  name: string;
-  date: string;
-  content: string;
-  likes: number;
-  comments: number;
-  shares: number;
-  images?: string[];
-  avatar?: string;
-  feeling?: { icon: string; label: string } | null;
-  location?: string | null;
-  onOpenDetail?: (postObj: any) => void;
-  theme?: string;
-  hideActions?: boolean;
-  author?: Author;
-  is_approved?: boolean;
+    post: PostType;
+    onOpenDetail?: (post: PostType) => void;
+    onPostCreated?: (newPost: PostType) => void;
+    theme?: string;
+    className?: string;
+    hideActions?: boolean;
 }
 
 // Thêm hàm tối ưu URL Cloudinary với các parameters phù hợp
 const optimizeCloudinaryUrl = (url: string) => {
-  if (!url.includes('cloudinary.com')) return url;
-  
-  // Thêm các parameters tối ưu cho Cloudinary
-  return url.replace(
-    '/upload/',
-    '/upload/w_auto,c_limit,q_auto,f_auto,dpr_auto/'
-  );
+    if (!url.includes("cloudinary.com")) return url;
+
+    // Thêm các parameters tối ưu cho Cloudinary
+    return url.replace(
+        "/upload/",
+        "/upload/w_auto,c_limit,q_auto,f_auto,dpr_auto/"
+    );
 };
 
 // Thêm một low-quality image placeholder cho loading state
@@ -69,493 +56,509 @@ const shimmer = (w: number, h: number) => `
 `;
 
 const toBase64 = (str: string) =>
-  typeof window === 'undefined'
-    ? Buffer.from(str).toString('base64')
-    : window.btoa(str);
+    typeof window === "undefined"
+        ? Buffer.from(str).toString("base64")
+        : window.btoa(str);
 
-const Post = ({ 
-  id, 
-  userId,
-  name, 
-  date, 
-  content, 
-  likes, 
-  comments, 
-  shares, 
-  images, 
-  avatar, 
-  feeling, 
-  location, 
-  onOpenDetail, 
-  hideActions, 
-  shared_post_id,
-  onPostCreated,
-  theme,
-  is_approved
-}: PostProps & { shared_post_id?: string, onPostCreated?: (post: any) => void }) => {
-  const [showReport, setShowReport] = useState(false);
-  const { user: currentUser } = useUser();
-  const reporterId = currentUser?.id || '';
-  const [liked, setLiked] = useState(false);
-  const [likeCount, setLikeCount] = useState(likes);
-  const [showLikeList, setShowLikeList] = useState(false);
-  const likeBtnRef = useRef<HTMLButtonElement>(null);
-  const [likeList, setLikeList] = useState<string[]>([]);
-  const [commentCount, setCommentCount] = useState(comments);
-  const [filteredContent, setFilteredContent] = useState(content);
-  const [showShareModal, setShowShareModal] = useState(false);
-  const [shareCount, setShareCount] = useState(shares);
-  const [sharedPost, setSharedPost] = useState<any>(null);
-  const [showFullContent, setShowFullContent] = useState(false);
-  const [showFullSharedContent, setShowFullSharedContent] = useState(false);
+const Post = (props: PostProps) => {
+    const { post, onOpenDetail, onPostCreated, theme, hideActions, className } =
+        props;
 
-  useEffect(() => {
-    // Kiểm tra user đã like chưa
-    if (currentUser?.id) {
-      axios.get('/api/likes/is-liked', {
-        params: { post_id: id, user_id: currentUser.id },
-        baseURL: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000',
-      }).then(res => {
-        setLiked(res.data.liked);
-        if (res.data.likeCount !== undefined) {
-          setLikeCount(res.data.likeCount);
-        }
-        setLikeList(res.data.likeList || []);
-      });
-    }
-
-    // Fetch updated comment count
-    axios.get(`${process.env.NEXT_PUBLIC_API_URL}/api/posts/${id}`).then(res => {
-      setCommentCount(res.data.comment_count || comments);
-    });
-
-    // Lọc từ cấm
-    let ignore = false;
-    async function filterContent() {
-      const words = await fetchForbiddenWords();
-      if (!ignore) {
-        setFilteredContent(filterForbiddenWords(content, words));
-      }
-    }
-    filterContent();
-
-    if (shared_post_id) {
-      axios.get(`${process.env.NEXT_PUBLIC_API_URL}/api/posts/${shared_post_id}`)
-        .then(res => setSharedPost(res.data))
-        .catch(() => setSharedPost(null));
-    }
-
-    return () => { ignore = true; };
-  }, [id, currentUser, content, comments, shared_post_id]);
-
-  const handleLike = async () => {
-    if (!currentUser?.id || !id) {
-      toast.info('Bạn cần đăng nhập để thực hiện chức năng này!');
-      return;
-    }
-
-    const endpoint = liked ? '/api/likes/unlike' : '/api/likes/like';
-    try {
-      // Cập nhật local trước
-      setLiked(!liked);
-      setLikeCount(prev => liked ? prev - 1 : prev + 1);
-      // Gửi request lên server để cập nhật, không lấy lại số lượng like từ response
-      await axios.post(endpoint, 
-        { post_id: id, user_id: currentUser.id },
-        { baseURL: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000' }
-      );
-    } catch (error) {
-      console.error('Error handling like:', error);
-    }
-  };
-
-  const handleCommentClick = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    if (!currentUser?.id) {
-      toast.info('Bạn cần đăng nhập để thực hiện chức năng này!');
-      return;
-    }
-    if (onOpenDetail && id) {
-      onOpenDetail({
+    const {
         id,
-        name,
-        date,
+        user_id: userId,
+        first_name,
+        last_name,
+        created_at: date,
         content,
-        likes: likeCount,
-        comments: commentCount,
-        shares: shareCount,
+        like_count: likes,
+        comment_count: comments,
+        shares,
         images,
-        feeling: sharedPost?.feeling || feeling,
-        location: sharedPost?.location || location,
-        avatar_url: avatar
-      });
-    }
-  };
+        avatar_url: avatar,
+        feeling,
+        location,
+        is_approved,
+        is_liked,
+        shared_post_id,
+        shared_post,
+    } = post;
 
-  const handleShareClick = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    if (!currentUser?.id) {
-      toast.info('Bạn cần đăng nhập để thực hiện chức năng này!');
-      return;
-    }
-    setShowShareModal(true);
-  };
+    const { user: currentUser } = useUser();
+    const { openModal } = useImageModalStore();
 
-  const handleReportClick = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    if (!currentUser?.id) {
-      toast.info('Bạn cần đăng nhập để thực hiện chức năng này!');
-      return;
-    }
-    setShowReport(true);
-  };
+    const [showReport, setShowReport] = useState(false);
+    const [liked, setLiked] = useState(is_liked || false);
+    const [likeCount, setLikeCount] = useState(likes);
+    const [showLikeList, setShowLikeList] = useState(false);
+    const [commentCount, setCommentCount] = useState(comments);
+    const [shareCount, setShareCount] = useState(shares);
+    const [filteredContent, setFilteredContent] = useState(content);
+    const [showShareModal, setShowShareModal] = useState(false);
+    const [sharedPost, setSharedPost] = useState<SharedPostType | null>(
+        shared_post || null
+    );
+    const [loadingShared, setLoadingShared] = useState(false);
+    const [showFullContent, setShowFullContent] = useState(false);
+    const [showFullSharedContent, setShowFullSharedContent] = useState(false);
 
-  const imagesArray: string[] = Array.isArray(images) ? images :
-    typeof images === 'string' ? JSON.parse(images) : [];
+    const parseImages = (
+        imgData: string | string[] | undefined | null
+    ): string[] => {
+        if (!imgData) return [];
+        if (Array.isArray(imgData)) return imgData;
+        if (typeof imgData === "string") {
+            try {
+                const parsed = JSON.parse(imgData);
+                return Array.isArray(parsed) ? parsed : [];
+            } catch {
+                console.warn(
+                    "Could not parse images, it might be a single URL or malformed JSON:",
+                    imgData
+                );
+                // Trả về một mảng rỗng nếu không phải JSON hợp lệ
+                return [];
+            }
+        }
+        // Trả về một mảng rỗng cho các kiểu dữ liệu không mong muốn khác
+        return [];
+    };
 
-  // Hàm mở detail bài gốc (fetch lại từ API)
-  const handleOpenDetailRootPost = async (e: React.MouseEvent) => {
-    e.stopPropagation();
-    if (!onOpenDetail || !sharedPost?.id) return;
-    try {
-      const res = await axios.get(`/api/posts/${sharedPost.id}`, {
-        baseURL: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000',
-      });
-      if (res.data && res.data.id) {
-        onOpenDetail({
-          id: res.data.id,
-          name: `${res.data.first_name || ''} ${res.data.last_name || ''}`.trim(),
-          date: res.data.created_at || res.data.date || '',
-          content: res.data.content,
-          likes: res.data.likes,
-          comments: res.data.comments,
-          shares: res.data.shares,
-          images: res.data.images,
-          feeling: res.data.feeling,
-          location: res.data.location,
-          avatar_url: res.data.avatar_url
-        });
-      }
-    } catch (err) {
-      if (sharedPost.id) {
-        onOpenDetail({
-          id: sharedPost.id,
-          name: `${sharedPost.first_name || ''} ${sharedPost.last_name || ''}`.trim(),
-          date: sharedPost.created_at || sharedPost.date || '',
-          content: sharedPost.content,
-          likes: sharedPost.likes,
-          comments: sharedPost.comments,
-          shares: sharedPost.shares,
-          images: sharedPost.images,
-          feeling: sharedPost.feeling,
-          location: sharedPost.location,
-          avatar_url: sharedPost.avatar_url
-        });
-      }
-    }
-  };
+    useEffect(() => {
+        setLiked(is_liked || false);
+        setLikeCount(likes);
+        setCommentCount(comments);
+    }, [is_liked, likes, comments]);
 
-  // Thêm hàm handleCollapseContent
-  const handleCollapseContent = () => {
-    if (showFullContent) setShowFullContent(false);
-  };
-  const handleCollapseSharedContent = (e: React.MouseEvent) => {
-    if (showFullSharedContent) setShowFullSharedContent(false);
-    e.stopPropagation();
-  };
+    useEffect(() => {
+        let ignore = false;
+        async function filterContent() {
+            const words = await fetchForbiddenWords();
+            if (!ignore) {
+                setFilteredContent(filterForbiddenWords(content, words));
+            }
+        }
+        filterContent();
 
-  return (
-    <div className="bg-white rounded-2xl p-6 shadow-sm w-full max-w-3xl my-6 transform transition-all duration-200 hover:shadow-md relative">
-      {/* Nếu chưa duyệt thì hiển thị nhãn */}
-      {is_approved === false && (
-        <div className="absolute top-8 left-1/2 transform -translate-x-1/2 bg-yellow-300 text-yellow-900 px-4 py-1 rounded-full text-xs font-bold z-20 animate-pulse shadow-md">
-          Đang chờ duyệt
-        </div>
-      )}
-      <button
-        className="absolute top-4 right-4 p-2 hover:bg-slate-50 rounded-full transition-colors z-10"
-        onClick={handleReportClick}
-      >
-        <span className="material-symbols-outlined text-slate-400">more_horiz</span>
-      </button>
-      {shared_post_id && sharedPost === null ? (
-        <SkeletonPost />
-      ) : sharedPost ? (
-        <div>
-          {/* Người share */}
-          <div className="flex items-center gap-3 mb-4 relative">
+        if (shared_post_id && !sharedPost) {
+            setLoadingShared(true);
+            axios
+                .get(
+                    `${process.env.NEXT_PUBLIC_API_URL}/api/posts/${shared_post_id}`
+                )
+                .then((res) => {
+                    if (!ignore) setSharedPost(res.data);
+                })
+                .catch(() => {
+                    if (!ignore) setSharedPost(null);
+                })
+                .finally(() => {
+                    if (!ignore) setLoadingShared(false);
+                });
+        }
+
+        return () => {
+            ignore = true;
+        };
+    }, [shared_post_id, content, sharedPost]);
+
+    const handleLike = async () => {
+        if (!currentUser?.id) {
+            toast.info("Bạn cần đăng nhập để thực hiện chức năng này!");
+            return;
+        }
+        setLiked(!liked);
+        setLikeCount((prev) => (liked ? prev - 1 : prev + 1));
+        try {
+            await axios.post(
+                `/api/likes/${liked ? "unlike" : "like"}`,
+                { post_id: id, user_id: currentUser.id },
+                {
+                    baseURL:
+                        process.env.NEXT_PUBLIC_API_URL ||
+                        "http://localhost:5000",
+                }
+            );
+        } catch (error) {
+            console.error("Error handling like:", error);
+            // Revert optimistic update on error
+            setLiked(liked);
+            setLikeCount(likes);
+        }
+    };
+
+    const handleActionClick = (e: React.MouseEvent, action: () => void) => {
+        e.stopPropagation();
+        if (!currentUser) {
+            toast.info("Bạn cần đăng nhập để thực hiện chức năng này!");
+            return;
+        }
+        action();
+    };
+
+    const handleCommentClick = () => {
+        if (onOpenDetail) onOpenDetail(post);
+    };
+
+    const handleShareClick = () => setShowShareModal(true);
+
+    const handleReportClick = () => setShowReport(true);
+
+    const handleImageClick = (e: React.MouseEvent, imageUrl: string) => {
+        e.stopPropagation();
+        if (
+            imageUrl &&
+            typeof imageUrl === "string" &&
+            imageUrl.startsWith("http")
+        ) {
+            openModal(imageUrl);
+        } else {
+            console.warn("Invalid image URL:", imageUrl);
+            toast.error("Không thể mở hình ảnh do lỗi định dạng!");
+        }
+    };
+
+    const name = `${first_name || ""} ${last_name || ""}`.trim();
+
+    const renderContent = (
+        text: string,
+        isFull: boolean,
+        setFull: (show: boolean) => void
+    ) => {
+        if (text.length > 300 && !isFull) {
+            return (
+                <>
+                    {text.slice(0, 300)}
+                    <button
+                        className="ml-1 text-indigo-600 hover:underline font-medium focus:outline-none"
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            setFull(true);
+                        }}
+                    >
+                        ... Xem thêm
+                    </button>
+                </>
+            );
+        }
+        return text;
+    };
+
+    const PostHeader = ({
+        postUserId,
+        avatar,
+        postName,
+        postDate,
+        isShareHeader = false,
+        sharedByName,
+        feeling,
+        location,
+    }: {
+        postUserId: string;
+        avatar?: string;
+        postName: string;
+        postDate: string;
+        isShareHeader?: boolean;
+        sharedByName?: string;
+        feeling?: { icon: string; label: string } | null;
+        location?: string | null;
+    }) => (
+        <div className="flex items-center gap-3 mb-4">
             <Link
-              href={userId === currentUser?.id ? '/profile' : `/profile/${userId}`}
-              className="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center overflow-hidden group hover:ring-2 hover:ring-indigo-600 hover:ring-offset-2 transition-all"
-              onClick={e => e.stopPropagation()}
+                href={
+                    postUserId === currentUser?.id
+                        ? "/profile"
+                        : `/profile/${postUserId}`
+                }
+                className="w-12 h-12 rounded-full bg-slate-100 flex-shrink-0 flex items-center justify-center overflow-hidden group hover:ring-2 hover:ring-indigo-600 hover:ring-offset-2 transition-all"
+                onClick={(e) => e.stopPropagation()}
             >
-              {avatar ? (
-                <img src={avatar} alt={name} width={40} height={40} className="object-cover w-10 h-10" />
-              ) : (
-                <span className="material-symbols-outlined text-slate-400">person</span>
-              )}
+                {avatar ? (
+                    <Image
+                        src={optimizeCloudinaryUrl(avatar)}
+                        alt={postName}
+                        width={48}
+                        height={48}
+                        className="object-cover w-full h-full transition-transform group-hover:scale-110"
+                        placeholder="blur"
+                        blurDataURL={`data:image/svg+xml;base64,${toBase64(
+                            shimmer(48, 48)
+                        )}`}
+                    />
+                ) : (
+                    <span className="material-symbols-outlined text-slate-400">
+                        person
+                    </span>
+                )}
             </Link>
             <div className="flex-grow">
-              <Link
-                href={userId === currentUser?.id ? '/profile' : `/profile/${userId}`}
-                className="font-medium text-slate-900 block hover:text-indigo-600 transition-colors"
-                onClick={e => e.stopPropagation()}
-              >
-                {name}
-              </Link>
-              <span className="text-gray-500 text-sm block">
-                đã chia sẻ bài viết của <Link href={sharedPost.user_id === currentUser?.id ? '/profile' : `/profile/${sharedPost.user_id}`} className="font-semibold hover:text-indigo-600 transition-colors" onClick={e => e.stopPropagation()}>{sharedPost.first_name} {sharedPost.last_name}</Link>
-              </span>
-              <span className="text-sm text-slate-500 block">{formatDate(date)}</span>
-            </div>
-          </div>
-          {/* Nội dung shareText nếu có */}
-          {content && (
-            <div className="mb-2 text-slate-900 whitespace-pre-wrap break-words"
-              onClick={showFullContent ? handleCollapseContent : undefined}
-              style={showFullContent ? { cursor: 'pointer' } : {}}>
-              {content.length > 300 && !showFullContent ? (
-                <>
-                  {content.slice(0, 300)}
-                  <button
-                    className="ml-1 text-indigo-600 hover:underline font-medium focus:outline-none"
-                    onClick={e => { e.stopPropagation(); setShowFullContent(true); }}
-                  >
-                    ... Xem thêm
-                  </button>
-                </>
-              ) : (
-                content
-              )}
-            </div>
-          )}
-          {/* Bài viết gốc */}
-          <div
-            className="bg-gray-50 border rounded-lg p-4 cursor-pointer hover:bg-gray-100 transition"
-            onClick={handleOpenDetailRootPost}
-          >
-            <div className="flex items-center gap-2 mb-2">
-              <Link href={sharedPost.user_id === currentUser?.id ? '/profile' : `/profile/${sharedPost.user_id}`} className="w-8 h-8 rounded-full overflow-hidden flex items-center justify-center hover:ring-2 hover:ring-indigo-600 transition-all" onClick={e => e.stopPropagation()}>
-                <img src={sharedPost.avatar_url || '/images/default-avatar.png'} alt={sharedPost.first_name ? `${sharedPost.first_name} ${sharedPost.last_name}` : 'avatar'} className="w-8 h-8 rounded-full object-cover" />
-              </Link>
-              <Link href={sharedPost.user_id === currentUser?.id ? '/profile' : `/profile/${sharedPost.user_id}`} className="font-semibold hover:text-indigo-600 transition-colors" onClick={e => e.stopPropagation()}>
-                {sharedPost.first_name} {sharedPost.last_name}
-              </Link>
-              <span className="text-gray-500 text-xs">{formatDate(sharedPost.created_at)}</span>
-            </div>
-            <div className="mb-2 text-slate-900 whitespace-pre-wrap break-words"
-              onClick={showFullSharedContent ? handleCollapseSharedContent : undefined}
-              style={showFullSharedContent ? { cursor: 'pointer' } : {}}>
-              {sharedPost?.content && sharedPost.content.length > 300 && !showFullSharedContent ? (
-                <>
-                  {sharedPost.content.slice(0, 300)}
-                  <button
-                    className="ml-1 text-indigo-600 hover:underline font-medium focus:outline-none"
-                    onClick={e => { e.stopPropagation(); setShowFullSharedContent(true); }}
-                  >
-                    ... Xem thêm
-                  </button>
-                </>
-              ) : (
-                sharedPost?.content
-              )}
-            </div>
-            {sharedPost.images && sharedPost.images.length > 0 && (
-              <div className={`grid ${sharedPost.images.length > 1 ? 'grid-cols-2' : 'grid-cols-1'} gap-2 mb-2`}>
-                {sharedPost.images.map((img: string, idx: number) => (
-                  <div key={idx} className="aspect-video bg-slate-100 rounded-xl flex items-center justify-center">
-                    <img src={img} alt={`post-img-${idx}`} className="object-cover w-full h-full rounded-xl" />
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-          {/* Nút like/share/comment giống post thường */}
-          {!hideActions && (
-            <div className="flex items-center justify-between text-sm border-t border-slate-100 pt-4 mt-4">
-              <button
-                ref={likeBtnRef}
-                onClick={handleLike}
-                className="flex-1 flex items-center justify-center gap-1 py-2 text-slate-600 hover:text-rose-500 transition-all duration-200 rounded-lg hover:bg-slate-50"
-              >
-                <div className="w-7 h-7 flex items-center justify-center mr-1">
-                  {liked ? (
-                    <img src="/heart_fill.svg" alt="liked" className="w-6 h-6" />
-                  ) : (
-                    <img src="/heart.svg" alt="like" className="w-6 h-6" />
-                  )}
+                <p className="text-slate-900">
+                    <Link
+                        href={
+                            postUserId === currentUser?.id
+                                ? "/profile"
+                                : `/profile/${postUserId}`
+                        }
+                        className="font-medium hover:text-indigo-600 transition-colors"
+                        onClick={(e) => e.stopPropagation()}
+                    >
+                        {postName}
+                    </Link>
+                    {feeling && !isShareHeader && (
+                        <span className="font-normal text-slate-600">
+                            {" "}
+                            — đang cảm thấy {feeling.icon} {feeling.label}
+                        </span>
+                    )}
+                    {isShareHeader && (
+                        <span className="text-gray-500 font-normal">
+                            {" "}
+                            đã chia sẻ bài viết của{" "}
+                            <span className="font-semibold">
+                                {sharedByName}
+                            </span>
+                        </span>
+                    )}
+                </p>
+                <div className="flex items-center text-sm text-slate-500 gap-1.5 flex-wrap">
+                    <span>{formatDate(postDate)}</span>
+                    {location && (
+                        <>
+                            <span>·</span>
+                            <span className="flex items-center gap-0.5">
+                                <span className="material-symbols-outlined text-base">
+                                    location_on
+                                </span>
+                                {location}
+                            </span>
+                        </>
+                    )}
                 </div>
-                <span
-                  className="cursor-pointer hover:underline"
-                  onClick={e => { e.stopPropagation(); setShowLikeList(true); }}
-                >
-                  {likeCount}
+            </div>
+        </div>
+    );
+
+    const PostImages = ({
+        images,
+        onImgClick,
+    }: {
+        images?: string[];
+        onImgClick: (e: React.MouseEvent, url: string) => void;
+    }) => {
+        const validImages =
+            images?.filter(
+                (img) =>
+                    img && typeof img === "string" && img.startsWith("http")
+            ) || [];
+        if (validImages.length === 0) return null;
+
+        return (
+            <div
+                className={`grid ${
+                    validImages.length > 1 ? "grid-cols-2" : "grid-cols-1"
+                } gap-2`}
+            >
+                {validImages.map((img, index) => (
+                    <div
+                        key={index}
+                        className="aspect-video bg-slate-100 rounded-xl flex items-center justify-center group cursor-pointer hover:shadow-lg transition-all duration-200 overflow-hidden"
+                        onClick={(e) => onImgClick(e, img)}
+                    >
+                        <Image
+                            src={optimizeCloudinaryUrl(img)}
+                            alt={`Post image ${index + 1}`}
+                            width={500}
+                            height={300}
+                            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200"
+                            placeholder="blur"
+                            blurDataURL={`data:image/svg+xml;base64,${toBase64(
+                                shimmer(500, 300)
+                            )}`}
+                            sizes="(max-width: 768px) 100vw, 500px"
+                        />
+                    </div>
+                ))}
+            </div>
+        );
+    };
+
+    const PostActions = () => (
+        <div className="flex items-center justify-between text-sm border-t border-slate-100 pt-4 mt-4">
+            <button
+                onClick={(e) => handleActionClick(e, handleLike)}
+                className="flex-1 flex items-center justify-center gap-1 py-2 text-slate-600 hover:text-rose-500 transition-all duration-200 rounded-lg hover:bg-slate-50"
+            >
+                <span className="w-7 h-7 flex items-center justify-center mr-1">
+                    <Image
+                        src={liked ? "/heart_fill.svg" : "/heart.svg"}
+                        alt={liked ? "liked" : "like"}
+                        width={24}
+                        height={24}
+                    />
                 </span>
-              </button>
-              <button
-                onClick={handleCommentClick}
+                <span
+                    className="cursor-pointer hover:underline"
+                    onClick={(e) =>
+                        handleActionClick(e, () => setShowLikeList(true))
+                    }
+                >
+                    {likeCount}
+                </span>
+            </button>
+            <button
+                onClick={(e) => handleActionClick(e, handleCommentClick)}
                 className="flex-1 flex items-center justify-center gap-1 py-2 text-slate-600 hover:text-indigo-500 transition-all duration-200 rounded-lg hover:bg-slate-50"
-              >
+            >
                 <span className="material-symbols-outlined">chat_bubble</span>
                 <span>{commentCount}</span>
-              </button>
-              <button
+            </button>
+            <button
+                onClick={(e) => handleActionClick(e, handleShareClick)}
                 className="flex-1 flex items-center justify-center gap-1 py-2 text-slate-600 hover:text-emerald-500 transition-all duration-200 rounded-lg hover:bg-slate-50"
-                onClick={handleShareClick}
-              >
+            >
                 <span className="material-symbols-outlined">share</span>
                 <span>{shareCount}</span>
-              </button>
-            </div>
-          )}
+            </button>
         </div>
-      ) : (
-        <>
-          {/* Post Header */}
-          <div className="flex items-center gap-3 mb-4">
-            <Link 
-              href={userId === currentUser?.id ? '/profile' : `/profile/${userId}`}
-              className="w-12 h-12 rounded-full bg-slate-100 flex items-center justify-center overflow-hidden group hover:ring-2 hover:ring-indigo-600 hover:ring-offset-2 transition-all"
+    );
+
+    return (
+        <div
+            className={`bg-white rounded-2xl p-6 shadow-sm w-full max-w-3xl transform transition-all duration-200 hover:shadow-md relative ${
+                className || ""
+            }`.trim()}
+            onClick={() => onOpenDetail && onOpenDetail(post)}
+        >
+            {is_approved === false && (
+                <div className="absolute top-8 left-1/2 transform -translate-x-1/2 bg-yellow-300 text-yellow-800 px-4 py-1 rounded-full text-xs font-semibold animate-pulse shadow-md">
+                    Đang chờ duyệt
+                </div>
+            )}
+            <button
+                className="absolute top-4 right-4 p-2 hover:bg-gray-100 rounded-full transition-colors z-10"
+                onClick={(e) => handleActionClick(e, handleReportClick)}
             >
-              {avatar ? (
-                <Image
-                  src={optimizeCloudinaryUrl(avatar)}
-                  alt={name}
-                  width={48}
-                  height={48}
-                  className="object-cover rounded-full transition-transform group-hover:scale-110"
-                  placeholder="blur"
-                  blurDataURL={`data:image/svg+xml;base64,${toBase64(shimmer(48, 48))}`} />
-              ) : (
-                <span className="material-symbols-outlined text-slate-400">person</span>
-              )}
-            </Link>
-            <div className="flex-grow">
-              <Link 
-                href={userId === currentUser?.id ? '/profile' : `/profile/${userId}`}
-                className="font-medium text-slate-900 hover:text-indigo-600 transition-colors"
-              >
-                {name}
-              </Link>
-              <p className="text-sm text-slate-500">{formatDate(date)}</p>
-            </div>
-          </div>
-          {/* Post Content */}
-          <div className="space-y-4">
-            <p className="text-slate-900 whitespace-pre-wrap break-words"
-              onClick={showFullContent ? handleCollapseContent : undefined}
-              style={showFullContent ? { cursor: 'pointer' } : {}}>
-              {filteredContent.length > 300 && !showFullContent ? (
+                <span className="material-symbols-outlined text-gray-500">
+                    more_horiz
+                </span>
+            </button>
+
+            {loadingShared && <SkeletonPost />}
+
+            {sharedPost ? (
+                <div>
+                    <PostHeader
+                        postUserId={userId}
+                        avatar={avatar}
+                        postName={name}
+                        postDate={date}
+                        isShareHeader
+                        sharedByName={`${sharedPost.first_name || ""} ${
+                            sharedPost.last_name || ""
+                        }`.trim()}
+                    />
+                    {content && (
+                        <p className="mb-2 text-slate-900 whitespace-pre-wrap break-words">
+                            {renderContent(
+                                content,
+                                showFullContent,
+                                setShowFullContent
+                            )}
+                        </p>
+                    )}
+                    <div className="bg-gray-50 border rounded-lg p-4 mt-2 hover:bg-gray-100 transition">
+                        <PostHeader
+                            postUserId={sharedPost.user_id}
+                            avatar={sharedPost.avatar_url}
+                            postName={`${sharedPost.first_name || ""} ${
+                                sharedPost.last_name || ""
+                            }`.trim()}
+                            postDate={
+                                sharedPost.created_at || sharedPost.date || ""
+                            }
+                        />
+                        {sharedPost.content && (
+                            <p className="mb-2 text-slate-900 whitespace-pre-wrap break-words">
+                                {renderContent(
+                                    sharedPost.content,
+                                    showFullSharedContent,
+                                    setShowFullSharedContent
+                                )}
+                            </p>
+                        )}
+                        <PostImages
+                            images={parseImages(sharedPost.images)}
+                            onImgClick={handleImageClick}
+                        />
+                    </div>
+                </div>
+            ) : (
                 <>
-                  {filteredContent.slice(0, 300)}
-                  <button
-                    className="ml-1 text-indigo-600 hover:underline font-medium focus:outline-none"
-                    onClick={e => { e.stopPropagation(); setShowFullContent(true); }}
-                  >
-                    ... Xem thêm
-                  </button>
+                    <PostHeader
+                        postUserId={userId}
+                        avatar={avatar}
+                        postName={name}
+                        postDate={date}
+                        feeling={feeling}
+                        location={location}
+                    />
+                    <div className="space-y-4">
+                        <p className="text-slate-900 whitespace-pre-wrap break-words">
+                            {renderContent(
+                                filteredContent,
+                                showFullContent,
+                                setShowFullContent
+                            )}
+                        </p>
+                        <PostImages
+                            images={parseImages(images)}
+                            onImgClick={handleImageClick}
+                        />
+                    </div>
                 </>
-              ) : (
-                filteredContent
-              )}
-            </p>
-            {/* Post Images */}
-            {imagesArray.length > 0 && (
-              <div className={`grid ${imagesArray.length > 1 ? 'grid-cols-2' : 'grid-cols-1'} gap-2`}>
-                {imagesArray.map((img: string, index: number) => (
-                  <div key={index} className="aspect-video bg-slate-100 rounded-xl flex items-center justify-center group cursor-pointer hover:bg-slate-200 transition-all duration-200 overflow-hidden">
-                    {img.startsWith('http') ? (
-                      <Image
-                        src={optimizeCloudinaryUrl(img)}
-                        alt={`Post image ${index + 1}`}
-                        width={500}
-                        height={300}
-                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200"
-                        placeholder="blur"
-                        blurDataURL={`data:image/svg+xml;base64,${toBase64(shimmer(500, 300))}`} 
-                        priority={index === 0}
-                        sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
-                      />
-                    ) : (
-                      <span className="material-symbols-outlined text-4xl text-slate-400 group-hover:scale-110 transition-transform">
-                        {img}
-                      </span>
-                    )}
-                  </div>
-                ))}
-              </div>
             )}
-            {/* Post Actions */}
-            {!hideActions && (
-              <div className="flex items-center justify-between text-sm border-t border-slate-100 pt-4 mt-4">
-                <button
-                  ref={likeBtnRef}
-                  onClick={handleLike}
-                  className="flex-1 flex items-center justify-center gap-1 py-2 text-slate-600 hover:text-rose-500 transition-all duration-200 rounded-lg hover:bg-slate-50"
-                >
-                  <div className="w-7 h-7 flex items-center justify-center mr-1">
-                    {liked ? (
-                      <img src="/heart_fill.svg" alt="liked" className="w-6 h-6" />
-                    ) : (
-                      <img src="/heart.svg" alt="like" className="w-6 h-6" />
-                    )}
-                  </div>
-                  <span
-                    className="cursor-pointer hover:underline"
-                    onClick={e => { e.stopPropagation(); setShowLikeList(true); }}
-                  >
-                    {likeCount}
-                  </span>
-                </button>
-                <button
-                  onClick={handleCommentClick}
-                  className="flex-1 flex items-center justify-center gap-1 py-2 text-slate-600 hover:text-indigo-500 transition-all duration-200 rounded-lg hover:bg-slate-50"
-                >
-                  <span className="material-symbols-outlined">chat_bubble</span>
-                  <span>{commentCount}</span>
-                </button>
-                <button
-                  className="flex-1 flex items-center justify-center gap-1 py-2 text-slate-600 hover:text-emerald-500 transition-all duration-200 rounded-lg hover:bg-slate-50"
-                  onClick={handleShareClick}
-                >
-                  <span className="material-symbols-outlined">share</span>
-                  <span>{shareCount}</span>
-                </button>
-              </div>
+
+            {!hideActions && <PostActions />}
+
+            {showReport && currentUser?.id && (
+                <ReportPostModal
+                    postId={id}
+                    reporterId={currentUser.id}
+                    onClose={() => setShowReport(false)}
+                />
             )}
-          </div>
-        </>
-      )}
-      {/* Modals */}
-      {showReport && (
-        <ReportPostModal
-          postId={id}
-          reporterId={reporterId}
-          onClose={() => setShowReport(false)}
-        />
-      )}
-      {showLikeList && (
-        <LikeListModal
-          postId={id}
-          onClose={() => setShowLikeList(false)}
-        />
-      )}
-      {showShareModal && (
-        <SharePostModal
-          isOpen={showShareModal}
-          onClose={() => setShowShareModal(false)}
-          post={{ id, name, content, images }}
-          onShared={(newPost) => {
-            setShowShareModal(false);
-            setShareCount(shareCount + 1);
-            if (onPostCreated) onPostCreated(newPost);
-          }}
-          typePost={theme === 'reflective' ? 'negative' : 'positive'}
-        />
-      )}
-      <ToastContainer position="bottom-right" autoClose={3000} hideProgressBar newestOnTop closeOnClick rtl={false} pauseOnFocusLoss draggable pauseOnHover />
-    </div>
-  );
+            {showLikeList && (
+                <LikeListModal
+                    postId={id}
+                    onClose={() => setShowLikeList(false)}
+                />
+            )}
+            {showShareModal && (
+                <SharePostModal
+                    isOpen={showShareModal}
+                    onClose={() => setShowShareModal(false)}
+                    post={{ id, name, content, images }}
+                    onShared={(newPost) => {
+                        setShowShareModal(false);
+                        setShareCount((s) => s + 1);
+                        if (onPostCreated) onPostCreated(newPost);
+                    }}
+                    typePost={theme === "reflective" ? "negative" : "positive"}
+                />
+            )}
+            <ToastContainer
+                position="bottom-right"
+                autoClose={3000}
+                hideProgressBar
+                newestOnTop
+                closeOnClick
+                rtl={false}
+                pauseOnFocusLoss
+                draggable
+                pauseOnHover
+            />
+        </div>
+    );
 };
 
 export default Post;

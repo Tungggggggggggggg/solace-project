@@ -13,6 +13,7 @@ const verifyFirebaseToken = async (idToken) => {
     const decoded = await admin.auth().verifyIdToken(idToken);
     return decoded;
 };
+
 // Hàm kiểm tra user_info tồn tại
 async function checkUserInfo(userId) {
     try {
@@ -37,6 +38,7 @@ async function checkUserInfo(userId) {
     }
 }
 
+// Google Login
 exports.googleLogin = async (req, res) => {
     const authHeader = req.headers.authorization;
 
@@ -180,6 +182,7 @@ exports.googleLogin = async (req, res) => {
     }
 };
 
+// Login
 exports.login = async (req, res) => {
     const { email, password } = req.body;
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -246,7 +249,7 @@ exports.login = async (req, res) => {
             secure: process.env.NODE_ENV === "production",
             sameSite: "Strict",
             maxAge: 15 * 24 * 60 * 60 * 1000, // 15 ngày
-            path: "/", // Đặt path để cookie có thể truy cập từ mọi route
+            path: "/",
         });
 
         // Trả về access token và thông tin user
@@ -268,7 +271,7 @@ exports.login = async (req, res) => {
     }
 };
 
-// Đăng ký user mới (local)
+// Signup
 exports.signup = async (req, res) => {
     // Chuẩn hóa dữ liệu đầu vào
     const {
@@ -321,7 +324,7 @@ exports.signup = async (req, res) => {
             secure: process.env.NODE_ENV === "production",
             sameSite: "Strict",
             maxAge: 15 * 24 * 60 * 60 * 1000, // 15 ngày
-            path: "/", // Đặt path để cookie có thể truy cập từ mọi route
+            path: "/",
         });
 
         res.status(201).json({
@@ -349,7 +352,7 @@ exports.signup = async (req, res) => {
     }
 };
 
-// Refresh token
+// Refresh Token
 exports.refreshToken = async (req, res) => {
     const token = req.cookies.refreshToken;
     if (!token) return res.status(401).json({ error: "Unauthorized" });
@@ -369,17 +372,7 @@ exports.refreshToken = async (req, res) => {
         const user_id = tokenCheck.rows[0].user_id;
 
         // Xác thực refresh token
-        const decoded = await new Promise((resolve, reject) => {
-            jwt.verify(
-                token,
-                process.env.JWT_REFRESH_SECRET,
-                (err, decoded) => {
-                    if (err) reject(err);
-                    resolve(decoded);
-                }
-            );
-        });
-
+        const decoded = jwt.verify(token, process.env.JWT_REFRESH_SECRET);
         if (decoded.id !== user_id) {
             return res
                 .status(403)
@@ -388,7 +381,7 @@ exports.refreshToken = async (req, res) => {
 
         // Kiểm tra user
         const userResult = await pool.query(
-            "SELECT id, email FROM users WHERE id = $1",
+            "SELECT id, email, first_name, last_name, avatar_url FROM users WHERE id = $1",
             [user_id]
         );
 
@@ -403,7 +396,6 @@ exports.refreshToken = async (req, res) => {
 
         // Kiểm tra trạng thái active
         const is_active = await checkUserInfo(user.id);
-        console.log("Active: ", is_active);
         if (!is_active) {
             await pool.query("DELETE FROM refresh_tokens WHERE token = $1", [
                 token,
@@ -413,10 +405,11 @@ exports.refreshToken = async (req, res) => {
                 .json({ error: "Tài khoản của bạn đã bị khóa" });
         }
 
-        console.log("User: ", user);
         // Tạo token mới và xóa token cũ
         const accessToken = createAccessToken(user);
-        console.log("Access token: ", accessToken);
+        await pool.query("DELETE FROM refresh_tokens WHERE token = $1", [
+            token,
+        ]);
 
         res.json({ accessToken });
     } catch (err) {
@@ -448,7 +441,7 @@ exports.logout = async (req, res) => {
             secure: process.env.NODE_ENV === "production",
             sameSite: "Strict",
             path: "/",
-            maxAge: 0, // Đặt maxAge = 0 để xóa cookie
+            maxAge: 0,
         });
 
         res.json({ message: "Đã đăng xuất" });
@@ -458,13 +451,30 @@ exports.logout = async (req, res) => {
     }
 };
 
-// Trả về thông tin người dùng hiện tại sau xác thực
+// Get Profile
 exports.getProfile = async (req, res) => {
     try {
-        const { id, email, first_name, last_name, avatar_url, created_at } =
-            req.user;
+        const {
+            id,
+            email,
+            first_name,
+            last_name,
+            avatar_url,
+            cover_url,
+            bio,
+            created_at,
+        } = req.user;
         res.json({
-            user: { id, email, first_name, last_name, avatar_url, created_at },
+            user: {
+                id,
+                email,
+                first_name,
+                last_name,
+                avatar_url,
+                cover_url,
+                bio,
+                created_at,
+            },
         });
     } catch (err) {
         console.error("Lỗi getProfile:", err);
@@ -472,7 +482,7 @@ exports.getProfile = async (req, res) => {
     }
 };
 
-// Gửi email reset password
+// Forgot Password
 exports.forgotPassword = async (req, res) => {
     const { email } = req.body;
 
@@ -530,7 +540,7 @@ exports.forgotPassword = async (req, res) => {
     }
 };
 
-// Đặt lại mật khẩu
+// Reset Password
 exports.resetPassword = async (req, res) => {
     const { token, newPassword } = req.body;
 

@@ -19,6 +19,8 @@ interface UserData {
     avatar_url: string;
     created_at?: string;
     role?: string;
+    bio?: string;
+    cover_url?: string;
 }
 
 interface UserContextType {
@@ -36,6 +38,7 @@ interface UserContextType {
     ) => void;
     login: (email: string, password: string) => void;
     logout: (reason?: string) => Promise<void>;
+    fetchUser: (token: string) => Promise<void>;
 }
 
 export const UserContext = createContext<UserContextType>({
@@ -48,6 +51,7 @@ export const UserContext = createContext<UserContextType>({
     login: async () => {},
     signup: async () => {},
     logout: async () => {},
+    fetchUser: async () => {},
 });
 
 export function UserContextProvider({ children }: { children: ReactNode }) {
@@ -240,6 +244,9 @@ export function UserContextProvider({ children }: { children: ReactNode }) {
 
             if (!res.ok) {
                 const errorData = await res.json();
+                if (res.status === 401) {
+                    // Xử lý khi refresh token cũng hết hạn
+                }
                 throw new Error(
                     errorData.error ||
                         "Đăng nhập không thành công. Vui lòng kiểm tra lại thông tin."
@@ -249,6 +256,7 @@ export function UserContextProvider({ children }: { children: ReactNode }) {
             const data = await res.json();
             setUserData(data.user, data.accessToken);
             if (!socket.connected) socket.connect();
+            router.push("/");
             return;
         } catch (error: any) {
             console.error("Lỗi khi đăng nhập:", error);
@@ -259,28 +267,31 @@ export function UserContextProvider({ children }: { children: ReactNode }) {
     const setUserData = (userData: UserData, token: string) => {
         setUser(userData);
         setAccessToken(token);
-        sessionStorage.setItem("accessToken", token);
         sessionStorage.setItem("user", JSON.stringify(userData));
+        sessionStorage.setItem("accessToken", token);
     };
 
     const logout = async (reason?: string) => {
         try {
             await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/auth/logout`, {
                 method: "POST",
-                credentials: "include",
+                credentials: "include", // Gửi cookie httpOnly
             });
         } catch (error) {
-            console.error("Lỗi khi logout:", error);
+            console.error("Logout API call failed, proceeding locally", error);
+        } finally {
+            setUser(null);
+            setAccessToken(null);
+            sessionStorage.removeItem("user");
+            sessionStorage.removeItem("accessToken");
+            if (socket.connected) socket.disconnect();
+
+            // Chuyển hướng với lý do (nếu có)
+            const logoutReason = reason
+                ? `?reason=${encodeURIComponent(reason)}`
+                : "";
+            router.push(`/login${logoutReason}`);
         }
-        setUser(null);
-        setAccessToken(null);
-        sessionStorage.removeItem("accessToken");
-        sessionStorage.removeItem("user");
-        socket.disconnect();
-        if (reason) {
-            alert(reason); // Hoặc thay bằng modal
-        }
-        router.push("/");
     };
 
     return (
@@ -295,6 +306,7 @@ export function UserContextProvider({ children }: { children: ReactNode }) {
                 signup,
                 login,
                 logout,
+                fetchUser,
             }}
         >
             {children}

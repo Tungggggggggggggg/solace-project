@@ -39,6 +39,10 @@ export default function FollowListModal({
     const [confirmUnfollowId, setConfirmUnfollowId] = useState<string | null>(
         null
     );
+    const menuRefs = useRef<{ [key: string]: HTMLDivElement | null }>({});
+    const [menuDirection, setMenuDirection] = useState<{
+        [key: string]: "down" | "up";
+    }>({});
 
     useEffect(() => {
         if (isOpen) {
@@ -78,6 +82,17 @@ export default function FollowListModal({
             fetchUsers();
         }
     }, [userId, type, isOpen, accessToken]);
+
+    useEffect(() => {
+        if (openMenuUserId && menuRefs.current[openMenuUserId]) {
+            const direction = menuDirection[openMenuUserId] || "down";
+            gsap.fromTo(
+                menuRefs.current[openMenuUserId],
+                { y: direction === "up" ? 10 : -10, opacity: 0 },
+                { y: 0, opacity: 1, duration: 0.25, ease: "power2.out" }
+            );
+        }
+    }, [openMenuUserId, menuDirection]);
 
     const handleFollow = async (targetUserId: string) => {
         try {
@@ -145,6 +160,56 @@ export default function FollowListModal({
         });
     };
 
+    const handleOpenMenu = (userId: string) => {
+        setOpenMenuUserId((prev) => (prev === userId ? null : userId));
+        if (openMenuUserId !== userId) {
+            setTimeout(() => {
+                const btn = document.getElementById(`follow-btn-${userId}`);
+                const modal = document.querySelector(".max-w-lg");
+                if (btn && modal) {
+                    const btnRect = btn.getBoundingClientRect();
+                    const modalRect = modal.getBoundingClientRect();
+                    const spaceBelow = modalRect.bottom - btnRect.bottom;
+                    if (spaceBelow >= 90) {
+                        setMenuDirection((prev) => ({
+                            ...prev,
+                            [userId]: "down",
+                        }));
+                    } else {
+                        const modalEl = modal as HTMLElement;
+                        const scrollAmount =
+                            btnRect.bottom - (modalRect.bottom - 120);
+                        if (
+                            scrollAmount > 0 &&
+                            modalEl.scrollTop + modalEl.clientHeight <
+                                modalEl.scrollHeight
+                        ) {
+                            modalEl.scrollBy({
+                                top: scrollAmount,
+                                behavior: "smooth",
+                            });
+                            setMenuDirection((prev) => ({
+                                ...prev,
+                                [userId]: "down",
+                            }));
+                        } else {
+                            setMenuDirection((prev) => ({
+                                ...prev,
+                                [userId]: "up",
+                            }));
+                        }
+                    }
+                }
+            }, 10);
+        }
+    };
+
+    // Xác định user cuối cùng trong danh sách
+    const isLastUser = (userId: string) => {
+        if (users.length === 0) return false;
+        return users[users.length - 1].id === userId;
+    };
+
     if (!isOpen) return null;
 
     return (
@@ -155,7 +220,11 @@ export default function FollowListModal({
         >
             <div
                 ref={contentRef}
-                className="bg-white rounded-2xl w-full max-w-lg shadow-xl"
+                className={`bg-white rounded-2xl w-full max-w-lg shadow-xl transition-all duration-200 ${
+                    openMenuUserId && isLastUser(openMenuUserId)
+                        ? "min-h-[260px]"
+                        : ""
+                }`}
                 onClick={(e) => e.stopPropagation()}
             >
                 <div className="flex items-center justify-between p-6 border-b">
@@ -200,7 +269,11 @@ export default function FollowListModal({
                             {users.map((user) => (
                                 <div
                                     key={user.id}
-                                    className="flex items-center gap-4 relative group"
+                                    className={`flex items-center gap-4 relative group transition-all duration-200 ${
+                                        openMenuUserId === user.id
+                                            ? "mb-12"
+                                            : ""
+                                    }`}
                                 >
                                     <Link
                                         href={
@@ -243,14 +316,11 @@ export default function FollowListModal({
                                             {user.is_following ? (
                                                 <>
                                                     <button
+                                                        id={`follow-btn-${user.id}`}
                                                         aria-label="Mở menu hủy theo dõi"
                                                         onClick={() =>
-                                                            setOpenMenuUserId(
-                                                                (prev) =>
-                                                                    prev ===
-                                                                    user.id
-                                                                        ? null
-                                                                        : user.id
+                                                            handleOpenMenu(
+                                                                user.id
                                                             )
                                                         }
                                                         className="px-4 py-2 rounded-full text-sm font-medium transition-all bg-slate-100 text-slate-600 hover:bg-slate-200 flex items-center gap-1 min-w-[110px] justify-center"
@@ -266,7 +336,20 @@ export default function FollowListModal({
 
                                                     {openMenuUserId ===
                                                         user.id && (
-                                                        <div className="absolute top-full mt-2 right-0 z-40 bg-white border rounded-xl shadow-xl min-w-[160px]">
+                                                        <div
+                                                            ref={(el) =>
+                                                                (menuRefs.current[
+                                                                    user.id
+                                                                ] = el)
+                                                            }
+                                                            className={`absolute ${
+                                                                menuDirection[
+                                                                    user.id
+                                                                ] === "up"
+                                                                    ? "bottom-full mb-3"
+                                                                    : "top-full mt-3"
+                                                            } right-0 z-50 bg-white border rounded-xl shadow-xl min-w-[160px] overflow-auto max-h-40`}
+                                                        >
                                                             <button
                                                                 className="w-full text-left px-4 py-2 text-red-600 hover:bg-red-50 rounded-t-xl flex items-center gap-2"
                                                                 onClick={() => {

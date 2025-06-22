@@ -16,38 +16,43 @@ exports.isAuthenticated = async (req, res, next) => {
     try {
         const decoded = jwt.verify(token, process.env.JWT_SECRET);
 
-        // 1. Kiểm tra xem user có tồn tại trong bảng public.users không, join thêm user_info để lấy created_at
-        let userResult = await pool.query(
-            `SELECT u.id, u.email, u.first_name, u.last_name, u.avatar_url, ui.created_at
+        // Truy vấn thông tin người dùng từ DB
+        const userResult = await pool.query(
+            `SELECT u.id, u.email, u.first_name, u.last_name, u.avatar_url, u.cover_url, u.bio, ui.created_at
        FROM users u
        LEFT JOIN user_info ui ON u.id = ui.id
        WHERE u.id = $1`,
             [decoded.id]
         );
 
-        let userProfile = userResult.rows[0];
+        const userProfile = userResult.rows[0];
 
-        // 2. Nếu user chưa có profile trong public.users, tạo một entry cơ bản
+        // Nếu người dùng có token hợp lệ nhưng không tồn tại trong DB, đó là trạng thái không nhất quán
         if (!userProfile) {
-            console.warn(
-                `User ${decoded.id} not found in public.users, creating a basic profile.`
+            console.error(
+                `Authenticated user with id ${decoded.id} not found in database.`
             );
-            // Bạn có thể lấy thêm thông tin từ decoded JWT (như email) nếu có
-            const insertResult = await pool.query(
-                "INSERT INTO users (id, email, first_name, last_name) VALUES ($1, $2, $3, $4) RETURNING id, email, first_name, last_name, avatar_url",
-                [decoded.id, decoded.email, "Người", "Dùng Mới"] // Giá trị mặc định
-            );
-            userProfile = insertResult.rows[0];
+            return res.status(401).json({ error: "Người dùng không tồn tại." });
         }
 
-        // 3. Gắn thông tin user vào req
-        req.user = {
-            id: decoded.id, // ID từ JWT (auth.users.id)
-            ...userProfile, // Thông tin từ public.users (đã có hoặc vừa tạo)
-        };
+        // Gắn thông tin người dùng vào đối tượng request
+        req.user = userProfile;
         next();
     } catch (err) {
         console.error("Lỗi xác thực:", err);
-        res.status(401).json({ error: "Token không hợp lệ hoặc đã hết hạn" });
+
+        if (err.name === "TokenExpiredError") {
+            return res
+                .status(401)
+                .json({ error: "Token đã hết hạn", code: "TOKEN_EXPIRED" });
+        }
+        if (err.name === "JsonWebTokenError") {
+            return res.status(401).json({ error: "Token không hợp lệ" });
+        }
+
+        // Đối với tất cả các lỗi khác (ví dụ: lỗi cơ sở dữ liệu), trả về lỗi 500
+        return res
+            .status(500)
+            .json({ error: "Lỗi server trong quá trình xác thực" });
     }
 };

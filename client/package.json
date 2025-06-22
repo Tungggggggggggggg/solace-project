@@ -12,6 +12,7 @@
     "@tanstack/react-query": "^5.80.7",
     "@tanstack/react-virtual": "^3.13.10",
     "axios": "^1.10.0",
+    "browser-image-compression": "^2.0.2",
     "clsx": "^2.1.1",
     "emoji-picker-react": "^4.12.2",
     "firebase": "^11.8.1",
@@ -29,7 +30,8 @@
     "react-use": "^17.6.0",
     "react-window": "^1.8.11",
     "recharts": "^2.15.3",
-    "socket.io-client": "^4.8.1"
+    "socket.io-client": "^4.8.1",
+    "zustand": "^5.0.5"
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3",

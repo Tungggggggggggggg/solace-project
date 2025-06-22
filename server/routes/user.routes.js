@@ -3,7 +3,7 @@ const router = express.Router();
 const { pool, getClient } = require("../db");
 const { sanitizeInput } = require("../utils/security");
 const { isAuthenticated } = require("../middlewares/auth.middleware");
-const { createFollowNotification } = require("../utils/notification")
+const { createFollowNotification } = require("../utils/notification");
 
 // GET /api/users/search
 router.get("/search", isAuthenticated, async (req, res) => {
@@ -196,14 +196,20 @@ router.put("/:id/status", async (req, res) => {
 // PUT /api/users/:id
 router.put("/:id", async (req, res) => {
     const { id } = req.params;
-    const { first_name, last_name, email } = req.body;
+    const { first_name, last_name, email, avatar_url, cover_url, bio } =
+        req.body;
 
     try {
         await pool.query(
-            `UPDATE users SET first_name = $1, last_name = $2, email = $3 WHERE id = $4`,
-            [first_name, last_name, email, id]
+            `UPDATE users SET first_name = $1, last_name = $2, email = $3, avatar_url = $4, cover_url = $5, bio = $6 WHERE id = $7`,
+            [first_name, last_name, email, avatar_url, cover_url, bio, id]
         );
-        res.json({ success: true });
+        // Truy vấn lại user mới nhất
+        const updatedUser = await pool.query(
+            `SELECT id, first_name, last_name, email, avatar_url, cover_url, bio FROM users WHERE id = $1`,
+            [id]
+        );
+        res.json({ success: true, user: updatedUser.rows[0] });
     } catch (error) {
         console.error("Lỗi khi cập nhật thông tin người dùng:", error);
         res.status(500).json({ error: error.message });
@@ -343,10 +349,7 @@ router.post("/:id/follow", isAuthenticated, async (req, res) => {
 
         await pool.query("COMMIT");
 
-        await createFollowNotification(
-            followerId, 
-            id
-        );
+        await createFollowNotification(followerId, id);
 
         res.json({
             success: true,
@@ -443,7 +446,7 @@ router.get("/:id", async (req, res) => {
 });
 
 // Lấy tổng số bài viết của user
-router.get("/:id/post-stats", async (req, res) => {
+router.get("/:id/post-stats", isAuthenticated, async (req, res) => {
     const { id } = req.params;
     try {
         const result = await pool.query(
@@ -453,12 +456,12 @@ router.get("/:id/post-stats", async (req, res) => {
         res.json({ total_posts: parseInt(result.rows[0].total_posts, 10) });
     } catch (error) {
         console.error("Error getting post stats:", error);
-        res.status(500).json({ error: error.message });
+        res.status(500).json({ error: "Internal Server Error" });
     }
 });
 
 // API lấy danh sách bạn bè (mình follow và được follow lại)
-router.get('/:id/friends', isAuthenticated, async (req, res) => {
+router.get("/:id/friends", isAuthenticated, async (req, res) => {
     try {
         const userId = req.params.id;
         const result = await pool.query(
@@ -473,13 +476,13 @@ router.get('/:id/friends', isAuthenticated, async (req, res) => {
         WHERE ur1.follower_id = $1 AND ur2.user_id = $1
       )
       `,
-      [userId]
-    );
-    res.json({ friends: result.rows });
-  } catch (err) {
-    console.error("Lỗi khi lấy friends:", err);
-    res.status(500).json({ error: 'Server error' });
-  }
+            [userId]
+        );
+        res.json({ friends: result.rows });
+    } catch (err) {
+        console.error("Lỗi khi lấy friends:", err);
+        res.status(500).json({ error: "Server error" });
+    }
 });
 
 module.exports = router;

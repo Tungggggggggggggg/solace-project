@@ -1,257 +1,282 @@
 "use client";
 
 // Import các component và hook cần thiết cho trang chủ
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useContext, useMemo } from "react";
 import Header from "@/components/Header";
 import Tabs from "@/components/Tabs";
 import InputSection from "@/components/InputSection";
 import Post from "@/components/Post";
 import LeftSidebar from "@/components/LeftSidebar";
 import RightSidebar from "@/components/RightSidebar";
-import AuthModal from "@/components/AuthModal";
 import PostDetailPopup from "@/components/PostDetailPopup";
-import { useUser } from "@/contexts/UserContext";
+import { UserContext } from "@/contexts/UserContext";
 import CreatePostModal from "@/components/CreatePostModal";
+import ImageModal from "@/components/ImageModal";
 import axios from "axios";
-import type { PostType } from '@/types/Post';
+import type { PostType } from "@/types/Post";
+import { socket } from "@/socket";
 import SkeletonPost from "@/components/SkeletonPost";
-import { socket } from '@/socket';
 import { ForbiddenWordsProvider } from "@/contexts/ForbiddenWordsContext";
 
-interface OpenPostType {
-  id: string;
-  name: string;
-  date: string;
-  content: string;
-  likes: number;
-  comments: number;
-  shares: number;
-  images?: string[];
-  avatar_url?: string;
-  feeling?: { icon: string; label: string };
-  location?: string;
-  shared_post?: any;
-}
+const POSTS_PER_PAGE = 5;
+
+const useAPI = () => {
+    const { accessToken, logout } = useContext(UserContext);
+    const baseURL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000";
+
+    const axiosInstance = useMemo(() => {
+        const instance = axios.create({ baseURL });
+        instance.interceptors.response.use(
+            (response) => response,
+            async (error) => {
+                if (
+                    axios.isAxiosError(error) &&
+                    error.response?.status === 401
+                ) {
+                    await logout("Phiên đăng nhập đã hết hạn");
+                }
+                return Promise.reject(error);
+            }
+        );
+        return instance;
+    }, [baseURL, logout]);
+
+    const apiCall = useCallback(
+        async (endpoint: string, options: Record<string, unknown> = {}) => {
+            try {
+                const response = await axiosInstance({
+                    ...options,
+                    url: endpoint,
+                    headers: {
+                        ...(options.headers || {}),
+                        Authorization: `Bearer ${accessToken}`,
+                    },
+                });
+                return response.data;
+            } catch (error: unknown) {
+                console.error(`API Error (${endpoint}):`, error);
+                throw error;
+            }
+        },
+        [axiosInstance, accessToken]
+    );
+
+    return { apiCall };
+};
 
 // Component Home: Trang chính của ứng dụng mạng xã hội Solace
 export default function Home() {
-  const { user } = useUser();
-  // State kiểm soát hiển thị modal xác thực (đăng nhập/đăng ký)
-  const [showAuth, setShowAuth] = useState(false);
-  // State xác định tab mặc định của modal xác thực ('login' hoặc 'signup')
-  const [authTab, setAuthTab] = useState<'login' | 'signup'>('login');
-  // State xác định tab hiện tại của giao diện chính (0: Inspiring, 1: Reflective)
-  const [activeTab, setActiveTab] = useState(0);
-  // State lưu thông tin bài viết đang được xem chi tiết (nếu có)
-  const [openPost, setOpenPost] = useState<OpenPostType | null>(null);
-  const [showCreatePost, setShowCreatePost] = useState(false);
-  const [posts, setPosts] = useState<PostType[]>([]); // State lưu danh sách bài viết
-  const [visibleCount, setVisibleCount] = useState(3); // Số post hiển thị ban đầu
+    const { user } = useContext(UserContext);
+    const { apiCall } = useAPI();
 
-  const handleCommentAdded = (postId: string) => {
-    setPosts(prevPosts =>
-      prevPosts.map(p =>
-        p.id === postId ? { ...p, comments: (p.comments || 0) + 1 } : p
-      )
-    );
-    if (openPost && openPost.id === postId) {
-      setOpenPost(prevOpenPost => ({
-        ...prevOpenPost!,
-        comments: (prevOpenPost!.comments || 0) + 1,
-      }));
-    }
-  };
+    const [activeTab, setActiveTab] = useState(0);
+    const [openPost, setOpenPost] = useState<PostType | null>(null);
+    const [showCreatePost, setShowCreatePost] = useState(false);
+    const [posts, setPosts] = useState<PostType[]>([]);
+    const [page, setPage] = useState(0);
+    const [hasMore, setHasMore] = useState(true);
+    const [loading, setLoading] = useState(true);
+    const [loadingMore, setLoadingMore] = useState(false);
+    const [error, setError] = useState<string | null>(null);
 
-  // Mở modal xác thực với tab tương ứng (login/signup), chỉ khi chưa đăng nhập
-  const handleOpenAuth = (tab: 'login' | 'signup') => {
-    if (!user) {
-      setAuthTab(tab);
-      setShowAuth(true);
-    }
-  };
+    const fetchPosts = useCallback(
+        async (pageIndex: number, isRefresh = false) => {
+            if (pageIndex > 0) setLoadingMore(true);
+            else setLoading(true);
 
-  // Đóng modal xác thực sau khi đăng nhập/đăng ký thành công
-  const handleAuthSuccess = () => {
-    setShowAuth(false);
-  };
+            setError(null);
 
-  // Xác định theme màu sắc dựa trên tab hiện tại
-  const theme = activeTab === 1 ? 'reflective' : 'inspiring';
+            try {
+                const fetchedPosts = await apiCall(`/api/posts`, {
+                    params: {
+                        limit: POSTS_PER_PAGE,
+                        offset: pageIndex * POSTS_PER_PAGE,
+                        type: activeTab === 0 ? "positive" : "negative",
+                        viewer_id: user?.id,
+                    },
+                });
 
-  // Xác định class màu nền dựa trên tab hiện tại
-  const bgClass =
-    activeTab === 0
-      ? "bg-slate-50"
-      : "bg-[#F8F9FA]";
-
-  // Callback khi đăng bài thành công
-  const handlePostCreated = (newPost: PostType) => {
-    // Bổ sung tên và avatar nếu thiếu (thường xảy ra với post mới tạo)
-    const completedPost = {
-      ...newPost,
-      first_name: newPost.first_name || user?.first_name || '',
-      last_name: newPost.last_name || user?.last_name || '',
-      avatar_url: newPost.avatar_url || user?.avatar_url || '',
-    };
-    setPosts(prev => [completedPost, ...prev]);
-  };
-
-  useEffect(() => {
-    const fetchPosts = async () => {
-      try {
-        const res = await axios.get<PostType[]>(`${process.env.NEXT_PUBLIC_API_URL}/api/posts`, {
-          baseURL: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000',
-        });
-        setPosts(res.data);
-      } catch (error) {
-        console.error('Error fetching posts:', error);
-      }
-    };
-    fetchPosts();
-
-    // Lắng nghe sự kiện post được duyệt
-    const handlePostApproved = (data: { post: PostType }) => {
-      // Thêm bài viết mới vào đầu danh sách
-      setPosts((prevPosts) => [data.post, ...prevPosts]);
-    };
-
-    // Lắng nghe sự kiện post bị xóa
-    const handlePostDeleted = (data: { postId: string }) => {
-      setPosts((prevPosts) => prevPosts.filter((p) => p.id !== data.postId));
-    };
-    
-    socket.on('postApproved', handlePostApproved);
-    socket.on('postDeleted', handlePostDeleted);
-
-    return () => {
-      socket.off('postApproved', handlePostApproved);
-      socket.off('postDeleted', handlePostDeleted);
-    };
-  }, []);
-
-  // Lọc bài viết theo tab
-  const filteredPosts = posts
-    .filter(post => post.is_approved) // chỉ lấy bài đã duyệt
-    .filter(post =>
-      activeTab === 0 ? post.type_post === 'positive' : post.type_post === 'negative'
+                setPosts((prev) =>
+                    pageIndex === 0 || isRefresh
+                        ? fetchedPosts
+                        : [...prev, ...fetchedPosts]
+                );
+                setHasMore(fetchedPosts.length === POSTS_PER_PAGE);
+            } catch {
+                setError("Không thể tải bài viết. Vui lòng thử lại.");
+            } finally {
+                setLoading(false);
+                setLoadingMore(false);
+            }
+        },
+        [apiCall, activeTab, user?.id]
     );
 
-  // Lazy load: tăng số lượng post hiển thị khi kéo gần cuối trang
-  const handleScroll = useCallback(() => {
-    if (window.innerHeight + window.scrollY >= document.body.offsetHeight - 200) {
-      setVisibleCount((prev) => Math.min(prev + 4, filteredPosts.length));
-    }
-  }, [filteredPosts.length]);
+    // Initial fetch and tab change handler
+    useEffect(() => {
+        setPage(0);
+        setPosts([]);
+        setHasMore(true);
+        fetchPosts(0, true);
+    }, [activeTab, fetchPosts]);
 
-  useEffect(() => {
-    window.addEventListener('scroll', handleScroll);
-    return () => window.removeEventListener('scroll', handleScroll);
-  }, [handleScroll]);
+    // Infinite scroll page change
+    useEffect(() => {
+        if (page > 0) {
+            fetchPosts(page);
+        }
+    }, [page, fetchPosts]);
 
-  useEffect(() => {
-    setVisibleCount(4); // Reset khi đổi tab hoặc posts
-  }, [activeTab, posts]);
+    const handlePostCreated = (newPost: PostType) => {
+        const typePost = activeTab === 0 ? "positive" : "negative";
+        if (newPost.type_post === typePost) {
+            const completedPost = {
+                ...newPost,
+                first_name: newPost.first_name || user?.first_name || "",
+                last_name: newPost.last_name || user?.last_name || "",
+                avatar_url: newPost.avatar_url || user?.avatar_url || "",
+            };
+            setPosts((prev) => [completedPost, ...prev]);
+        }
+    };
 
-  return (
-    <div className={`min-h-screen w-full ${bgClass}`}>
-      {/* Header: Thanh điều hướng trên cùng, cho phép mở modal xác thực */}
-      <div className="fixed top-0 left-0 w-full z-50">
-        <Header onOpenAuth={handleOpenAuth} theme={theme} />
-      </div>
+    const handleOpenPostDetail = (postData: PostType) => {
+        setOpenPost(postData);
+    };
 
-      {/* Modal xác thực */}
-      {showAuth && !user && (
-        <AuthModal 
-          onClose={() => setShowAuth(false)} 
-          defaultTab={authTab} 
-          onSuccess={handleAuthSuccess}
-        />
-      )}
+    useEffect(() => {
+        const handlePostApproved = (data: { post: PostType }) => {
+            const typePost = activeTab === 0 ? "positive" : "negative";
+            if (data.post.type_post === typePost) {
+                setPosts((prevPosts) => [data.post, ...prevPosts]);
+            }
+        };
 
-      {/* Main Content */}
-      <div className="pt-20 flex flex-col lg:flex-row w-full">
-        {/* Sidebar trái - Ẩn trên mobile */}
-        <div className="hidden lg:block fixed top-[5.5rem] left-0 z-20">
-          <LeftSidebar theme={theme} />
-        </div>
+        const handlePostDeleted = (data: { postId: string }) => {
+            setPosts((prevPosts) =>
+                prevPosts.filter((p) => p.id !== data.postId)
+            );
+        };
 
-        {/* Nội dung trung tâm */}
-        <div className="flex-1 flex flex-col items-center mx-auto px-4 sm:px-6 lg:px-8 w-full max-w-4xl">
-          <div className="w-full max-w-3xl mx-auto">
-            {/* Tabs */}
-            <div className="w-full mt-8">
-              <Tabs onTabChange={setActiveTab} />
+        socket.on("postApproved", handlePostApproved);
+        socket.on("postDeleted", handlePostDeleted);
+
+        return () => {
+            socket.off("postApproved", handlePostApproved);
+            socket.off("postDeleted", handlePostDeleted);
+        };
+    }, [activeTab]);
+
+    const observer =
+        typeof window !== "undefined"
+            ? new IntersectionObserver(
+                  (entries) => {
+                      if (entries[0].isIntersecting && hasMore && !loading) {
+                          setPage((prev) => prev + 1);
+                      }
+                  },
+                  { threshold: 1.0 }
+              )
+            : null;
+
+    const loadMoreRef = useCallback(
+        (node: HTMLDivElement) => {
+            if (observer) {
+                observer.disconnect();
+                if (node) observer.observe(node);
+            }
+        },
+        [observer]
+    );
+
+    const theme = activeTab === 1 ? "reflective" : "inspiring";
+    const bgClass = activeTab === 0 ? "bg-slate-50" : "bg-[#F8F9FA]";
+
+    return (
+        <div className={`min-h-screen w-full ${bgClass}`}>
+            <div className="fixed top-0 left-0 w-full z-50">
+                <Header theme={theme} />
             </div>
 
-            {/* Create Post Section */}
-            <div className="w-full mt-6">
-              <InputSection onOpenModal={() => setShowCreatePost(true)} theme={theme} />
+            <div className="pt-20">
+                <div className="flex justify-center w-full">
+                    <div className="hidden lg:block w-[280px] flex-shrink-0">
+                        <div className="fixed top-[5.5rem] left-0 z-20 w-[280px] h-full">
+                            <LeftSidebar theme={theme} />
+                        </div>
+                    </div>
+
+                    <main className="w-full max-w-[700px] flex-shrink-0 px-4">
+                        <div className="w-full mt-8">
+                            <Tabs onTabChange={setActiveTab} />
+                        </div>
+
+                        <div className="w-full mt-6">
+                            <InputSection
+                                onOpenModal={() => setShowCreatePost(true)}
+                                theme={theme}
+                            />
+                        </div>
+
+                        <div className="w-full pt-6 pb-20 flex flex-col space-y-6">
+                            {loading && posts.length === 0 ? (
+                                <>
+                                    <SkeletonPost />
+                                    <SkeletonPost />
+                                    <SkeletonPost />
+                                </>
+                            ) : error ? (
+                                <div className="text-center py-8 bg-white rounded-2xl w-full">
+                                    <p className="text-red-500 mb-4">{error}</p>
+                                    <button
+                                        onClick={() => fetchPosts(0, true)}
+                                        className="px-4 py-2 bg-indigo-50 text-indigo-600 rounded-lg hover:bg-indigo-100"
+                                    >
+                                        Thử lại
+                                    </button>
+                                </div>
+                            ) : (
+                                posts.map((post) => (
+                                    <Post
+                                        key={post.id}
+                                        theme={theme}
+                                        post={post}
+                                        onOpenDetail={handleOpenPostDetail}
+                                    />
+                                ))
+                            )}
+                            {loadingMore && <SkeletonPost />}
+                            <div ref={loadMoreRef} className="h-1" />
+                        </div>
+                    </main>
+
+                    <div className="hidden lg:block w-[280px] flex-shrink-0">
+                        <div className="fixed top-[5.5rem] right-0 z-20 w-[280px] h-full">
+                            <RightSidebar theme={theme} />
+                        </div>
+                    </div>
+                </div>
             </div>
 
-            {/* Posts List */}
-            <div className="w-full pt-6 pb-20">
-              {filteredPosts.slice(0, visibleCount).map(post => (
-                <Post
-                  key={post.id}
-                  theme={theme}
-                  id={post.id}
-                  userId={post.user_id}
-                  name={`${post.first_name} ${post.last_name}`}
-                  date={post.created_at || ""}
-                  content={post.content}
-                  likes={post.likes || 0}
-                  comments={post.comments || 0}
-                  shares={post.shares || 0}
-                  images={post.images}
-                  avatar={post.avatar_url || undefined}
-                  feeling={post.feeling}
-                  location={post.location}
-                  shared_post_id={post.shared_post_id}
-                  onOpenDetail={postObj => setOpenPost({
-                    id: postObj.id,
-                    name: postObj.name || `${postObj.first_name || ''} ${postObj.last_name || ''}`.trim(),
-                    date: postObj.date || postObj.created_at || '',
-                    content: postObj.content,
-                    likes: postObj.likes,
-                    comments: postObj.comments,
-                    shares: postObj.shares,
-                    images: postObj.images,
-                    avatar_url: postObj.avatar_url || postObj.avatar,
-                    feeling: postObj.feeling,
-                    location: postObj.location,
-                    shared_post: postObj.shared_post, 
-                  })}
-                  onPostCreated={handlePostCreated}
+            {openPost && (
+                <PostDetailPopup
+                    post={openPost}
+                    onClose={() => setOpenPost(null)}
                 />
-              ))}
-            </div>
-          </div>
+            )}
+            {showCreatePost && (
+                <ForbiddenWordsProvider>
+                    <CreatePostModal
+                        onClose={() => setShowCreatePost(false)}
+                        onPostCreated={handlePostCreated}
+                        theme={theme}
+                        defaultTypePost={
+                            activeTab === 0 ? "positive" : "negative"
+                        }
+                    />
+                </ForbiddenWordsProvider>
+            )}
+            <ImageModal />
         </div>
-
-        {/* Sidebar phải - Ẩn trên mobile */}
-        <div className="hidden lg:block fixed top-[5.5rem] right-0 z-20">
-          <RightSidebar theme={theme} />
-        </div>
-      </div>
-
-      {/* Popups & Modals */}
-      {openPost && (
-        <PostDetailPopup 
-          post={openPost} 
-          onClose={() => setOpenPost(null)} 
-          onCommentAdded={() => handleCommentAdded(openPost.id)}
-        />
-      )}
-      {showCreatePost && (
-        <ForbiddenWordsProvider>
-          <CreatePostModal 
-            onClose={() => setShowCreatePost(false)} 
-            onPostCreated={handlePostCreated} 
-            theme={theme}
-            defaultTypePost={activeTab === 0 ? 'positive' : 'negative'}
-          />
-        </ForbiddenWordsProvider>
-      )}
-    </div>
-  );
+    );
 }
