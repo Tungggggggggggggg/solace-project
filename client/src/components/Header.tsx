@@ -14,6 +14,7 @@ import axios from 'axios';
 import { Notification } from "@/types/notification";
 import { formatDate } from "@/lib/dateUtils";
 import PostDetailPopup from "./PostDetailPopup";
+import clsx from "clsx";
 
 
 // Định nghĩa kiểu props cho Header
@@ -77,6 +78,7 @@ const Header = memo<HeaderProps>(({
   const [followedUserIds, setFollowedUserIds] = useState<string[]>([]);
   // Online users for dropdown message
   const [onlineUsers, setOnlineUsers] = useState<Set<string>>(new Set());
+  const [showMobileSearch, setShowMobileSearch] = useState(false);
   useEffect(() => {
     const handleOnline = (users: string[]) => setOnlineUsers(new Set(users));
     socket.on('onlineUsers', handleOnline);
@@ -946,126 +948,164 @@ const Header = memo<HeaderProps>(({
   return (
     <>
       <header className="flex items-center justify-between w-full h-14 sm:h-16 md:h-20 px-3 sm:px-4 md:px-6 lg:px-8 xl:px-16" style={{ backgroundColor: headerBg }}>
-        {/* Logo */}
-        <Link href="/" className="flex items-center h-12 w-28 sm:h-14 sm:w-32 md:h-16 md:w-40 lg:h-18 lg:w-44 xl:h-20 xl:w-48 hover:opacity-80 transition-opacity duration-200 cursor-pointer flex-shrink-0">
-          <Image src="/logo.png" alt="Solace Logo" width={192} height={80} className="object-contain w-full h-full" priority />
-        </Link>
-        
-        {/* Search Bar */}
-        <div className="flex-1 max-w-xs sm:max-w-sm md:max-w-md lg:max-w-xl mx-2 sm:mx-4 md:mx-6 lg:mx-8 relative">
-          <div className="flex w-full rounded-full border border-black bg-white overflow-hidden" ref={inputWrapperRef}>
-            <FilteredInput
-              ref={inputRef}
-              type="text"
-              value={value}
-              onChange={memoizedHandleChange}
-              onFocus={handleInputFocus}
-              onBlur={handleInputBlur}
-              onKeyDown={e => {
-                if (e.key === 'Enter') handleSearchWithHistory();
-                else memoizedHandleKeyDown(e);
-              }}
-              placeholder="Tìm kiếm..."
-              className="flex-1 px-2 sm:px-3 md:px-4 lg:px-5 py-1.5 sm:py-2 bg-white text-xs sm:text-sm md:text-base font-normal placeholder:text-gray-400 focus:outline-none border-none rounded-none text-black"
-            />
-            <div 
-              className="flex items-center justify-center px-2 sm:px-3 md:px-4 lg:px-5 border-l border-black cursor-pointer flex-shrink-0" 
-              style={{ minHeight: "32px", backgroundColor: headerBg }} 
-              onClick={memoizedHandleClick}
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="black" className="w-4 h-4 sm:w-5 sm:h-5 md:w-6 md:h-6">
-                <circle cx="11" cy="11" r="7" />
-                <line x1="16.5" y1="16.5" x2="21" y2="21" stroke="black" strokeWidth={2} strokeLinecap="round" />
-              </svg>
+        {/* Mobile Search View */}
+        {showMobileSearch && (
+            <div className="absolute inset-0 flex items-center bg-white px-2 z-20">
+                <button 
+                    onClick={() => setShowMobileSearch(false)} 
+                    className="p-2 text-gray-600 hover:text-black"
+                >
+                    <span className="material-symbols-outlined">arrow_back</span>
+                </button>
+                <div className="flex-1 relative">
+                    <FilteredInput
+                      ref={inputRef}
+                      type="text"
+                      value={value}
+                      onChange={memoizedHandleChange}
+                      onFocus={handleInputFocus}
+                      onBlur={handleInputBlur}
+                      onKeyDown={e => {
+                        if (e.key === 'Enter') handleSearchWithHistory();
+                        else memoizedHandleKeyDown(e);
+                      }}
+                      placeholder="Tìm kiếm..."
+                      className="w-full px-4 py-2 bg-gray-100 rounded-full focus:outline-none"
+                      autoFocus
+                    />
+                </div>
             </div>
-          </div>
-          {/* Search Dropdown */}
-          <div className="dropdown-wrapper absolute left-0 right-0 top-full z-50">
-            {showSuggestions && suggestions.length > 0 ? (
-              <div ref={dropdownRef} className="bg-white border border-gray-200 rounded-xl shadow-lg max-h-48 sm:max-h-60 overflow-y-auto mt-1">
-                {suggestions.filter(s => s.type === 'user' && s.avatar).map((s, idx) => (
-                  <div
-                    key={s.id}
-                    className="flex items-center gap-2 sm:gap-3 px-3 sm:px-4 py-2 cursor-pointer hover:bg-gradient-to-r from-blue-50 to-white text-gray-800 text-xs sm:text-sm group suggestion-item transition-all duration-200"
-                    onMouseEnter={e => gsap.to(e.currentTarget, { background: 'linear-gradient(to right, #e6f0fa, #ffffff)', duration: 0.2 })}
-                    onMouseLeave={e => gsap.to(e.currentTarget, { background: 'transparent', duration: 0.2 })}
-                    onMouseDown={() => handleSuggestionClick(s)}
-                  >
-                    <Image src={typeof s.avatar === 'string' && s.avatar ? s.avatar : '/default-avatar.png'} alt={s.name} width={28} height={28} className="w-7 h-7 sm:w-8 sm:h-8 rounded-full object-cover" />
-                    <span className="font-medium text-gray-900 truncate">{s.name}</span>
-                  </div>
-                ))}
-              </div>
-            ) : showHistory && searchHistory.length > 0 ? (
-              <div ref={dropdownRef} className="bg-white border border-gray-200 rounded-xl shadow-lg max-h-56 sm:max-h-72 overflow-y-auto mt-1">
-                <div className="flex flex-col divide-y divide-gray-100">
-                  {searchHistory.slice(0, 8).map((item, idx) => (
-                    <div
-                      key={item.id}
-                      id={`history-item-${idx}`}
-                      role="option"
-                      aria-selected="false"
-                      tabIndex={0}
-                      className="flex items-center justify-between px-3 sm:px-4 py-2 hover:bg-gradient-to-r from-blue-50 to-white cursor-pointer text-gray-700 group bg-white history-item transition-all duration-200"
-                      onMouseEnter={e => {
-                        if (!e.currentTarget.classList.contains('being-removed')) {
-                          gsap.to(e.currentTarget, { background: 'linear-gradient(to right, #e6f0fa, #ffffff)', duration: 0.2 });
-                        }
-                      }}
-                      onMouseLeave={e => {
-                        if (!e.currentTarget.classList.contains('being-removed')) {
-                          gsap.to(e.currentTarget, { background: 'transparent', duration: 0.2 });
-                        }
-                      }}
-                    >
-                      <div
-                        className="flex items-center gap-2 flex-1 min-w-0"
-                        onMouseDown={async (e) => {
-                          e.stopPropagation();
-                          setSearch(item.keyword);
-                          setShowHistory(false);
-                          if (onSearchChange) onSearchChange({ target: { value: item.keyword } } as any);
-                          await saveSearchHistory(item.keyword);
-                          router.push(`/search?query=${encodeURIComponent(item.keyword)}`);
-                        }}
-                      >
-                        <span className="inline-flex items-center justify-center w-6 h-6 sm:w-7 sm:h-7 text-gray-500">
-                          <svg viewBox="0 0 21 21" aria-hidden="true" width="16" height="16" className="sm:w-5 sm:h-5">
-                            <g>
-                              <path d="M9.094 3.095c-3.314 0-6 2.686-6 6s2.686 6 6 6c1.657 0 3.155-.67 4.243-1.757 1.087-1.088 1.757-2.586 1.757-4.243 0-3.314-2.686-6-6-6zm-9 6c0-4.971 4.029-9 9-9s9 4.029 9 9c0 1.943-.617 3.744-1.664 5.215l4.475 4.474-2.122 2.122-4.474-4.475c-1.471 1.047-3.272 1.664-5.215 1.664-4.97-.001-8.999-4.03-9-9z"></path>
-                            </g>
-                          </svg>
-                        </span>
-                        <span className="truncate text-xs sm:text-sm font-medium text-gray-900">{item.keyword}</span>
-                      </div>
-                      <button
-                        aria-label="Xóa"
-                        type="button"
-                        className="ml-1 sm:ml-2 p-1 rounded-full hover:bg-red-100 text-red-500 opacity-0 group-hover:opacity-100 focus:opacity-100 transition-opacity duration-200"
-                        onMouseDown={(e) => {
-                          e.preventDefault();
-                          e.stopPropagation();
-                          handleDeleteKeywordByIndex(idx);
-                        }}
-                      >
-                        <span className="inline-flex items-center justify-center w-5 h-5 sm:w-6 sm:h-6">
-                          <svg viewBox="0 0 24 24" aria-hidden="true" width="14" height="14" className="sm:w-4 sm:h-4">
-                            <g>
-                              <path d="M10.59 12L4.54 5.96l1.42-1.42L12 10.59l6.04-6.05 1.42 1.42L13.41 12l6.05 6.04-1.42 1.42L12 13.41l-6.04 6.05-1.42-1.42L10.59 12z"></path>
-                            </g>
-                          </svg>
-                        </span>
-                      </button>
-                    </div>
-                  ))}
+        )}
+
+        <div className={clsx("flex items-center justify-between w-full", { "invisible": showMobileSearch })}>
+            {/* Logo */}
+            <Link href="/" className="flex items-center h-12 w-28 sm:h-14 sm:w-32 md:h-16 md:w-40 lg:h-18 lg:w-44 xl:h-20 xl:w-48 hover:opacity-80 transition-opacity duration-200 cursor-pointer flex-shrink-0">
+              <Image src="/logo.png" alt="Solace Logo" width={192} height={80} className="object-contain w-full h-full" priority />
+            </Link>
+            
+            {/* Search Bar */}
+            <div className="hidden md:flex flex-1 max-w-xs sm:max-w-sm md:max-w-md lg:max-w-xl mx-2 sm:mx-4 md:mx-6 lg:mx-8 relative">
+              <div className="flex w-full rounded-full border border-black bg-white overflow-hidden" ref={inputWrapperRef}>
+                <FilteredInput
+                  ref={inputRef}
+                  type="text"
+                  value={value}
+                  onChange={memoizedHandleChange}
+                  onFocus={handleInputFocus}
+                  onBlur={handleInputBlur}
+                  onKeyDown={e => {
+                    if (e.key === 'Enter') handleSearchWithHistory();
+                    else memoizedHandleKeyDown(e);
+                  }}
+                  placeholder="Tìm kiếm..."
+                  className="flex-1 px-2 sm:px-3 md:px-4 lg:px-5 py-1.5 sm:py-2 bg-white text-xs sm:text-sm md:text-base font-normal placeholder:text-gray-400 focus:outline-none border-none rounded-none text-black"
+                />
+                <div 
+                  className="flex items-center justify-center px-2 sm:px-3 md:px-4 lg:px-5 border-l border-black cursor-pointer flex-shrink-0" 
+                  style={{ minHeight: "32px", backgroundColor: headerBg }} 
+                  onClick={memoizedHandleClick}
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="black" className="w-4 h-4 sm:w-5 sm:h-5 md:w-6 md:h-6">
+                    <circle cx="11" cy="11" r="7" />
+                    <line x1="16.5" y1="16.5" x2="21" y2="21" stroke="black" strokeWidth={2} strokeLinecap="round" />
+                  </svg>
                 </div>
               </div>
-            ) : null}
-          </div>
+              {/* Search Dropdown */}
+              <div className="dropdown-wrapper absolute left-0 right-0 top-full z-50">
+                {showSuggestions && suggestions.length > 0 ? (
+                  <div ref={dropdownRef} className="bg-white border border-gray-200 rounded-xl shadow-lg max-h-48 sm:max-h-60 overflow-y-auto mt-1">
+                    {suggestions.filter(s => s.type === 'user' && s.avatar).map((s, idx) => (
+                      <div
+                        key={s.id}
+                        className="flex items-center gap-2 sm:gap-3 px-3 sm:px-4 py-2 cursor-pointer hover:bg-gradient-to-r from-blue-50 to-white text-gray-800 text-xs sm:text-sm group suggestion-item transition-all duration-200"
+                        onMouseEnter={e => gsap.to(e.currentTarget, { background: 'linear-gradient(to right, #e6f0fa, #ffffff)', duration: 0.2 })}
+                        onMouseLeave={e => gsap.to(e.currentTarget, { background: 'transparent', duration: 0.2 })}
+                        onMouseDown={() => handleSuggestionClick(s)}
+                      >
+                        <Image src={typeof s.avatar === 'string' && s.avatar ? s.avatar : '/default-avatar.png'} alt={s.name} width={28} height={28} className="w-7 h-7 sm:w-8 sm:h-8 rounded-full object-cover" />
+                        <span className="font-medium text-gray-900 truncate">{s.name}</span>
+                      </div>
+                    ))}
+                  </div>
+                ) : showHistory && searchHistory.length > 0 ? (
+                  <div ref={dropdownRef} className="bg-white border border-gray-200 rounded-xl shadow-lg max-h-56 sm:max-h-72 overflow-y-auto mt-1">
+                    <div className="flex flex-col divide-y divide-gray-100">
+                      {searchHistory.slice(0, 8).map((item, idx) => (
+                        <div
+                          key={item.id}
+                          id={`history-item-${idx}`}
+                          role="option"
+                          aria-selected="false"
+                          tabIndex={0}
+                          className="flex items-center justify-between px-3 sm:px-4 py-2 hover:bg-gradient-to-r from-blue-50 to-white cursor-pointer text-gray-700 group bg-white history-item transition-all duration-200"
+                          onMouseEnter={e => {
+                            if (!e.currentTarget.classList.contains('being-removed')) {
+                              gsap.to(e.currentTarget, { background: 'linear-gradient(to right, #e6f0fa, #ffffff)', duration: 0.2 });
+                            }
+                          }}
+                          onMouseLeave={e => {
+                            if (!e.currentTarget.classList.contains('being-removed')) {
+                              gsap.to(e.currentTarget, { background: 'transparent', duration: 0.2 });
+                            }
+                          }}
+                        >
+                          <div
+                            className="flex items-center gap-2 flex-1 min-w-0"
+                            onMouseDown={async (e) => {
+                              e.stopPropagation();
+                              setSearch(item.keyword);
+                              setShowHistory(false);
+                              if (onSearchChange) onSearchChange({ target: { value: item.keyword } } as any);
+                              await saveSearchHistory(item.keyword);
+                              router.push(`/search?query=${encodeURIComponent(item.keyword)}`);
+                            }}
+                          >
+                            <span className="inline-flex items-center justify-center w-6 h-6 sm:w-7 sm:h-7 text-gray-500">
+                              <svg viewBox="0 0 21 21" aria-hidden="true" width="16" height="16" className="sm:w-5 sm:h-5">
+                                <g>
+                                  <path d="M9.094 3.095c-3.314 0-6 2.686-6 6s2.686 6 6 6c1.657 0 3.155-.67 4.243-1.757 1.087-1.088 1.757-2.586 1.757-4.243 0-3.314-2.686-6-6-6zm-9 6c0-4.971 4.029-9 9-9s9 4.029 9 9c0 1.943-.617 3.744-1.664 5.215l4.475 4.474-2.122 2.122-4.474-4.475c-1.471 1.047-3.272 1.664-5.215 1.664-4.97-.001-8.999-4.03-9-9z"></path>
+                                </g>
+                              </svg>
+                            </span>
+                            <span className="truncate text-xs sm:text-sm font-medium text-gray-900">{item.keyword}</span>
+                          </div>
+                          <button
+                            aria-label="Xóa"
+                            type="button"
+                            className="ml-1 sm:ml-2 p-1 rounded-full hover:bg-red-100 text-red-500 opacity-0 group-hover:opacity-100 focus:opacity-100 transition-opacity duration-200"
+                            onMouseDown={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              handleDeleteKeywordByIndex(idx);
+                            }}
+                          >
+                            <span className="inline-flex items-center justify-center w-5 h-5 sm:w-6 sm:h-6">
+                              <svg viewBox="0 0 24 24" aria-hidden="true" width="14" height="14" className="sm:w-4 sm:h-4">
+                                <g>
+                                  <path d="M10.59 12L4.54 5.96l1.42-1.42L12 10.59l6.04-6.05 1.42 1.42L13.41 12l6.05 6.04-1.42 1.42L12 13.41l-6.04 6.05-1.42-1.42L10.59 12z"></path>
+                                </g>
+                              </svg>
+                            </span>
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ) : null}
+              </div>
+            </div>
         </div>
         
         {/* Right Side Actions */}
         <div className="flex items-center gap-1 sm:gap-2 md:gap-3 justify-end flex-shrink-0 min-w-0">
+            <button
+              onClick={() => setShowMobileSearch(true)}
+              className="md:hidden p-1"
+              aria-label="Search"
+            >
+                <span className="material-symbols-outlined text-2xl">search</span>
+            </button>
           {loading ? (
             <div className="flex items-center gap-1 sm:gap-2 p-1 sm:p-2">
               <div className="bg-gray-200 rounded-full w-5 h-5 sm:w-6 sm:h-6 md:w-8 md:h-8 animate-pulse" />
@@ -1126,13 +1166,7 @@ const Header = memo<HeaderProps>(({
                   {showMessageDropdown && (
                     <div
                       ref={messageDropdownRef}
-                      className="absolute right-0 mt-2 w-72 sm:w-80 md:w-96 max-w-[calc(100vw-2rem)] bg-white rounded-xl shadow-lg py-2 z-50 border border-gray-100 animate-fade-in notification-dropdown-mobile"
-                      style={{ 
-                        minWidth: '260px',
-                        maxWidth: 'calc(100vw - 1rem)',
-                        right: '0',
-                        left: 'auto'
-                      }}
+                      className="absolute top-full mt-2 right-[-1rem] sm:right-0 w-[calc(100vw-2rem)] max-w-sm sm:w-80 md:w-96 bg-white rounded-xl shadow-lg py-2 z-50 border border-gray-100 animate-fade-in"
                     >
                       {/* Header dropdown */}
                       <div className="flex items-center justify-between px-3 sm:px-4 py-2 border-b border-gray-100">
@@ -1256,13 +1290,7 @@ const Header = memo<HeaderProps>(({
                   {showNotificationDropdown && (
                     <div
                       ref={notificationDropdownRef}
-                      className="absolute right-0 mt-2 w-72 sm:w-80 md:w-96 max-w-[calc(100vw-2rem)] bg-white rounded-xl shadow-lg py-2 z-50 border border-gray-100 animate-fade-in notification-dropdown-mobile"
-                      style={{ 
-                        minWidth: '260px',
-                        maxWidth: 'calc(100vw - 1rem)',
-                        right: '0',
-                        left: 'auto'
-                      }}
+                      className="absolute top-full mt-2 right-[-1rem] sm:right-0 w-[calc(100vw-2rem)] max-w-sm sm:w-80 md:w-96 bg-white rounded-xl shadow-lg py-2 z-50 border border-gray-100 animate-fade-in"
                     >
                       {/* Header dropdown */}
                       <div className="flex items-center justify-between px-3 sm:px-4 py-2 border-b border-gray-100">
@@ -1434,15 +1462,8 @@ const Header = memo<HeaderProps>(({
                   <span className="hidden sm:inline text-xs sm:text-sm font-medium text-gray-700 group-hover:text-blue-600 truncate">{user.last_name} {user.first_name}</span>
                 </button>
                 {showUserMenu && (
-                  <div className="absolute right-0 mt-2 w-40 sm:w-44 md:w-48 bg-white rounded-xl shadow-lg py-1 z-50 transform transition-all duration-200 ease-out border border-gray-100 user-menu-dropdown user-menu-mobile"
-                       style={{
-                         minWidth: '160px',
-                         maxWidth: 'calc(100vw - 2rem)',
-                         right: '0',
-                         left: 'auto',
-                         top: '100%',
-                         position: 'absolute'
-                       }}>
+                  <div className="absolute top-full right-0 mt-2 w-40 sm:w-44 md:w-48 bg-white rounded-xl shadow-lg py-1 z-50 transform transition-all duration-200 ease-out border border-gray-100"
+                       >
                     <button
                       onClick={() => router.push("/profile")}
                       className="flex items-center gap-2 w-full text-left px-3 sm:px-4 py-2.5 text-xs sm:text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-600 transition-colors duration-200 touch-manipulation"

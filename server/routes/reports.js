@@ -2,6 +2,7 @@ const express = require('express');
 const pool = require('../db');
 const notificationUtils = require('../utils/notification');
 const router = express.Router();
+const { getIO } = require('../socket');
 
 // Lấy danh sách báo cáo
 router.get('/', async (req, res) => {
@@ -216,10 +217,19 @@ router.post('/send-notification', async (req, res) => {
     if (!user_id || !title || !content) {
       return res.status(400).json({ success: false, message: 'Thiếu thông tin bắt buộc' });
     }
-    await pool.query(
-      'INSERT INTO notifications (user_id, title, content, type) VALUES ($1, $2, $3, $4)',
+    const result  = await pool.query(
+      'INSERT INTO notifications (user_id, title, content, type) VALUES ($1, $2, $3, $4) RETURNING *',
       [user_id, title, content, type || null]
     );
+
+    const notification = result.rows[0];
+    
+    // Gửi thông báo qua Socket.IO
+    const io = getIO(); 
+    io.to(`user:${user_id}`).emit('newNotification', {
+      ...notification
+    });
+    
     res.json({ success: true, message: 'Đã gửi thông báo và lưu vào database!' });
   } catch (err) {
     console.error('Send notification error:', err);

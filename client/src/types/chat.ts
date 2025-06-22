@@ -11,7 +11,7 @@ export interface Message {
   sender_id: string;
   content: string;
   type: 'text' | 'image' | 'system';
-  image_url?: string;
+  image_urls?: string[];
   reply_to_message_id?: string;
   reply_to_content?: string;
   reply_to_sender_name?: string;

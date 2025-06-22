@@ -23,8 +23,13 @@ const MessageItemComponent: FC<MessageItemProps> = ({
   const imageRef = useRef<HTMLImageElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const [toggler, setToggler] = useState(false);
+  const [activeImageIndex, setActiveImageIndex] = useState(0);
 
-  const openLightbox = () => {
+  const images = message.image_urls || [];
+  const hasImages = images.length > 0;
+
+  const openLightbox = (index: number) => {
+    setActiveImageIndex(index);
     setToggler(!toggler);
   };
 
@@ -106,23 +111,51 @@ const MessageItemComponent: FC<MessageItemProps> = ({
           )}
 
           {/* Tin nhắn hình ảnh */}
-          {message.type === 'image' && message.image_url && (
+          {hasImages && (
             <>
-              <figure
-                className="mb-2 cursor-pointer rounded-lg overflow-hidden"
-                onClick={openLightbox}
-                role="button"
-                tabIndex={0}
+              <div
+                className={clsx('grid max-w-md gap-1 rounded-lg overflow-hidden', {
+                  'grid-cols-1': images.length === 1,
+                  'grid-cols-2 grid-rows-2 aspect-square': images.length > 1,
+                })}
               >
-                <img
-                  ref={imageRef}
-                  src={message.image_url}
-                  alt="Sent content"
-                  loading="lazy"
-                  className="max-w-full max-h-64 object-cover rounded-lg border border-gray-200 shadow hover:shadow-lg transition-shadow duration-300"
-                />
-              </figure>
-              <FsLightbox toggler={toggler} sources={[message.image_url]} key={message.id} type="image" />
+                {images.slice(0, 4).map((url, index) => (
+                  <figure
+                    key={url}
+                    className={clsx(
+                      'relative cursor-pointer group',
+                      {
+                        'col-span-2 row-span-2': images.length === 1,
+                        'col-span-1 row-span-2': images.length === 2 && index === 0,
+                        'col-span-1 row-span-2': images.length === 3 && index === 0,
+                        'col-span-1 row-span-1': images.length >= 2,
+                      }
+                    )}
+                    onClick={() => openLightbox(index)}
+                    role="button"
+                    tabIndex={0}
+                  >
+                    <img
+                      src={url}
+                      alt={`Sent content ${index + 1}`}
+                      loading="lazy"
+                      className="w-full h-full object-cover border border-gray-200 group-hover:opacity-80 transition-opacity"
+                    />
+                    {images.length > 4 && index === 3 && (
+                      <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
+                        <span className="text-white text-2xl font-bold">+{images.length - 4}</span>
+                      </div>
+                    )}
+                  </figure>
+                ))}
+              </div>
+              <FsLightbox
+                toggler={toggler}
+                sources={images}
+                slide={activeImageIndex + 1}
+                key={message.id}
+                type="image"
+              />
             </>
           )}
 
@@ -130,7 +163,7 @@ const MessageItemComponent: FC<MessageItemProps> = ({
           {message.content && (
             <div
               className={clsx(
-                'px-4 py-2 rounded-2xl whitespace-pre-wrap break-words shadow-sm text-gray-900',
+                'px-4 py-2 rounded-2xl whitespace-pre-wrap break-words shadow-sm text-gray-900 mt-1',
                 isOwn
                   ? 'bg-[#CCE5FF] rounded-br-sm self-end hover:bg-[#B3D8FF]'
                   : 'bg-[#F1F5F9] rounded-bl-sm self-start hover:bg-[#E2E8F0]'

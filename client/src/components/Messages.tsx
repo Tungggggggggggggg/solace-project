@@ -40,7 +40,7 @@ const MessagePage: FC = () => {
   const [typingUsers, setTypingUsers] = useState<Set<string>>(new Set());
   const typingTimeout = useRef<NodeJS.Timeout | null>(null);
   const [replyingTo, setReplyingTo] = useState<Message | null>(null);
-  const [pendingImageUrl, setPendingImageUrl] = useState<string | undefined>(undefined);
+  const [pendingImageUrls, setPendingImageUrls] = useState<string[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const router = useRouter();
 
@@ -65,10 +65,10 @@ const MessagePage: FC = () => {
   const firstLoadRef = useRef(true); // Scroll 1 lần khi mở phòng
   const isLoadingMoreRef = useRef(false);
 
-  const { uploadFile, isUploading, uploadProgress } = useFileUpload({
-    onUploadComplete: (imageUrl) => {
-      setPendingImageUrl(imageUrl); // Store the image URL for preview
-      setShowImageUpload(false); // Close the upload modal
+  const { uploadFiles, isUploading, uploadProgress } = useFileUpload({
+    onUploadComplete: (imageUrls) => {
+      setPendingImageUrls(prev => [...prev, ...imageUrls]);
+      setShowImageUpload(false);
     },
     onError: (error) => {
       setError(error);
@@ -413,7 +413,7 @@ const MessagePage: FC = () => {
               m.id.startsWith('temp-') &&
               m.sender_id === msg.sender_id &&
               m.content === msg.content &&
-              (m.image_url === msg.image_url || (!m.image_url && !msg.image_url))
+              ((m.image_urls || []).some(url => (msg.image_urls || []).includes(url)))
           );
           if (pendingIdx !== -1) {
             const newMsgs = [...msgs];
@@ -433,7 +433,7 @@ const MessagePage: FC = () => {
               conv.id === msg.conversation_id
                 ? {
                     ...conv,
-                    last_message: msg.content || (msg.image_url ? '[Hình ảnh]' : ''),
+                    last_message: msg.content || ((msg.image_urls && msg.image_urls.length > 0) ? '[Hình ảnh]' : ''),
                     last_message_at: msg.created_at,
                     unread_count: msg.conversation_id !== currentConversationId ? conv.unread_count + 1 : 0,
                     updated_at: msg.created_at,
@@ -499,24 +499,24 @@ const MessagePage: FC = () => {
   const handleSelectConversation = useCallback((id: string) => {
     setCurrentConversationId(id);
     setReplyingTo(null);
-    setPendingImageUrl(undefined);
+    setPendingImageUrls([]);
     if (isMobile) setSidebarOpen(false);
   }, [isMobile, setCurrentConversationId]);
 
   const handleSendMessage = useCallback(
-    async (content: string, imageUrl?: string) => {
-      if ((!content.trim() && !imageUrl) || !currentConversationId || !accessToken || !user) return;
+    async (content: string, imageUrls?: string[]) => {
+      if ((!content.trim() && (!imageUrls || imageUrls.length === 0)) || !currentConversationId || !accessToken || !user) return;
       // 1. Tạo tin nhắn tạm thời (pending)
       const tempId = 'temp-' + Date.now();
       const optimisticMsg: Message = {
         id: tempId,
         sender_id: user.id,
         content,
-        image_url: imageUrl,
+        image_urls: imageUrls,
         created_at: new Date().toISOString(),
         status: 'pending' as any,
         conversation_id: currentConversationId,
-        type: imageUrl ? 'image' : 'text',
+        type: imageUrls && imageUrls.length > 0 ? 'image' : 'text',
         read_by_count: 1,
         sender_name: `${user.first_name} ${user.last_name}`,
         sender_avatar: user.avatar_url,
@@ -527,7 +527,7 @@ const MessagePage: FC = () => {
       }));
 
       setReplyingTo(null);
-      setPendingImageUrl(undefined);
+      setPendingImageUrls([]);
       if (content) setText('');
 
       try {
@@ -541,8 +541,8 @@ const MessagePage: FC = () => {
             },
             body: JSON.stringify({ 
               content, 
-              imageUrl,
-              type: imageUrl ? 'image' : 'text',
+              imageUrls,
+              type: imageUrls && imageUrls.length > 0 ? 'image' : 'text',
               replyToMessageId: replyingTo?.id
             })
           }
@@ -558,7 +558,7 @@ const MessagePage: FC = () => {
             conv.id === currentConversationId
               ? {
                   ...conv,
-                  last_message: content || (imageUrl ? '[Hình ảnh]' : ''),
+                  last_message: content || (imageUrls && imageUrls.length > 0 ? '[Hình ảnh]' : ''),
                   last_message_at: new Date().toISOString(),
                   updated_at: new Date().toISOString(),
                 }
@@ -581,9 +581,9 @@ const MessagePage: FC = () => {
   const handleKeyPress = useCallback((e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
-      handleSendMessage(text, pendingImageUrl);
+      handleSendMessage(text, pendingImageUrls);
     }
-  }, [handleSendMessage, text, pendingImageUrl]);
+  }, [handleSendMessage, text, pendingImageUrls]);
 
   const startNewConversation = useCallback(async (members: string[], type: string) => {
     if (!accessToken || !user) return;
@@ -613,7 +613,7 @@ const MessagePage: FC = () => {
       
       setCurrentConversationId(conversation.id);
       setReplyingTo(null);
-      setPendingImageUrl(undefined);
+      setPendingImageUrls([]);
       setShowNewModal(false);
       
       setConversations(prev => {
@@ -654,8 +654,8 @@ const MessagePage: FC = () => {
     setReplyingTo(null);
   }, []);
 
-  const cancelImage = useCallback(() => {
-    setPendingImageUrl(undefined);
+  const cancelImage = useCallback((urlToRemove: string) => {
+    setPendingImageUrls(prev => prev.filter(url => url !== urlToRemove));
   }, []);
 
   const handleCopyLink = useCallback(() => {
@@ -830,15 +830,16 @@ const MessagePage: FC = () => {
             <MessageInput 
               text={text}
               replyingTo={replyingTo}
-              pendingImageUrl={pendingImageUrl}
+              pendingImageUrls={pendingImageUrls}
               isUploading={isUploading}
               showImageUpload={showImageUpload}
               onTextChange={handleInputChange}
               onKeyPress={handleKeyPress}
-              onSend={() => handleSendMessage(text, pendingImageUrl)}
+              onSend={() => handleSendMessage(text, pendingImageUrls)}
               onCancelReply={cancelReply}
               onCancelImage={cancelImage}
               onImageToggle={() => setShowImageUpload(!showImageUpload)}
+              isMobile={isMobile}
             />
           </>
         ) : (
@@ -872,7 +873,7 @@ const MessagePage: FC = () => {
         uploadProgress={uploadProgress.percent}
         onClose={() => setShowImageUpload(false)}
         onUpload={async (files: FileList) => {
-          await uploadFile(files[0]);
+          await uploadFiles(files);
         }}
       />
     </div>

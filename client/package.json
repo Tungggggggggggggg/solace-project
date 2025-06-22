@@ -13,6 +13,7 @@
     "@tanstack/react-virtual": "^3.13.10",
     "axios": "^1.10.0",
     "clsx": "^2.1.1",
+    "emoji-picker-react": "^4.12.2",
     "firebase": "^11.8.1",
     "framer-motion": "^12.18.1",
     "fslightbox-react": "^1.8.0",

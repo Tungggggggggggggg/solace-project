@@ -1,7 +1,7 @@
 import { useState, useCallback } from 'react';
 
 interface UseFileUploadProps {
-  onUploadComplete: (imageUrl: string) => void;
+  onUploadComplete: (imageUrls: string[]) => void;
   onError: (error: string) => void;
 }
 
@@ -9,14 +9,18 @@ export const useFileUpload = ({ onUploadComplete, onError }: UseFileUploadProps)
   const [isUploading, setIsUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState({ percent: 0 });
 
-  const uploadFile = useCallback(
-    async (file: File) => {
+  const uploadFiles = useCallback(
+    async (files: FileList | null) => {
+      if (!files || files.length === 0) return;
+
       setIsUploading(true);
       setUploadProgress({ percent: 0 });
 
       try {
         const formData = new FormData();
-        formData.append('media', file);
+        for (let i = 0; i < files.length; i++) {
+          formData.append('media', files[i]);
+        }
 
         const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/posts/upload-media`, {
           method: 'POST',
@@ -25,14 +29,14 @@ export const useFileUpload = ({ onUploadComplete, onError }: UseFileUploadProps)
 
         if (!response.ok) {
           const errorData = await response.json();
-          throw new Error(errorData.error || 'Failed to upload file');
+          throw new Error(errorData.error || 'Failed to upload files');
         }
 
         const data = await response.json();
-        onUploadComplete(data.images[0]); // Assuming API returns { url: string }
+        onUploadComplete(data.images);
         setUploadProgress({ percent: 100 });
       } catch (error) {
-        onError(error instanceof Error ? error.message : 'Failed to upload file');
+        onError(error instanceof Error ? error.message : 'Failed to upload files');
       } finally {
         setIsUploading(false);
       }
@@ -40,14 +44,5 @@ export const useFileUpload = ({ onUploadComplete, onError }: UseFileUploadProps)
     [onUploadComplete, onError]
   );
 
-  const uploadMultipleFiles = useCallback(
-    async (files: File[]) => {
-      for (const file of files) {
-        await uploadFile(file);
-      }
-    },
-    [uploadFile]
-  );
-
-  return { uploadFile, uploadMultipleFiles, isUploading, uploadProgress };
+  return { uploadFiles, isUploading, uploadProgress };
 };

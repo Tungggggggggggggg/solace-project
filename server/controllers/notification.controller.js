@@ -102,7 +102,7 @@ exports.markAllAsRead = async (req, res) => {
   try {
     const userId = req.user.id;
     await pool.query(`
-      UPDATE notifications SET is_read = true 
+      UPDATE notifications n SET is_read = true 
       WHERE user_id = $1
       AND n.type != 'report_new' AND n.type != 'post_approval'
     `, [userId]);
@@ -155,7 +155,7 @@ exports.deleteNotification = async (req, res) => {
     
     // Xóa thông báo
     await pool.query(
-      `DELETE FROM notifications 
+      `DELETE FROM notifications n
       WHERE id = $1 AND user_id = $2
       AND n.type != 'report_new'
       AND n.type != 'post_approval'`,
@@ -178,7 +178,12 @@ exports.deleteNotification = async (req, res) => {
 exports.deleteAllNotifications = async (req, res) => {
   try {
     const userId = req.user.id;
-    await pool.query('DELETE FROM notifications WHERE user_id = $1', [userId]);
+    await pool.query(`
+      DELETE FROM notifications n 
+      WHERE user_id = $1  
+      AND n.type != 'report_new' 
+      AND n.type != 'post_approval'
+    `, [userId]);
     
     // Emit socket event để cập nhật số lượng thông báo chưa đọc
     await emitUnreadTotalUpdate(userId);
