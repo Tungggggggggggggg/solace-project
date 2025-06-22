@@ -17,6 +17,7 @@ import type { PostType } from "@/types/Post";
 import { socket } from "@/socket";
 import SkeletonPost from "@/components/SkeletonPost";
 import { ForbiddenWordsProvider } from "@/contexts/ForbiddenWordsContext";
+import MainLayout from "@/components/MainLayout";
 
 const POSTS_PER_PAGE = 5;
 
@@ -193,90 +194,89 @@ export default function Home() {
     const bgClass = activeTab === 0 ? "bg-slate-50" : "bg-[#F8F9FA]";
 
     return (
-        <div className={`min-h-screen w-full ${bgClass}`}>
-            <div className="fixed top-0 left-0 w-full z-50">
-                <Header theme={theme} />
-            </div>
+        <MainLayout>
+            <div className={`min-h-screen w-full ${bgClass}`}>
 
-            <div className="pt-20">
-                <div className="flex justify-center w-full">
-                    <div className="hidden lg:block w-[280px] flex-shrink-0">
-                        <div className="fixed top-[5.5rem] left-0 z-20 w-[280px] h-full">
-                            <LeftSidebar theme={theme} />
-                        </div>
-                    </div>
-
-                    <main className="w-full max-w-[700px] flex-shrink-0 px-4">
-                        <div className="w-full mt-8">
-                            <Tabs onTabChange={setActiveTab} />
+                <div className="pt-20">
+                    <div className="flex justify-center w-full">
+                        <div className="hidden lg:block w-[280px] flex-shrink-0">
+                            <div className="fixed top-[5.5rem] left-0 z-20 w-[280px] h-full">
+                                <LeftSidebar theme={theme} />
+                            </div>
                         </div>
 
-                        <div className="w-full mt-6">
-                            <InputSection
-                                onOpenModal={() => setShowCreatePost(true)}
-                                theme={theme}
-                            />
-                        </div>
+                        <main className="w-full max-w-[700px] flex-shrink-0 px-4">
+                            <div className="w-full mt-8">
+                                <Tabs onTabChange={setActiveTab} />
+                            </div>
 
-                        <div className="w-full pt-6 pb-20 flex flex-col space-y-6">
-                            {loading && posts.length === 0 ? (
-                                <>
-                                    <SkeletonPost />
-                                    <SkeletonPost />
-                                    <SkeletonPost />
-                                </>
-                            ) : error ? (
-                                <div className="text-center py-8 bg-white rounded-2xl w-full">
-                                    <p className="text-red-500 mb-4">{error}</p>
-                                    <button
-                                        onClick={() => fetchPosts(0, true)}
-                                        className="px-4 py-2 bg-indigo-50 text-indigo-600 rounded-lg hover:bg-indigo-100"
-                                    >
-                                        Thử lại
-                                    </button>
-                                </div>
-                            ) : (
-                                posts.map((post) => (
-                                    <Post
-                                        key={post.id}
-                                        theme={theme}
-                                        post={post}
-                                        onOpenDetail={handleOpenPostDetail}
-                                    />
-                                ))
-                            )}
-                            {loadingMore && <SkeletonPost />}
-                            <div ref={loadMoreRef} className="h-1" />
-                        </div>
-                    </main>
+                            <div className="w-full mt-6">
+                                <InputSection
+                                    onOpenModal={() => setShowCreatePost(true)}
+                                    theme={theme}
+                                />
+                            </div>
 
-                    <div className="hidden lg:block w-[280px] flex-shrink-0">
-                        <div className="fixed top-[5.5rem] right-0 z-20 w-[280px] h-full">
-                            <RightSidebar theme={theme} />
+                            <div className="w-full pt-6 pb-20 flex flex-col space-y-6">
+                                {loading && posts.length === 0 ? (
+                                    <>
+                                        <SkeletonPost />
+                                        <SkeletonPost />
+                                        <SkeletonPost />
+                                    </>
+                                ) : error ? (
+                                    <div className="text-center py-8 bg-white rounded-2xl w-full">
+                                        <p className="text-red-500 mb-4">{error}</p>
+                                        <button
+                                            onClick={() => fetchPosts(0, true)}
+                                            className="px-4 py-2 bg-indigo-50 text-indigo-600 rounded-lg hover:bg-indigo-100"
+                                        >
+                                            Thử lại
+                                        </button>
+                                    </div>
+                                ) : (
+                                    posts.map((post) => (
+                                        <Post
+                                            key={post.id}
+                                            theme={theme}
+                                            post={post}
+                                            onOpenDetail={handleOpenPostDetail}
+                                        />
+                                    ))
+                                )}
+                                {loadingMore && <SkeletonPost />}
+                                <div ref={loadMoreRef} className="h-1" />
+                            </div>
+                        </main>
+
+                        <div className="hidden lg:block w-[280px] flex-shrink-0">
+                            <div className="fixed top-[5.5rem] right-0 z-20 w-[280px] h-full">
+                                <RightSidebar theme={theme} />
+                            </div>
                         </div>
                     </div>
                 </div>
-            </div>
 
-            {openPost && (
-                <PostDetailPopup
-                    post={openPost}
-                    onClose={() => setOpenPost(null)}
-                />
-            )}
-            {showCreatePost && (
-                <ForbiddenWordsProvider>
-                    <CreatePostModal
-                        onClose={() => setShowCreatePost(false)}
-                        onPostCreated={handlePostCreated}
-                        theme={theme}
-                        defaultTypePost={
-                            activeTab === 0 ? "positive" : "negative"
-                        }
+                {openPost && (
+                    <PostDetailPopup
+                        post={openPost}
+                        onClose={() => setOpenPost(null)}
                     />
-                </ForbiddenWordsProvider>
-            )}
-            <ImageModal />
-        </div>
+                )}
+                {showCreatePost && (
+                    <ForbiddenWordsProvider>
+                        <CreatePostModal
+                            onClose={() => setShowCreatePost(false)}
+                            onPostCreated={handlePostCreated}
+                            theme={theme}
+                            defaultTypePost={
+                                activeTab === 0 ? "positive" : "negative"
+                            }
+                        />
+                    </ForbiddenWordsProvider>
+                )}
+                <ImageModal />
+            </div>
+        </MainLayout>
     );
 }
