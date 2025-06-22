@@ -342,7 +342,11 @@ const NotificationsPage = () => {
               {filteredNotifications.map((noti) => (
                 <div
                   key={noti.id}
-                  className={`group p-4 sm:p-5 bg-white rounded-xl shadow-sm hover:shadow-md transition-all duration-300 flex items-start relative ${!noti.is_read ? 'bg-orange-50' : ''} cursor-pointer touch-manipulation`}
+                  className={`group p-4 sm:p-5 rounded-xl transition-all duration-300 flex items-start relative cursor-pointer touch-manipulation ${
+                    !noti.is_read
+                      ? 'bg-orange-50 border border-orange-200 shadow-md'
+                      : 'bg-white shadow-sm hover:shadow-md hover:bg-gray-50'
+                  }`}
                   style={{ minHeight: 64 }}
                   onClick={() => {
                     if (noti.related_id) {
