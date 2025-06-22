@@ -12,12 +12,16 @@ export default function LeftSidebarAdmin({ className = '', ...props }: HTMLAttri
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
 
+  const baseLinkClasses = 'flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors duration-200 font-medium';
+  const activeLinkClasses = 'bg-blue-100 text-blue-700';
+  const inactiveLinkClasses = 'text-gray-600 hover:bg-gray-100 hover:text-gray-900';
+
   // Sidebar responsive: overlay trên mobile/tablet, fixed trên desktop
   return (
     <>
       {/* Nút mở sidebar trên mobile/tablet */}
       <button
-        className="fixed top-3 left-3 z-40 bg-[#AECBEB] p-2 rounded-full shadow-lg lg:hidden"
+        className="fixed top-3 left-3 z-40 bg-blue-100 text-blue-700 p-2 rounded-full shadow-lg lg:hidden"
         onClick={() => setOpen(true)}
         aria-label="Mở menu quản trị"
       >
@@ -31,30 +35,32 @@ export default function LeftSidebarAdmin({ className = '', ...props }: HTMLAttri
         {...props}
       >
         <div className="space-y-6">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-[#AECBEB] rounded-full"></div>
-            <h1 className="text-lg font-medium text-[#1C170D]">Solace Admin</h1>
+          <div className="flex items-center gap-3 p-2">
+            <div className="w-10 h-10 bg-blue-600 text-white rounded-full flex items-center justify-center shadow-md">
+              <RiDashboardLine className="w-6 h-6" />
+            </div>
+            <h1 className="text-xl font-bold text-gray-800">Solace Admin</h1>
           </div>
           <nav className="space-y-2">
-            <Link href="/admin/overview" className={`flex items-center gap-3 px-3 py-2 rounded-lg ${pathname === '/admin/overview' ? 'bg-[#AECBEB] text-black' : 'hover:bg-gray-100 text-gray-700'}`}>
+            <Link href="/admin/overview" className={`${baseLinkClasses} ${pathname === '/admin/overview' ? activeLinkClasses : inactiveLinkClasses}`}>
               <RiDashboardLine className="w-5 h-5" />
-              <span className="font-medium">Tổng quan</span>
+              <span>Tổng quan</span>
             </Link>
-            <Link href="/admin/users" className={`flex items-center gap-3 px-3 py-2 rounded-lg ${pathname === '/admin/users' ? 'bg-[#AECBEB] text-black' : 'hover:bg-gray-100 text-gray-700'}`}>
+            <Link href="/admin/users" className={`${baseLinkClasses} ${pathname === '/admin/users' ? activeLinkClasses : inactiveLinkClasses}`}>
               <HiOutlineUsers className="w-5 h-5" />
-              <span className="font-medium">Quản lý người dùng</span>
+              <span>Quản lý người dùng</span>
             </Link>
-            <Link href="/admin/posts" className={`flex items-center gap-3 px-3 py-2 rounded-lg ${pathname === '/admin/posts' ? 'bg-[#AECBEB] text-black' : 'hover:bg-gray-100 text-gray-700'}`}>
+            <Link href="/admin/posts" className={`${baseLinkClasses} ${pathname === '/admin/posts' ? activeLinkClasses : inactiveLinkClasses}`}>
               <HiOutlineDocumentText className="w-5 h-5" />
-              <span className="font-medium">Quản lý bài đăng</span>
+              <span>Quản lý bài đăng</span>
             </Link>
-            <Link href="/admin/reports" className={`flex items-center gap-3 px-3 py-2 rounded-lg ${pathname === '/admin/reports' ? 'bg-[#AECBEB] text-black' : 'hover:bg-gray-100 text-gray-700'}`}>
+            <Link href="/admin/reports" className={`${baseLinkClasses} ${pathname === '/admin/reports' ? activeLinkClasses : inactiveLinkClasses}`}>
               <HiOutlineExclamationCircle className="w-5 h-5" />
-              <span className="font-medium">Quản lý báo cáo</span>
+              <span>Quản lý báo cáo</span>
             </Link>
-            <Link href="/admin/setting" className={`flex items-center gap-3 px-3 py-2 rounded-lg ${pathname === '/admin/setting' ? 'bg-[#AECBEB] text-black' : 'hover:bg-gray-100 text-gray-700'}`}>
+            <Link href="/admin/setting" className={`${baseLinkClasses} ${pathname === '/admin/setting' ? activeLinkClasses : inactiveLinkClasses}`}>
               <FiSettings className="w-5 h-5" />
-              <span className="font-medium">Quản lý cài đặt</span>
+              <span>Quản lý cài đặt</span>
             </Link>
           </nav>
         </div>

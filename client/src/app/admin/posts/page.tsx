@@ -5,9 +5,9 @@ import { FiSearch, FiChevronDown, FiTrash2, FiEye, FiCheck } from 'react-icons/f
 import AdminLayout from '@/components/AdminLayout';
 import { toast, ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
-import FilteredInput from '@/components/FilteredInput';
 import { socket } from '@/socket';
 import AdminGuard from '@/components/AdminGuard';
+import { FixedSizeList as List } from 'react-window';
 
 type Post = {
   id: string;
@@ -29,15 +29,67 @@ export default function PostManagementPage() {
   const [search, setSearch] = useState('');
   const [type, setType] = useState<'all' | 'positive' | 'negative'>('all');
   const [status, setStatus] = useState<'all' | 'approved' | 'pending'>('all');
-  const [showDropdown, setShowDropdown] = useState(false);
-  const [showFilterDropdown, setShowFilterDropdown] = useState(false);
-  const dropdownRef = useRef<HTMLButtonElement>(null);
-  const filterDropdownRef = useRef<HTMLButtonElement>(null);
-  const [dropdownPos, setDropdownPos] = useState({ top: 0, left: 0 });
-  const [filterDropdownPos, setFilterDropdownPos] = useState({ top: 0, left: 0 });
+  const [showStatusDropdown, setShowStatusDropdown] = useState(false);
+  const [showTimeDropdown, setShowTimeDropdown] = useState(false);
+  const statusDropdownRef = useRef<HTMLButtonElement>(null);
+  const timeDropdownRef = useRef<HTMLButtonElement>(null);
+  const statusDropdownMenuRef = useRef<HTMLUListElement>(null);
+  const timeDropdownMenuRef = useRef<HTMLUListElement>(null);
+  const [sortTime, setSortTime] = useState<'newest' | 'oldest' | null>(null);
   const [selectedPost, setSelectedPost] = useState<Post | null>(null);
   const [sharedPost, setSharedPost] = useState<Post | null>(null);
   const [deletePostId, setDeletePostId] = useState<string | null>(null);
+  const [listHeight, setListHeight] = useState(420);
+  const [listWidth, setListWidth] = useState<string | number>('100%');
+  const listRef = useRef<List>(null);
+
+  const truncateIfNeeded = (text: string): string => {
+    if (text == null || typeof text !== 'string') {
+      return '';
+    }
+    const trimmedText = text.trim();
+    
+    // 1. Process each "word" based on the 7-char rule
+    const processedWords = trimmedText.split(/\s+/).map(word => {
+        if (word.length > 7) {
+            return word.substring(0, 7); // Truncate long words
+        }
+        return word;
+    });
+
+    // 2. Determine word limit based on screen size
+    const windowWidth = typeof window !== 'undefined' ? window.innerWidth : Infinity;
+    const wordLimit = (windowWidth >= 620 && windowWidth <= 1500) ? 3 : 5;
+
+    // 3. Apply word limit
+    if (processedWords.length > wordLimit) {
+        return processedWords.slice(0, wordLimit).join(' ') + '...';
+    }
+
+    // 4. Join the words and add ellipsis if any truncation happened
+    const finalResult = processedWords.join(' ');
+    if (finalResult.length < trimmedText.length) {
+        return finalResult + '...';
+    }
+
+    return finalResult;
+  };
+
+  useEffect(() => {
+    const handleResize = () => {
+      const container = document.querySelector('.table-container');
+      if (container) {
+        const height = Math.min(600, window.innerHeight * 0.6);
+        const width = container.clientWidth;
+        setListHeight(height);
+        setListWidth(width > 900 ? width : 900);
+      }
+    };
+
+    handleResize();
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   const fetchPosts = async () => {
     const params = new URLSearchParams();
@@ -47,24 +99,58 @@ export default function PostManagementPage() {
 
     const res = await fetch(`http://localhost:5000/api/admin/posts?${params.toString()}`);
     const data = await res.json();
-    setPosts(data);
+    let sortedPosts = [...data];
+
+    if (sortTime === 'newest') {
+      sortedPosts.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+    } else if (sortTime === 'oldest') {
+      sortedPosts.sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
+    }
+
+    setPosts(sortedPosts);
   };
 
   useEffect(() => {
     fetchPosts();
 
     const handleNewPost = (data: { post: Post }) => {
-      setPosts((prev) => [data.post, ...prev]);
+      setPosts((prev) =>
+        [data.post, ...prev].sort((a, b) =>
+          sortTime === 'newest'
+            ? new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+            : sortTime === 'oldest'
+            ? new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+            : 0
+        )
+      );
     };
 
     const handlePostApproved = (data: { post: Post }) => {
       setPosts((prev) =>
-        prev.map((p) => (p.id === data.post.id ? { ...p, is_approved: true } : p))
+        prev
+          .map((p) => (p.id === data.post.id ? { ...p, is_approved: true } : p))
+          .sort((a, b) =>
+            sortTime === 'newest'
+              ? new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+              : sortTime === 'oldest'
+              ? new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+              : 0
+          )
       );
     };
 
     const handlePostDeleted = (data: { postId: string }) => {
-      setPosts((prev) => prev.filter((p) => p.id !== data.postId));
+      setPosts((prev) =>
+        prev
+          .filter((p) => p.id !== data.postId)
+          .sort((a, b) =>
+            sortTime === 'newest'
+              ? new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+              : sortTime === 'oldest'
+              ? new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+              : 0
+          )
+      );
     };
 
     socket.on('newPost', handleNewPost);
@@ -76,7 +162,7 @@ export default function PostManagementPage() {
       socket.off('postApproved', handlePostApproved);
       socket.off('postDeleted', handlePostDeleted);
     };
-  }, [type, status]);
+  }, [type, status, sortTime]);
 
   useEffect(() => {
     if (search.trim() === '') fetchPosts();
@@ -127,7 +213,6 @@ export default function PostManagementPage() {
         <main className="p-4 sm:p-6 max-w-7xl mx-auto">
           <h1 className="text-2xl sm:text-3xl font-bold mb-4 sm:mb-6 text-gray-900">Quản lý bài đăng</h1>
 
-          {/* Bộ lọc */}
           <div className="flex flex-col sm:flex-row gap-2 sm:gap-4 mb-4 sm:mb-6">
             <div className="relative flex-1">
               <FiSearch
@@ -135,7 +220,7 @@ export default function PostManagementPage() {
                 onClick={fetchPosts}
                 title="Tìm kiếm"
               />
-              <FilteredInput
+              <input
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 onKeyDown={(e) => e.key === 'Enter' && fetchPosts()}
@@ -143,85 +228,104 @@ export default function PostManagementPage() {
                 className="pl-10 pr-4 py-2 bg-[#F5F0E5] rounded-xl text-gray-800 w-full outline-none text-sm sm:text-base"
               />
             </div>
-            <div className="relative">
+            <div className="flex gap-2 sm:gap-4">
               <button
-                ref={filterDropdownRef}
-                onClick={() => {
-                  setShowFilterDropdown(!showFilterDropdown);
-                  if (!showFilterDropdown && filterDropdownRef.current) {
-                    const rect = filterDropdownRef.current.getBoundingClientRect();
-                    setFilterDropdownPos({
-                      top: rect.bottom + window.scrollY + 4,
-                      left: rect.left + window.scrollX,
-                    });
-                  }
-                }}
-                className="px-4 py-2 text-gray-800 border rounded-xl bg-white flex items-center gap-2 text-sm sm:text-base w-full sm:w-auto"
+                onClick={() => setType('positive')}
+                className={`px-4 py-2 text-gray-800 rounded-lg transition-all duration-200 ${
+                  type === 'positive' ? 'bg-blue-100 ring-2 ring-blue-400 font-semibold' : 'bg-blue-100 hover:bg-blue-200'
+                }`}
               >
-                {type === 'all' ? 'Loại: Tất cả' : type === 'positive' ? 'Loại: Tích cực' : 'Loại: Tiêu cực'}
-                <FiChevronDown />
+                Tích cực
               </button>
-              {showFilterDropdown && (
-                <ul
-                  className="fixed w-40 bg-white shadow-md rounded-xl z-[9999] border"
-                  style={{ top: filterDropdownPos.top, left: filterDropdownPos.left }}
-                >
-                  {['all', 'positive', 'negative'].map((t) => (
-                    <li
-                      key={t}
-                      className="px-4 py-2 text-gray-800 hover:bg-gray-100 cursor-pointer text-sm"
-                      onClick={() => {
-                        setType(t as any);
-                        setShowFilterDropdown(false);
-                      }}
-                    >
-                      {t === 'all' ? 'Tất cả' : t === 'positive' ? 'Tích cực' : 'Tiêu cực'}
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </div>
-            <div className="relative">
               <button
-                ref={dropdownRef}
-                onClick={() => {
-                  setShowDropdown(!showDropdown);
-                  if (!showDropdown && dropdownRef.current) {
-                    const rect = dropdownRef.current.getBoundingClientRect();
-                    setDropdownPos({
-                      top: rect.bottom + window.scrollY + 4,
-                      left: rect.left + window.scrollX,
-                    });
-                  }
-                }}
+                onClick={() => setType('negative')}
+                className={`px-4 py-2 text-gray-800 rounded-lg transition-all duration-200 ${
+                  type === 'negative' ? 'bg-red-100 ring-2 ring-red-400 font-semibold' : 'bg-red-100 hover:bg-red-200'
+                }`}
+              >
+                Tiêu cực
+              </button>
+              <button
+                onClick={() => setType('all')}
+                className={`px-4 py-2 text-gray-800 rounded-lg transition-all duration-200 ${
+                  type === 'all' ? 'bg-gray-100 ring-2 ring-gray-400 font-semibold' : 'bg-gray-100 hover:bg-gray-200'
+                }`}
+              >
+                Tất cả
+              </button>
+            </div>
+            <div className="relative inline-block">
+              <button
+                ref={statusDropdownRef}
+                onClick={() => setShowStatusDropdown(!showStatusDropdown)}
                 className="px-4 py-2 text-gray-800 border rounded-xl bg-white flex items-center gap-2 text-sm sm:text-base w-full sm:w-auto"
               >
                 {status === 'all' ? 'Tất cả trạng thái' : status === 'approved' ? 'Đã duyệt' : 'Chưa duyệt'}
                 <FiChevronDown />
               </button>
-              {showDropdown && (
+              {showStatusDropdown && (
                 <ul
-                  className="fixed w-40 bg-white shadow-md rounded-xl z-[9999] border"
-                  style={{ top: dropdownPos.top, left: dropdownPos.left }}
+                  ref={statusDropdownMenuRef}
+                  className="absolute left-0 top-full w-full bg-white shadow-md rounded-xl z-50 border mt-1"
+                  style={{ minWidth: statusDropdownRef.current?.offsetWidth }}
                 >
-                  {['all', 'approved', 'pending'].map((s) => (
-                    <li
-                      key={s}
-                      className="px-4 py-2 text-gray-800 hover:bg-gray-100 cursor-pointer text-sm"
-                      onClick={() => {
-                        setStatus(s as any);
-                        setShowDropdown(false);
-                      }}
-                    >
-                      {s === 'all' ? 'Tất cả trạng thái' : s === 'approved' ? 'Đã duyệt' : 'Chưa duyệt'}
-                    </li>
-                  ))}
+                  {['all', 'approved', 'pending']
+                    .filter((s) => s !== status)
+                    .map((s) => (
+                      <li
+                        key={s}
+                        className="px-4 py-2 text-gray-800 hover:bg-gray-100 cursor-pointer text-sm"
+                        onClick={() => {
+                          setStatus(s as 'all' | 'approved' | 'pending');
+                          setShowStatusDropdown(false);
+                          fetchPosts();
+                        }}
+                      >
+                        {s === 'all' ? 'Tất cả trạng thái' : s === 'approved' ? 'Đã duyệt' : 'Chưa duyệt'}
+                      </li>
+                    ))}
+                </ul>
+              )}
+            </div>
+            <div className="relative inline-block">
+              <button
+                ref={timeDropdownRef}
+                onClick={() => setShowTimeDropdown(!showTimeDropdown)}
+                className="px-4 py-2 text-gray-800 border rounded-xl bg-white flex items-center gap-2 text-sm sm:text-base w-full sm:w-auto"
+              >
+                {sortTime === 'newest'
+                  ? 'Bài đăng mới nhất'
+                  : sortTime === 'oldest'
+                  ? 'Bài đăng cũ nhất'
+                  : 'Thời gian'}
+                <FiChevronDown />
+              </button>
+              {showTimeDropdown && (
+                <ul
+                  ref={timeDropdownMenuRef}
+                  className="absolute left-0 top-full w-full bg-white shadow-md rounded-xl z-50 border mt-1"
+                  style={{ minWidth: timeDropdownRef.current?.offsetWidth }}
+                >
+                  {['newest', 'oldest']
+                    .filter((t) => t !== sortTime)
+                    .map((t) => (
+                      <li
+                        key={t}
+                        className="px-4 py-2 text-gray-800 hover:bg-gray-100 cursor-pointer text-sm"
+                        onClick={() => {
+                          setSortTime(t as 'newest' | 'oldest');
+                          setShowTimeDropdown(false);
+                          fetchPosts();
+                        }}
+                      >
+                        {t === 'newest' ? 'Bài đăng mới nhất' : 'Bài đăng cũ nhất'}
+                      </li>
+                    ))}
                 </ul>
               )}
             </div>
           </div>
 
-          {/* Danh sách bài đăng trên di động */}
           <div className="block sm:hidden">
             {posts.length === 0 ? (
               <div className="p-6 text-center text-gray-500 bg-white rounded-xl border">
@@ -239,8 +343,8 @@ export default function PostManagementPage() {
                     </p>
                     <p className="text-gray-600 text-sm">
                       <span className="font-medium">Nội dung:</span>{' '}
-                      <span className="text-gray-700 whitespace-pre-line" title={post.content}>
-                        {post.content.length > 100 ? post.content.slice(0, 100) + '...' : post.content}
+                      <span className="text-gray-700 break-words whitespace-pre-wrap" title={post.content}>
+                        {truncateIfNeeded(post.content)}
                       </span>
                     </p>
                     <p className="text-gray-600 text-sm">
@@ -290,84 +394,47 @@ export default function PostManagementPage() {
             )}
           </div>
 
-          {/* Bảng cho màn hình lớn */}
-          <div className="hidden sm:block border border-[#DBE0E5] rounded-xl overflow-x-auto bg-white">
-            <table className="w-full min-w-[800px] text-sm">
-              <thead className="bg-white border-b border-[#DBE0E5] sticky top-0 z-10">
-                <tr className="text-left">
-                  <th className="p-3 text-gray-800 bg-white">Nội dung</th>
-                  <th className="p-3 text-gray-800 bg-white">Loại</th>
-                  <th className="p-3 text-gray-800 bg-white">Người đăng</th>
-                  <th className="p-3 text-gray-800 bg-white">Ngày đăng</th>
-                  <th className="p-3 text-gray-800 bg-white">Cảm xúc</th>
-                  <th className="p-3 text-gray-800 bg-white min-w-[110px]">Trạng thái</th>
-                  <th className="p-3 text-gray-800 bg-white">Hành động</th>
-                </tr>
-              </thead>
-              <tbody>
-                {posts.length === 0 ? (
-                  <tr>
-                    <td colSpan={7} className="p-6 text-center text-gray-500 bg-white">
-                      {search.trim()
-                        ? 'Không có kết quả nào phù hợp với từ khóa tìm kiếm.'
-                        : 'Không có bài viết nào phù hợp với bộ lọc hiện tại.'}
-                    </td>
-                  </tr>
-                ) : (
-                  posts.map((post) => (
-                    <tr key={post.id} className="bg-white border-b border-[#E5E8EB] hover:bg-gray-50 transition">
-                      <td className="p-3 break-words whitespace-pre-line" title={post.content}>
-                        {post.content.length > 40 ? post.content.slice(0, 40) + '...' : post.content}
-                      </td>
-                      <td className="p-3 whitespace-nowrap">
-                        <span
-                          className={`px-2 py-1 rounded-full text-xs ${
-                            post.type_post === 'positive' ? 'bg-blue-200' : 'bg-red-100'
-                          }`}
-                        >
-                          {post.type_post === 'positive' ? 'Tích cực' : 'Tiêu cực'}
-                        </span>
-                      </td>
-                      <td className="p-3 break-words whitespace-pre-line">
-                        {post.first_name} {post.last_name}
-                      </td>
-                      <td className="p-3 whitespace-nowrap">{new Date(post.created_at).toLocaleDateString()}</td>
-                      <td className="p-3">{post.like_count}</td>
-                      <td className="p-3 min-w-[110px] whitespace-nowrap">
-                        <span
-                          className={`px-2 py-1 rounded-full text-xs ${
-                            post.is_approved ? 'bg-green-200' : 'bg-yellow-200'
-                          }`}
-                        >
-                          {post.is_approved ? 'Đã duyệt' : 'Chưa duyệt'}
-                        </span>
-                      </td>
-                      <td className="p-3 flex gap-2">
-                        <button className="text-blue-500 hover:text-blue-600" onClick={() => handleViewPost(post.id)}>
-                          <FiEye />
-                        </button>
-                        {!post.is_approved && (
-                          <button
-                            onClick={() => handleApprove(post.id)}
-                            className="text-green-600 hover:text-green-700"
-                          >
-                            <FiCheck />
-                          </button>
-                        )}
-                        <button onClick={() => handleDelete(post.id)} className="text-red-500 hover:text-red-600">
-                          <FiTrash2 />
-                        </button>
-                      </td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
+          <div className="hidden sm:block table-container border border-[#DBE0E5] rounded-xl bg-white">
+            <style>
+              {`
+                .table-container {
+                  overflow-x: auto;
+                }
+              `}
+            </style>
+            <div className="overflow-x-auto relative">
+              <div className="flex w-full min-w-[900px] text-sm font-semibold bg-white border-b border-[#DBE0E5] sticky top-0 z-10">
+                <div className="p-3 flex-1 min-w-[120px] text-gray-800 flex justify-center items-center text-center">Nội dung</div>
+                <div className="p-3 flex-1 min-w-[120px] text-gray-800 flex justify-center items-center text-center">Loại</div>
+                <div className="p-3 flex-1 min-w-[120px] text-gray-800 flex justify-center items-center text-center">Người đăng</div>
+                <div className="p-3 flex-1 min-w-[120px] text-gray-800 flex justify-center items-center text-center">Ngày đăng</div>
+                <div className="p-3 flex-1 min-w-[120px] text-gray-800 flex justify-center items-center text-center">Cảm xúc</div>
+                <div className="p-3 flex-1 min-w-[120px] text-gray-800 flex justify-center items-center text-center">Trạng thái</div>
+                <div className="p-3 flex-1 min-w-[150px] text-gray-800 flex justify-center items-center text-center">Hành động</div>
+              </div>
+              {posts.length === 0 ? (
+                <div className="p-6 text-center text-gray-500 bg-white">
+                  {search.trim()
+                    ? 'Không có kết quả nào phù hợp với từ khóa tìm kiếm.'
+                    : 'Không có bài viết nào phù hợp với bộ lọc hiện tại.'}
+                </div>
+              ) : (
+                <List
+                  ref={listRef}
+                  height={listHeight}
+                  itemCount={posts.length}
+                  itemSize={56}
+                  width={listWidth}
+                  className="relative z-10"
+                >
+                  {Row}
+                </List>
+              )}
+            </div>
           </div>
 
           <ToastContainer position="top-right" autoClose={3000} aria-label="Thông báo hệ thống" />
 
-          {/* Modal Xem chi tiết */}
           {selectedPost && (
             <div
               className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-[9999] p-4"
@@ -405,9 +472,11 @@ export default function PostManagementPage() {
                     )}
                   </div>
                 </div>
-                <p className="text-gray-700 text-sm sm:text-base mb-4 whitespace-pre-line">
-                  {selectedPost.content}
-                </p>
+                <div className="text-gray-700 text-sm sm:text-base mb-4 whitespace-pre-wrap break-words">
+                  {selectedPost.content.match(/.{1,40}/g)?.map((line, index) => (
+                    <p key={index}>{line}</p>
+                  )) || selectedPost.content}
+                </div>
                 {(() => {
                   let parsedImages: string[] = [];
                   if (selectedPost.images) {
@@ -422,12 +491,7 @@ export default function PostManagementPage() {
                   return parsedImages.length > 0 ? (
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4">
                       {parsedImages.map((img, i) => (
-                        <img
-                          key={i}
-                          src={img}
-                          alt={`Image ${i}`}
-                          className="w-full rounded-xl object-cover shadow"
-                        />
+                        <img key={i} src={img} alt={`Image ${i}`} className="w-full rounded-xl object-cover shadow" />
                       ))}
                     </div>
                   ) : null;
@@ -445,13 +509,15 @@ export default function PostManagementPage() {
                           {sharedPost.first_name} {sharedPost.last_name}
                         </div>
                         <div className="text-xs text-gray-500">
-                          {sharedPost.created_at
-                            ? new Date(sharedPost.created_at).toLocaleString('vi-VN')
-                            : ''}
+                          {sharedPost.created_at ? new Date(sharedPost.created_at).toLocaleString('vi-VN') : ''}
                         </div>
                       </div>
                     </div>
-                    <div className="text-gray-800 text-sm whitespace-pre-line">{sharedPost.content}</div>
+                    <div className="text-gray-800 text-sm whitespace-pre-wrap break-words">
+                      {sharedPost.content.match(/.{1,40}/g)?.map((line, index) => (
+                        <p key={index}>{line}</p>
+                      )) || sharedPost.content}
+                    </div>
                     {(() => {
                       let imgs: string[] = [];
                       if (sharedPost.images) {
@@ -505,7 +571,6 @@ export default function PostManagementPage() {
             </div>
           )}
 
-          {/* Modal xác nhận xóa */}
           {deletePostId && (
             <div
               className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-[9999] p-4"
@@ -542,4 +607,58 @@ export default function PostManagementPage() {
       </AdminLayout>
     </AdminGuard>
   );
+
+  function Row({ index, style }: { index: number; style: React.CSSProperties }) {
+    const post = posts[index];
+    return (
+      <div
+        key={post.id}
+        style={style}
+        className="flex w-full text-sm bg-white border-b border-[#E5E8EB] hover:bg-gray-50 transition items-center"
+      >
+        <div className="p-3 flex-1 min-w-[120px] text-center" title={post.content}>
+          {truncateIfNeeded(post.content)}
+        </div>
+        <div className="p-3 flex-1 min-w-[120px] flex justify-center items-center text-center">
+          <span
+            className={`px-2 py-1 rounded-full text-xs ${
+              post.type_post === 'positive' ? 'bg-blue-200' : 'bg-red-100'
+            }`}
+          >
+            {post.type_post === 'positive' ? 'Tích cực' : 'Tiêu cực'}
+          </span>
+        </div>
+        <div className="p-3 flex-1 min-w-[120px] text-center">
+          {post.first_name} {post.last_name}
+        </div>
+        <div className="p-3 flex-1 min-w-[120px] text-center">{new Date(post.created_at).toLocaleDateString()}</div>
+        <div className="p-3 flex-1 min-w-[120px] text-center">{post.like_count}</div>
+        <div className="p-3 flex-1 min-w-[120px] flex justify-center items-center text-center">
+          <span
+            className={`px-2 py-1 rounded-full text-xs ${
+              post.is_approved ? 'bg-green-200' : 'bg-yellow-200'
+            }`}
+          >
+            {post.is_approved ? 'Đã duyệt' : 'Chưa duyệt'}
+          </span>
+        </div>
+        <div className="p-3 flex-1 min-w-[150px] flex gap-2 justify-center items-center">
+          <button className="text-blue-500 hover:text-blue-600" onClick={() => handleViewPost(post.id)}>
+            <FiEye />
+          </button>
+          {!post.is_approved && (
+            <button
+              onClick={() => handleApprove(post.id)}
+              className="text-green-600 hover:text-green-700"
+            >
+              <FiCheck />
+            </button>
+          )}
+          <button onClick={() => handleDelete(post.id)} className="text-red-500 hover:text-red-600">
+            <FiTrash2 />
+          </button>
+        </div>
+      </div>
+    );
+  }
 }
