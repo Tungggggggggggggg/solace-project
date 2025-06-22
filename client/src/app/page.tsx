@@ -16,6 +16,7 @@ import axios from "axios";
 import type { PostType } from '@/types/Post';
 import SkeletonPost from "@/components/SkeletonPost";
 import { socket } from '@/socket';
+import { ForbiddenWordsProvider } from "@/contexts/ForbiddenWordsContext";
 
 interface OpenPostType {
   id: string;
@@ -46,6 +47,20 @@ export default function Home() {
   const [showCreatePost, setShowCreatePost] = useState(false);
   const [posts, setPosts] = useState<PostType[]>([]); // State lưu danh sách bài viết
   const [visibleCount, setVisibleCount] = useState(3); // Số post hiển thị ban đầu
+
+  const handleCommentAdded = (postId: string) => {
+    setPosts(prevPosts =>
+      prevPosts.map(p =>
+        p.id === postId ? { ...p, comments: (p.comments || 0) + 1 } : p
+      )
+    );
+    if (openPost && openPost.id === postId) {
+      setOpenPost(prevOpenPost => ({
+        ...prevOpenPost!,
+        comments: (prevOpenPost!.comments || 0) + 1,
+      }));
+    }
+  };
 
   // Mở modal xác thực với tab tương ứng (login/signup), chỉ khi chưa đăng nhập
   const handleOpenAuth = (tab: 'login' | 'signup') => {
@@ -221,15 +236,21 @@ export default function Home() {
 
       {/* Popups & Modals */}
       {openPost && (
-        <PostDetailPopup post={openPost} onClose={() => setOpenPost(null)} />
+        <PostDetailPopup 
+          post={openPost} 
+          onClose={() => setOpenPost(null)} 
+          onCommentAdded={() => handleCommentAdded(openPost.id)}
+        />
       )}
       {showCreatePost && (
-        <CreatePostModal 
-          onClose={() => setShowCreatePost(false)} 
-          onPostCreated={handlePostCreated} 
-          theme={theme}
-          defaultTypePost={activeTab === 0 ? 'positive' : 'negative'}
-        />
+        <ForbiddenWordsProvider>
+          <CreatePostModal 
+            onClose={() => setShowCreatePost(false)} 
+            onPostCreated={handlePostCreated} 
+            theme={theme}
+            defaultTypePost={activeTab === 0 ? 'positive' : 'negative'}
+          />
+        </ForbiddenWordsProvider>
       )}
     </div>
   );

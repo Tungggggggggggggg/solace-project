@@ -33,10 +33,11 @@ interface PostDetailPopupProps {
     };
   };
   onClose: () => void;
+  onCommentAdded?: () => void;
   theme?: 'inspiring' | 'reflective';
 }
 
-const PostDetailPopup = ({ post, onClose, theme = 'inspiring' }: PostDetailPopupProps) => {
+const PostDetailPopup = ({ post, onClose, theme = 'inspiring', onCommentAdded }: PostDetailPopupProps) => {
   const [selectedImg, setSelectedImg] = useState(0);
   const { user } = useUser();
   const popupRef = useRef<HTMLDivElement>(null);
@@ -45,6 +46,14 @@ const PostDetailPopup = ({ post, onClose, theme = 'inspiring' }: PostDetailPopup
   const commentsRef = useRef<HTMLDivElement>(null);
   const [showFullContent, setShowFullContent] = useState(false);
   const [showFullSharedContent, setShowFullSharedContent] = useState(false);
+  const [commentCount, setCommentCount] = useState(post.comments || 0);
+
+  const handleCommentAdded = () => {
+    setCommentCount(prevCount => prevCount + 1);
+    if (onCommentAdded) {
+      onCommentAdded();
+    }
+  };
 
   const bgColor = theme === 'reflective' ? '#E3D5CA' : '#E1ECF7';
 
@@ -203,7 +212,7 @@ const PostDetailPopup = ({ post, onClose, theme = 'inspiring' }: PostDetailPopup
           </div>
           {/* Khu vực bình luận */}
           <div className="border-t pt-6" ref={commentsRef}>
-            <CommentsSection postId={post.id} currentUser={user} />
+            <CommentsSection postId={post.id} currentUser={user} onCommentAdded={handleCommentAdded} />
           </div>
         </div>
       </div>

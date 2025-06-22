@@ -15,7 +15,7 @@ interface Comment {
   avatar_url?: string;
 }
 
-export default function CommentsSection({ postId, currentUser }: { postId: string, currentUser: any }) {
+export default function CommentsSection({ postId, currentUser, onCommentAdded }: { postId: string, currentUser: any, onCommentAdded?: () => void }) {
   const [comments, setComments] = useState<Comment[]>([]);
   const [newComment, setNewComment] = useState('');
   const [loading, setLoading] = useState(false);
@@ -85,6 +85,9 @@ export default function CommentsSection({ postId, currentUser }: { postId: strin
       });
       setComments(prev => [...prev, res.data]);
       setNewComment('');
+      if (onCommentAdded) {
+        onCommentAdded();
+      }
     } catch (err) {
       setToast({ message: 'Bình luận thất bại', type: 'error' });
     }
@@ -99,7 +102,7 @@ export default function CommentsSection({ postId, currentUser }: { postId: strin
       <div className="space-y-4 mb-4" style={{ maxHeight: 350, overflowY: 'auto' }} onScroll={handleScroll}>
         {comments.slice(0, visibleCount).map(c => (
           <div key={c.id} className="flex items-start gap-3">
-            <img src={c.avatar_url || '/images/default-avatar.png'} className="w-8 h-8 rounded-full object-cover" alt="avatar" />
+            <img src={c.avatar_url || '/default-avatar.png'} className="w-8 h-8 rounded-full object-cover" alt="avatar" />
             <div>
               <div className="font-medium">{c.first_name} {c.last_name}</div>
               <div className="text-sm text-gray-700">{c.content}</div>

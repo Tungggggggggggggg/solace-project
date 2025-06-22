@@ -6,6 +6,7 @@ import axios from 'axios';
 import { useUser } from '../contexts/UserContext';
 import gsap from 'gsap';
 import { fetchForbiddenWords, filterForbiddenWords } from '../lib/forbiddenWords';
+import { getForbiddenWordsInText } from '../utils/filterForbiddenWords';
 import Toast from './Toast';
 import type { PostType } from '../types/Post';
 
@@ -143,6 +144,12 @@ export default function CreatePostModal({ onClose, onPostCreated, theme, default
       setToast({ message: 'Nội dung bài viết không được để trống!', type: 'warning' });
       return;
     }
+    // Kiểm tra từ cấm
+    const found = getForbiddenWordsInText(content, forbiddenWords);
+    if (found.length > 0) {
+      setToast({ message: `Nội dung có chứa từ cấm: "${found.join(', ')}"`, type: 'error' });
+      return;
+    }
     setUploading(true);
     try {
       const res = await axios.post('/api/posts', {
@@ -178,8 +185,7 @@ export default function CreatePostModal({ onClose, onPostCreated, theme, default
   };
 
   const handleContentChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-    const value = e.target.value;
-    setContent(filterForbiddenWords(value, forbiddenWords));
+    setContent(e.target.value);
   };
 
   useLayoutEffect(() => {

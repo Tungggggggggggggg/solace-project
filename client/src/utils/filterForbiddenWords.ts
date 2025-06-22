@@ -6,3 +6,8 @@ export function filterForbiddenWords(text: string, forbiddenWords: string[]): st
   });
   return result;
 }
+
+export function getForbiddenWordsInText(text: string, forbiddenWords: string[]): string[] {
+  const lowerText = text.toLowerCase();
+  return forbiddenWords.filter(word => lowerText.includes(word.toLowerCase()));
+}

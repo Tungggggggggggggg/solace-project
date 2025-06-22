@@ -5,6 +5,9 @@ import { UserContext } from '../contexts/UserContext';
 import { ToastContainer, toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import axios from 'axios';
+import FilteredTextarea from './FilteredTextarea';
+import { useForbiddenWords } from '../contexts/ForbiddenWordsContext';
+import { filterForbiddenWords, getForbiddenWordsInText } from '../utils/filterForbiddenWords';
 
 interface PostContent {
   id: string;
@@ -27,12 +30,19 @@ const SharePostModal: React.FC<SharePostModalProps> = ({ isOpen, onClose, post, 
   const { user } = useContext(UserContext);
   const [liked, setLiked] = useState(false);
   const [likeCount, setLikeCount] = useState(0);
+  const forbiddenWords = useForbiddenWords();
 
   if (!isOpen) return null;
 
   const handleShare = async () => {
     if (!user?.id) {
       toast.error('Bạn cần đăng nhập để chia sẻ bài viết!');
+      return;
+    }
+    // Kiểm tra từ cấm
+    const found = getForbiddenWordsInText(shareText, forbiddenWords);
+    if (found.length > 0) {
+      toast.error(`Nội dung có chứa từ cấm: "${found.join(', ')}"`);
       return;
     }
 
@@ -123,7 +133,7 @@ const SharePostModal: React.FC<SharePostModalProps> = ({ isOpen, onClose, post, 
         </button>
         <div className="flex items-center gap-3 mb-2">
           {user && (
-            <img src={user.avatar_url || '/images/default-avatar.png'} alt="User Avatar" className="w-12 h-12 rounded-full object-cover" />
+            <img src={user.avatar_url || '/default-avatar.png'} alt="User Avatar" className="w-12 h-12 rounded-full object-cover" />
           )}
           <div className="flex-grow">
             <span className="font-medium text-slate-900 block">{user ? `${user.first_name} ${user.last_name}` : ''}</span>
@@ -132,16 +142,16 @@ const SharePostModal: React.FC<SharePostModalProps> = ({ isOpen, onClose, post, 
         </div>
 
         <div className="space-y-4 mt-2">
-          <textarea
+          <FilteredTextarea
             className="w-full p-3 border border-gray-300 rounded-lg mb-4 focus:outline-none focus:ring-2 focus:ring-blue-500"
             rows={4}
             placeholder="Hãy nói gì đó về nội dung này..."
             value={shareText}
             onChange={(e) => setShareText(e.target.value)}
-          ></textarea>
+          />
           <div className="bg-gray-50 border rounded-lg p-4">
             <div className="flex items-center gap-2 mb-2">
-              <img src={post.avatar_url || '/images/default-avatar.png'} alt={post.name} className="w-8 h-8 rounded-full object-cover" />
+              <img src={post.avatar_url || '/default-avatar.png'} alt={post.name} className="w-8 h-8 rounded-full object-cover" />
               <span className="font-semibold">{post.name}</span>
               <span className="text-gray-500 text-xs">{new Date().toLocaleString('vi-VN')}</span>
             </div>
