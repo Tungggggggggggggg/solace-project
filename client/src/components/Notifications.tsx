@@ -110,6 +110,9 @@ const NotificationsPage = () => {
     if (!user || !socket.connected) return;
 
     const handleNewNotification = (notification: Notification) => {
+      if (activeTab === 'system' && notification.type !== 'system') {
+        return;
+      }
       setNotifications((prev) => [notification, ...prev]);
     };
 
@@ -118,7 +121,7 @@ const NotificationsPage = () => {
     return () => {
       socket.off('newNotification', handleNewNotification);
     };
-  }, [user]);
+  }, [user, activeTab]);
 
   // Infinite scroll
   useEffect(() => {

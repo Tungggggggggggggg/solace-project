@@ -839,19 +839,27 @@ const Header = memo<HeaderProps>(({
     if (!user) return;
     const handleNewNotification = (notification: Notification) => {
       if (notification.type === 'report_new' || notification.type === 'post_approval') {
-        // Chỉ thêm vào dropdown nếu đang mở
-        if (showNotificationDropdown) {
-          setRecentNotifications(prev => [notification, ...prev].slice(0, 30));
+        return;
+      }
+
+      // Cập nhật tổng số thông báo chưa đọc
+      setUnreadNotifications(prev => prev + 1);
+
+      // Chỉ thêm vào dropdown nếu đang mở
+      if (showNotificationDropdown) {
+        // Lọc theo tab đang chọn trong dropdown
+        if (dropdownTab === 'system' && notification.type !== 'system') {
+          return;
         }
-        // Tăng số lượng thông báo chưa đọc
-        setUnreadNotifications(prev => prev + 1);
+        // Với tab 'all' và 'unread', thêm tất cả thông báo mới
+        setRecentNotifications(prev => [notification, ...prev].slice(0, 30));
       }
     };
     socket.on('newNotification', handleNewNotification);
     return () => {
       socket.off('newNotification', handleNewNotification);
     };
-  }, [user, showNotificationDropdown]);
+  }, [user, showNotificationDropdown, dropdownTab]);
 
   // Real-time: cập nhật conversations khi có tin nhắn mới
   useEffect(() => {
