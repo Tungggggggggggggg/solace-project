@@ -71,22 +71,47 @@ export default function SearchPage() {
       .finally(() => setLoading(false));
   }, [query]);
 
-  // Khi tìm kiếm mới
-  const handleSearch = async () => {
-    if (search.trim()) {
-      router.push(`/search?query=${encodeURIComponent(search.trim())}`);
-    }
-  };
-  const handleKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Enter') handleSearch();
-  };
-
   // Lọc kết quả liên quan
   const themePostType = theme === 'inspiring' ? 'positive' : 'reflective';
   const allPosts = results.filter(item => item.type === "post" && item.type_post === themePostType);
   const allUsers = results.filter(item => item.type === "user");
   const postsTab = allPosts.slice(0, postTabLimit);
   const usersTab = allUsers.slice(0, userTabLimit);
+
+  // Hàm kiểm tra trạng thái follow cho danh sách user
+  const fetchFollowStatus = async (userIds: string[]) => {
+    if (!user || userIds.length === 0) return;
+    try {
+      const res = await fetch(`/api/users/${user.id}/following`, {
+        headers: { 'Authorization': `Bearer ${accessToken}` }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        console.log('following-list data:', data); // DEBUG: Xem dữ liệu thực tế trả về
+        console.log('allUsers:', allUsers); // DEBUG: Xem dữ liệu user trên giao diện
+        const followingIds = Array.isArray(data)
+          ? data.map((u: any) => String(u.id ?? u._id ?? u.user_id))
+          : [];
+        setFriendRequests(prev => {
+          const updated = { ...prev };
+          userIds.forEach(uid => {
+            const _uid = uid as any;
+            const userIdStr = String(_uid ?? _uid?.id ?? _uid?._id ?? _uid?.user_id);
+            updated[uid] = followingIds.includes(userIdStr);
+          });
+          return updated;
+        });
+      }
+    } catch (err) {
+      console.error('Error fetching follow status:', err);
+    }
+  };
+
+  // Sau khi lấy allUsers, kiểm tra trạng thái follow
+  useEffect(() => {
+    fetchFollowStatus(allUsers.map(u => u.id));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user, allUsers.length]);
 
   // Lazy load cho các tab
   useEffect(() => {
@@ -118,6 +143,16 @@ export default function SearchPage() {
     setUserTabLimit(6);
     setCombinedLimit(10);
   }, [tab, query]);
+
+  // Khi tìm kiếm mới
+  const handleSearch = async () => {
+    if (search.trim()) {
+      router.push(`/search?query=${encodeURIComponent(search.trim())}`);
+    }
+  };
+  const handleKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') handleSearch();
+  };
 
   return (
     <div className={`min-h-screen w-full ${bgClass}`}> 
@@ -198,23 +233,14 @@ export default function SearchPage() {
                     <>
                       {/* Render 2 post đầu */}
                       {allPosts.slice(0, 2).map((item) => (
-                        <Post
-                          key={item.id}
-                          id={item.id}
-                          userId={item.user_id}
-                          name={`${item.first_name || ''} ${item.last_name || ''}`.trim() || "Người dùng ẩn danh"}
-                          date={item.created_at || ''}
-                          content={item.content}
-                          likes={item.like_count || 0}
-                          comments={item.comment_count || 0}
-                          shares={item.shares || 0}
-                          images={item.images || []}
-                          avatar={item.avatar_url}
-                          feeling={item.feeling}
-                          location={item.location}
-                          onOpenDetail={() => setSelectedPost(item)}
-                          theme={theme}
-                        />
+                        item && item.type === 'post' && item.id ? (
+                          <Post
+                            key={item.id}
+                            post={item}
+                            onOpenDetail={() => setSelectedPost(item)}
+                            theme={theme}
+                          />
+                        ) : null
                       ))}
 
                       {/* Chỉ render div 'Mọi người' sau 2 post đầu nếu có user */}
@@ -234,7 +260,8 @@ export default function SearchPage() {
                             return (
                               <div
                                 key={item.id}
-                                className="flex items-center gap-5 rounded-[32px] px-4 py-3 mb-3 bg-[#F8FAFC] border border-gray-200 hover:bg-gray-50 transition-all duration-200"
+                                className="flex items-center gap-5 rounded-[32px] px-4 py-3 mb-3 bg-[#F8FAFC] border border-gray-200 hover:bg-gray-50 transition-all duration-200 cursor-pointer"
+                                onClick={() => router.push(`/profile/${item.id}`)}
                               >
                                 <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-full flex items-center justify-center border" style={{ background: avatarBg }}>
                                   {item.avatar ? (
@@ -248,21 +275,46 @@ export default function SearchPage() {
                                 <span className={`font-semibold text-base sm:text-lg flex-1 ${isAnonymous ? 'text-gray-600' : ''}`}>{item.name || 'Người dùng'}</span>
                                 {friendRequests[item.id] ? (
                                   <button
-                                    className="friend-btn px-4 py-2 rounded-full bg-gray-400 text-white font-semibold shadow cursor-not-allowed text-sm sm:text-base"
-                                    disabled
-                                  >
-                                    Đã theo dõi
-                                  </button>
-                                ) : (
-                                  <button
-                                    className="friend-btn px-4 py-2 rounded-full bg-blue-500 text-white font-semibold shadow transition-all hover:bg-blue-600 hover:scale-105 text-sm sm:text-base"
-                                    onClick={() => {
+                                    className="friend-btn px-4 py-2 rounded-full bg-gray-400 text-white font-semibold shadow transition-all hover:bg-red-500 hover:scale-105 text-sm sm:text-base"
+                                    onClick={async (e) => {
+                                      e.stopPropagation();
                                       if (!user) {
                                         setShowAuthModal(true);
                                         return;
                                       }
-                                      setFriendRequests((prev) => ({ ...prev, [item.id]: true }));
-                                      // TODO: Gửi request follow lên server ở đây nếu muốn
+                                      try {
+                                        const res = await fetch(`/api/users/${item.id}/follow`, {
+                                          method: 'DELETE',
+                                          headers: { 'Authorization': `Bearer ${accessToken}` },
+                                        });
+                                        if (res.ok) {
+                                          setFriendRequests((prev) => ({ ...prev, [item.id]: false }));
+                                          await fetchFollowStatus(allUsers.map(u => u.id));
+                                        }
+                                      } catch {}
+                                    }}
+                                  >
+                                    Unfollow
+                                  </button>
+                                ) : (
+                                  <button
+                                    className="friend-btn px-4 py-2 rounded-full bg-blue-500 text-white font-semibold shadow transition-all hover:bg-blue-600 hover:scale-105 text-sm sm:text-base"
+                                    onClick={async (e) => {
+                                      e.stopPropagation();
+                                      if (!user) {
+                                        setShowAuthModal(true);
+                                        return;
+                                      }
+                                      try {
+                                        const res = await fetch(`/api/users/${item.id}/follow`, {
+                                          method: 'POST',
+                                          headers: { 'Authorization': `Bearer ${accessToken}` },
+                                        });
+                                        if (res.ok) {
+                                          setFriendRequests((prev) => ({ ...prev, [item.id]: true }));
+                                          await fetchFollowStatus(allUsers.map(u => u.id));
+                                        }
+                                      } catch {}
                                     }}
                                   >
                                     Follow
@@ -282,23 +334,14 @@ export default function SearchPage() {
 
                       {/* Render các post còn lại */}
                       {allPosts.slice(2, combinedLimit).map((item) => (
-                        <Post
-                          key={item.id}
-                          id={item.id}
-                          userId={item.user_id}
-                          name={`${item.first_name || ''} ${item.last_name || ''}`.trim() || "Người dùng ẩn danh"}
-                          date={item.created_at || ''}
-                          content={item.content}
-                          likes={item.like_count || 0}
-                          comments={item.comment_count || 0}
-                          shares={item.shares || 0}
-                          images={item.images || []}
-                          avatar={item.avatar_url}
-                          feeling={item.feeling}
-                          location={item.location}
-                          onOpenDetail={() => setSelectedPost(item)}
-                          theme={theme}
-                        />
+                        item && item.type === 'post' && item.id ? (
+                          <Post
+                            key={item.id}
+                            post={item}
+                            onOpenDetail={() => setSelectedPost(item)}
+                            theme={theme}
+                          />
+                        ) : null
                       ))}
                     </>
                   )}
@@ -314,23 +357,14 @@ export default function SearchPage() {
                     <div className="text-gray-400 text-lg py-8 bg-white rounded-[32px] shadow border-2 border-[#E3E3E3] text-center">Không có bài viết phù hợp.</div>
                   ) : (
                     postsTab.map((item) => (
-                      <Post
-                        key={item.id}
-                        id={item.id}
-                        userId={item.user_id}
-                        name={`${item.first_name || ''} ${item.last_name || ''}`.trim() || "Người dùng ẩn danh"}
-                        date={item.created_at || ''}
-                        content={item.content}
-                        likes={item.like_count || 0}
-                        comments={item.comment_count || 0}
-                        shares={item.shares || 0}
-                        images={item.images || []}
-                        avatar={item.avatar_url}
-                        feeling={item.feeling}
-                        location={item.location}
-                        onOpenDetail={() => setSelectedPost(item)}
-                        theme={theme}
-                      />
+                      item && item.type === 'post' && item.id ? (
+                        <Post
+                          key={item.id}
+                          post={item}
+                          onOpenDetail={() => setSelectedPost(item)}
+                          theme={theme}
+                        />
+                      ) : null
                     ))
                   )}
                   {postsTab.length < allPosts.length && (
@@ -357,9 +391,10 @@ export default function SearchPage() {
                       return (
                         <div
                           key={item.id}
-                          className={`flex items-center gap-5 rounded-[32px] shadow px-8 py-4 border-2 border-[#E3E3E3] search-card mb-4 ${theme === 'reflective' ? 'bg-[#E9ECF1]' : 'bg-white'} ${theme === 'reflective' ? 'hover:bg-[#e3e3e3]' : 'hover:bg-blue-50'}`}
+                          className="flex items-center gap-5 rounded-[32px] px-4 py-3 mb-3 bg-[#F8FAFC] border border-gray-200 hover:bg-gray-50 transition-all duration-200 cursor-pointer"
+                          onClick={() => router.push(`/profile/${item.id}`)}
                         >
-                          <div className="w-14 h-14 rounded-full flex items-center justify-center border" style={{ background: avatarBg }}>
+                          <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-full flex items-center justify-center border" style={{ background: avatarBg }}>
                             {item.avatar ? (
                               <Image src={item.avatar} alt={item.name} width={40} height={40} className="rounded-full" />
                             ) : isAnonymous ? (
@@ -368,24 +403,49 @@ export default function SearchPage() {
                               <span className="text-white font-bold text-xl">{initials}</span>
                             )}
                           </div>
-                          <span className={`font-semibold text-lg flex-1 ${isAnonymous ? 'text-gray-600' : ''}`}>{item.name || 'Người dùng'}</span>
+                          <span className={`font-semibold text-base sm:text-lg flex-1 ${isAnonymous ? 'text-gray-600' : ''}`}>{item.name || 'Người dùng'}</span>
                           {friendRequests[item.id] ? (
                             <button
-                              className="friend-btn px-5 py-2 rounded-full bg-gray-400 text-white font-semibold shadow cursor-not-allowed"
-                              disabled
-                            >
-                              Đã theo dõi
-                            </button>
-                          ) : (
-                            <button
-                              className="friend-btn px-5 py-2 rounded-full bg-blue-500 text-white font-semibold shadow transition-all hover:bg-blue-600 hover:scale-105"
-                              onClick={() => {
+                              className="friend-btn px-4 py-2 rounded-full bg-gray-400 text-white font-semibold shadow transition-all hover:bg-red-500 hover:scale-105 text-sm sm:text-base"
+                              onClick={async (e) => {
+                                e.stopPropagation();
                                 if (!user) {
                                   setShowAuthModal(true);
                                   return;
                                 }
-                                setFriendRequests(prev => ({ ...prev, [item.id]: true }));
-                                // TODO: Gửi request follow lên server ở đây nếu muốn
+                                try {
+                                  const res = await fetch(`/api/users/${item.id}/follow`, {
+                                    method: 'DELETE',
+                                    headers: { 'Authorization': `Bearer ${accessToken}` },
+                                  });
+                                  if (res.ok) {
+                                    setFriendRequests((prev) => ({ ...prev, [item.id]: false }));
+                                    await fetchFollowStatus(allUsers.map(u => u.id));
+                                  }
+                                } catch {}
+                              }}
+                            >
+                              Unfollow
+                            </button>
+                          ) : (
+                            <button
+                              className="friend-btn px-4 py-2 rounded-full bg-blue-500 text-white font-semibold shadow transition-all hover:bg-blue-600 hover:scale-105 text-sm sm:text-base"
+                              onClick={async (e) => {
+                                e.stopPropagation();
+                                if (!user) {
+                                  setShowAuthModal(true);
+                                  return;
+                                }
+                                try {
+                                  const res = await fetch(`/api/users/${item.id}/follow`, {
+                                    method: 'POST',
+                                    headers: { 'Authorization': `Bearer ${accessToken}` },
+                                  });
+                                  if (res.ok) {
+                                    setFriendRequests((prev) => ({ ...prev, [item.id]: true }));
+                                    await fetchFollowStatus(allUsers.map(u => u.id));
+                                  }
+                                } catch {}
                               }}
                             >
                               Follow
@@ -403,7 +463,7 @@ export default function SearchPage() {
                 </>
               ) : null}
               {selectedPost && (
-                <PostDetailPopup post={selectedPost} onClose={() => setSelectedPost(null)} theme={theme} />
+                <PostDetailPopup post={selectedPost} onClose={() => setSelectedPost(null)} />
               )}
             </div>
           </div>

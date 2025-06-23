@@ -984,7 +984,7 @@ const Header = memo<HeaderProps>(({
             </Link>
             
             {/* Search Bar */}
-            <div className="hidden md:flex flex-1 max-w-xs sm:max-w-sm md:max-w-md lg:max-w-xl mx-2 sm:mx-4 md:mx-6 lg:mx-8 relative">
+            <div className="hidden md:block absolute left-1/2 top-1/2 transform -translate-x-1/2 -translate-y-1/2 w-full max-w-[700px] px-4 z-10">
               <div className="flex w-full rounded-full border border-black bg-white overflow-hidden" ref={inputWrapperRef}>
                 <FilteredInput
                   ref={inputRef}

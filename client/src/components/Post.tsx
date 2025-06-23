@@ -123,12 +123,36 @@ const Post = (props: PostProps) => {
         // Trả về một mảng rỗng cho các kiểu dữ liệu không mong muốn khác
         return [];
     };
-
+    
     useEffect(() => {
         setLiked(is_liked || false);
         setLikeCount(likes);
         setCommentCount(comments);
     }, [is_liked, likes, comments]);
+
+    // Kiểm tra user đã like chưa và cập nhật danh sách like, đồng thời lấy lại số lượng comment mới nhất
+    useEffect(() => {
+        if (currentUser?.id) {
+            axios.get('/api/likes/is-liked', {
+                params: { post_id: id, user_id: currentUser.id },
+                baseURL: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000',
+            }).then(res => {
+                setLiked(res.data.liked);
+                if (res.data.likeCount !== undefined) {
+                    setLikeCount(res.data.likeCount);
+                }
+                // Nếu muốn dùng likeList, cần khai báo thêm state
+                // if (res.data.likeList) setLikeList(res.data.likeList);
+            });
+        }
+        // Lấy lại số lượng comment mới nhất từ server khi có comment mới (onCommentAdded)
+        // Nếu có prop onCommentAdded thì truyền callback để CommentsSection gọi khi thêm comment thành công
+    }, [currentUser?.id, id]);
+
+    // Hàm callback để cập nhật lại số lượng comment khi có comment mới (tăng ngay trên FE)
+    const handleCommentAdded = (inc = 1) => {
+        setCommentCount((prev) => Number(prev) + inc);
+    };
 
     useEffect(() => {
         let ignore = false;
@@ -168,7 +192,7 @@ const Post = (props: PostProps) => {
             return;
         }
         setLiked(!liked);
-        setLikeCount((prev) => (liked ? prev - 1 : prev + 1));
+        setLikeCount((prev) => (liked ? Number(prev) - 1 : Number(prev) + 1));
         try {
             await axios.post(
                 `/api/likes/${liked ? "unlike" : "like"}`,

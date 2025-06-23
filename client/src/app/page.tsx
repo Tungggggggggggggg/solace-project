@@ -115,11 +115,13 @@ export default function Home() {
 
     // Initial fetch and tab change handler
     useEffect(() => {
-        setPage(0);
-        setPosts([]);
-        setHasMore(true);
-        fetchPosts(0, true);
-    }, [activeTab, fetchPosts]);
+        if (user?.id) {
+            setPage(0);
+            setPosts([]);
+            setHasMore(true);
+            fetchPosts(0, true);
+        }
+    }, [activeTab, fetchPosts, user?.id]);
 
     // Infinite scroll page change
     useEffect(() => {
@@ -193,11 +195,21 @@ export default function Home() {
     const theme = activeTab === 1 ? "reflective" : "inspiring";
     const bgClass = activeTab === 0 ? "bg-slate-50" : "bg-[#F8F9FA]";
 
+    const handleCommentAdded = (postId: string, inc = 1) => {
+        setPosts(prev =>
+            prev.map(post =>
+                post.id === postId
+                    ? { ...post, comment_count: Number(post.comment_count || 0) + Number(inc) }
+                    : post
+            )
+        );
+    };
+
     return (
         <MainLayout>
             <div className={`min-h-screen w-full ${bgClass}`}>
 
-                <div className="pt-20">
+                <div className="pt-[3rem]">
                     <div className="flex justify-center w-full">
                         <div className="hidden lg:block w-[280px] flex-shrink-0">
                             <div className="fixed top-[5.5rem] left-0 z-20 w-[280px] h-full">
@@ -206,7 +218,7 @@ export default function Home() {
                         </div>
 
                         <main className="w-full max-w-[700px] flex-shrink-0 px-4">
-                            <div className="w-full mt-8">
+                            <div className="w-full">
                                 <Tabs onTabChange={setActiveTab} />
                             </div>
 
@@ -261,6 +273,7 @@ export default function Home() {
                     <PostDetailPopup
                         post={openPost}
                         onClose={() => setOpenPost(null)}
+                        onCommentAdded={inc => handleCommentAdded(openPost.id, inc)}
                     />
                 )}
                 {showCreatePost && (

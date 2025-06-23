@@ -9,7 +9,7 @@ import { PostType } from "@/types/Post";
 interface PostDetailPopupProps {
     post: PostType;
     onClose: () => void;
-    onCommentAdded?: () => void;
+    onCommentAdded?: (inc?: number) => void; // sửa để nhận tham số
 }
 
 const PostDetailPopup = ({

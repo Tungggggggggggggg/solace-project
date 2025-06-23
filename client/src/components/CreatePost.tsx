@@ -13,7 +13,7 @@ const CreatePost: React.FC<{ onOpenModal: () => void }> = ({ onOpenModal }) => {
       <div className="flex items-center mb-4">
         {/* Avatar người dùng */}
         <img
-          src={user?.photoURL || '/images/default-avatar.png'}
+          src={user?.photoURL || '/default-avatar.png'}
           alt="User"
           className="w-12 h-12 rounded-full object-cover mr-4 border-2 border-violet-500 hover:scale-105 transition-transform"
         />

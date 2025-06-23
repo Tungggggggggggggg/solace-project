@@ -15,7 +15,7 @@ interface Comment {
   avatar_url?: string;
 }
 
-export default function CommentsSection({ postId, currentUser, onCommentAdded }: { postId: string, currentUser: any, onCommentAdded?: () => void }) {
+export default function CommentsSection({ postId, currentUser, onCommentAdded }: { postId: string, currentUser: any, onCommentAdded?: (inc?: number) => void }) {
   const [comments, setComments] = useState<Comment[]>([]);
   const [newComment, setNewComment] = useState('');
   const [loading, setLoading] = useState(false);
@@ -83,10 +83,17 @@ export default function CommentsSection({ postId, currentUser, onCommentAdded }:
       }, {
         baseURL: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000',
       });
-      setComments(prev => [...prev, res.data]);
+      // Merge thêm thông tin user hiện tại để hiển thị ngay
+      const comment: Comment = {
+        ...res.data,
+        first_name: currentUser.first_name,
+        last_name: currentUser.last_name,
+        avatar_url: currentUser.avatar_url,
+      };
+      setComments(prev => [...prev, comment]);
       setNewComment('');
       if (onCommentAdded) {
-        onCommentAdded();
+        onCommentAdded(1); // truyền số lượng comment tăng thêm
       }
     } catch (err) {
       setToast({ message: 'Bình luận thất bại', type: 'error' });
