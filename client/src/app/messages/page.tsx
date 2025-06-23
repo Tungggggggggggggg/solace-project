@@ -4,7 +4,7 @@ import { useParams } from 'next/navigation';
 import Messages from '../../components/Messages';
 import Header from '../../components/Header';
 
-const HEADER_HEIGHT = 80; // px, chỉnh lại nếu Header cao hơn
+const HEADER_HEIGHT = 80;
 
 const MessageDetailPage = () => {
   const params = useParams<{ conversationId: string }>();

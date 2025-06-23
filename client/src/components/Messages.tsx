@@ -413,15 +413,24 @@ const MessagePage: FC = () => {
               m.id.startsWith('temp-') &&
               m.sender_id === msg.sender_id &&
               m.content === msg.content &&
-              ((m.image_urls || []).some(url => (msg.image_urls || []).includes(url)))
+              (
+                // Cả hai đều không có image_urls hoặc đều là mảng rỗng
+                (!m.image_urls && !msg.image_urls) ||
+                (Array.isArray(m.image_urls) && Array.isArray(msg.image_urls) && m.image_urls.length === 0 && msg.image_urls.length === 0) ||
+                // Hoặc mọi url đều giống nhau về số lượng và giá trị
+                ((m.image_urls || []).length === (msg.image_urls || []).length &&
+                  (m.image_urls || []).every(url => (msg.image_urls || []).includes(url)))
+              )
           );
           if (pendingIdx !== -1) {
             const newMsgs = [...msgs];
             newMsgs[pendingIdx] = msg;
             return { ...prev, [msg.conversation_id]: newMsgs };
+          } else if (msgs.some(m => m.id === msg.id)) {
+            return prev;
+          } else {
+            return { ...prev, [msg.conversation_id]: [...msgs, msg] };
           }
-          if (msgs.some(m => m.id === msg.id)) return prev;
-          return { ...prev, [msg.conversation_id]: [...msgs, msg] };
         });
       }
 
