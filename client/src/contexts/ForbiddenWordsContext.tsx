@@ -12,7 +12,12 @@ export const ForbiddenWordsProvider = ({ children }: { children: React.ReactNode
     const fetchWords = async () => {
       const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/forbidden_words`);
       const data = await res.json();
-      if (data.success) setWords((data.forbiddenWords as ForbiddenWord[]).map(w => w.word.toLowerCase()));
+      if (data.success) {
+        const arr = Array.isArray(data.items) ? data.items : (Array.isArray(data.forbiddenWords) ? data.forbiddenWords : []);
+        setWords(arr.map((w: any) => w.word?.toLowerCase?.() || ''));
+      } else {
+        setWords([]);
+      }
     };
     fetchWords();
   }, []);

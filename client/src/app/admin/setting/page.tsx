@@ -23,6 +23,11 @@ export default function SettingPage(): ReactElement {
   const [newWord, setNewWord] = useState('');
   const [adding, setAdding] = useState(false);
   const [deleteWordId, setDeleteWordId] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [offset, setOffset] = useState(0);
+  const [hasMore, setHasMore] = useState(true);
+  const PAGE_SIZE = 20;
+  const [searchInput, setSearchInput] = useState('');
 
   const truncateIfNeeded = (text: string): string => {
     if (text == null || typeof text !== 'string') {
@@ -40,7 +45,7 @@ export default function SettingPage(): ReactElement {
 
     // 2. Determine word limit based on screen size
     const windowWidth = typeof window !== 'undefined' ? window.innerWidth : Infinity;
-    const wordLimit = (windowWidth >= 620 && windowWidth <= 1500) ? 3 : 5;
+    const wordLimit = (windowWidth >= 640 && windowWidth <= 1500) ? 3 : 5;
 
     // 3. Apply word limit
     if (processedWords.length > wordLimit) {
@@ -56,22 +61,37 @@ export default function SettingPage(): ReactElement {
     return finalResult;
   };
 
-  const fetchWords = async () => {
+  const fetchWords = async (reset = false) => {
+    setLoading(true);
     const params = new URLSearchParams();
     if (search.trim()) params.set('search', search);
+    params.set('offset', reset ? '0' : offset.toString());
+    params.set('limit', PAGE_SIZE.toString());
     const res = await fetch(`/api/forbidden_words?${params.toString()}`);
     const result = await res.json();
-    if (result.success) setWords(result.forbiddenWords);
-    else setWords([]);
+    let fetched = Array.isArray(result.items) ? result.items : [];
+    if (reset) {
+      setWords(fetched);
+      setOffset(PAGE_SIZE);
+    } else {
+      setWords(prev => [...prev, ...fetched]);
+      setOffset(prev => prev + PAGE_SIZE);
+    }
+    setHasMore(fetched.length === PAGE_SIZE);
+    setLoading(false);
   };
 
   useEffect(() => {
-    fetchWords();
+    fetchWords(true);
   }, []);
 
   useEffect(() => {
-    if (search.trim() === '') fetchWords();
-  }, [search]);
+    if (searchInput.trim() === '' && search !== '') {
+      setSearch('');
+      fetchWords(true);
+    }
+    // eslint-disable-next-line
+  }, [searchInput]);
 
   const handleDelete = async (id: string) => {
     setDeleteWordId(id);
@@ -82,7 +102,7 @@ export default function SettingPage(): ReactElement {
       await fetch(`/api/forbidden_words/${deleteWordId}`, { method: 'DELETE' });
       toast.success('Đã xóa từ cấm!');
       setDeleteWordId(null);
-      fetchWords();
+      fetchWords(true);
     }
   };
 
@@ -104,6 +124,10 @@ export default function SettingPage(): ReactElement {
     } else {
       toast.error('Có lỗi xảy ra, vui lòng thử lại.');
     }
+  };
+
+  const handleLoadMore = () => {
+    if (!loading && hasMore) fetchWords(false);
   };
 
   // Sắp xếp từ cấm theo ngày giảm dần, nếu cùng ngày thì so sánh tiếp theo giờ/phút/giây
@@ -130,20 +154,32 @@ export default function SettingPage(): ReactElement {
               <div className="relative flex-1 w-full sm:w-auto">
                 <FiSearch
                   className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500 cursor-pointer"
-                  onClick={fetchWords}
+                  onClick={() => {
+                    setSearch(searchInput);
+                    fetchWords(true);
+                  }}
                   style={{ zIndex: 2 }}
                   title="Tìm kiếm"
                 />
                 <input
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                  onKeyDown={(e) => e.key === 'Enter' && fetchWords()}
+                  value={searchInput}
+                  onChange={(e) => setSearchInput(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      setSearch(searchInput);
+                      fetchWords(true);
+                    }
+                    if (e.key === 'Backspace' && e.target.value === '') {
+                      setSearch('');
+                      fetchWords(true);
+                    }
+                  }}
                   placeholder="Tìm kiếm từ cấm..."
                   className="pl-10 pr-4 py-2 bg-[#F5F0E5] rounded-xl text-gray-800 w-full outline-none text-sm sm:text-base"
                 />
               </div>
               <button
-                className="w-full sm:w-auto px-4 py-2 bg-blue-500 text-white rounded-xl font-semibold hover:bg-blue-600 text-sm"
+                className="hidden sm:block w-full sm:w-auto px-4 py-2 bg-blue-500 text-white rounded-xl font-semibold hover:bg-blue-600 text-sm"
                 onClick={() => setShowAddModal(true)}
               >
                 + Thêm từ cấm
@@ -151,7 +187,7 @@ export default function SettingPage(): ReactElement {
             </div>
 
             {/* Danh sách từ cấm trên di động */}
-            <div className="block sm:hidden">
+            <div className="block sm:hidden relative">
               {words.length === 0 ? (
                 <div className="p-6 text-center text-gray-500 bg-white rounded-xl border">
                   {search.trim()
@@ -159,7 +195,7 @@ export default function SettingPage(): ReactElement {
                     : 'Không có từ cấm nào phù hợp với bộ lọc hiện tại.'}
                 </div>
               ) : (
-                words.map((word) => (
+                (Array.isArray(words) ? words : []).map((word) => (
                   <div key={word.id} className="bg-white border rounded-xl p-4 mb-4 shadow-sm hover:shadow-md transition">
                     <div className="flex flex-col gap-2">
                       <p className="text-gray-600 text-sm">
@@ -186,6 +222,28 @@ export default function SettingPage(): ReactElement {
                   </div>
                 ))
               )}
+              {/* Nút thêm từ cấm nổi dưới cùng bên phải */}
+              <button
+                className="fixed bottom-6 right-6 z-50 sm:hidden px-5 py-3 bg-blue-500 text-white rounded-full shadow-lg font-semibold hover:bg-blue-600 text-base"
+                onClick={() => setShowAddModal(true)}
+                style={{ boxShadow: '0 4px 16px rgba(0,0,0,0.12)' }}
+              >
+                + Thêm từ cấm
+              </button>
+              {/* Nút xem thêm */}
+              {hasMore && !loading && words.length > 0 && (
+                <div className="flex justify-center py-2">
+                  <button
+                    className="px-4 py-2 rounded-xl bg-blue-500 text-white hover:bg-blue-600 text-sm font-semibold"
+                    onClick={handleLoadMore}
+                  >
+                    Xem thêm
+                  </button>
+                </div>
+              )}
+              {loading && words.length > 0 && (
+                <div className="text-center py-2 text-gray-500">Đang tải...</div>
+              )}
             </div>
 
             {/* LazyColumn cho desktop */}
@@ -197,43 +255,60 @@ export default function SettingPage(): ReactElement {
                 <div className="p-3 flex-1 text-gray-800 flex justify-center items-center text-center">Ngày thêm</div>
                 <div className="p-3 flex-1 text-gray-800 flex justify-center items-center text-center">Hành động</div>
               </div>
-              {sortedWords.length === 0 ? (
+              {/* Nội dung bảng */}
+              {loading && words.length === 0 ? (
                 <div className="p-6 text-center text-gray-500 bg-white">
-                  {search.trim()
-                    ? 'Không có kết quả nào phù hợp với từ khóa tìm kiếm.'
-                    : 'Không có từ cấm nào phù hợp với bộ lọc hiện tại.'}
+                  <span className="inline-flex items-center justify-center">
+                    <svg className="animate-spin h-5 w-5 text-blue-500 mr-2" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none"/>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/>
+                    </svg>
+                    Đang tải dữ liệu...
+                  </span>
+                </div>
+              ) : words.length === 0 ? (
+                <div className="p-6 text-center text-gray-500 bg-white">
+                  Không có từ cấm nào phù hợp với bộ lọc hiện tại.
                 </div>
               ) : (
-                <List
-                  height={420}
-                  itemCount={sortedWords.length}
-                  itemSize={56}
-                  width={"100%"}
-                >
-                  {({ index, style }) => {
-                    const word = sortedWords[index];
-                    // Word cell
-                    let wordCell = word.word;
-                    if (word.word.trim().split(/\s+/).length > 20) {
-                      wordCell = truncateIfNeeded(word.word);
-                    }
-                    return (
-                      <div
-                        key={word.id}
-                        style={style}
-                        className="flex w-full text-sm bg-white border-b border-[#E5E8EB] hover:bg-gray-50 transition items-center"
-                      >
-                        <div className="p-3 flex-1 min-w-0 text-center" title={word.id}>{word.id}</div>
-                        <div className="p-3 flex-1 min-w-0 text-center" title={word.word}>{wordCell}</div>
-                        <div className="p-3 flex-1 min-w-0 text-center" title={word.added_at}>{new Date(word.added_at).toLocaleDateString('vi-VN')}</div>
-                        <div className="p-3 flex-1 flex gap-2 justify-center">
-                          <button className="text-blue-500 hover:text-blue-600" onClick={() => setSelectedWord(word)}><FiEye /></button>
-                          <button onClick={() => handleDelete(word.id)} className="text-red-500 hover:text-red-600"><FiTrash2 /></button>
+                <>
+                  <List
+                    height={320}
+                    itemCount={words.length}
+                    itemSize={56}
+                    width={"100%"}
+                    itemKey={index => words[index].id}
+                  >
+                    {({ index, style }) => {
+                      const word = words[index];
+                      // Word cell
+                      let wordCell = word.word;
+                      if (word.word.trim().split(/\s+/).length > 20) {
+                        wordCell = truncateIfNeeded(word.word);
+                      }
+                      return (
+                        <div
+                          key={word.id}
+                          style={style}
+                          className="flex w-full text-sm bg-white border-b border-[#E5E8EB] hover:bg-gray-50 transition items-center"
+                        >
+                          <div className="p-3 flex-1 min-w-0 text-center" title={word.id}>{word.id}</div>
+                          <div className="p-3 flex-1 min-w-0 text-center" title={word.word}>{wordCell}</div>
+                          <div className="p-3 flex-1 min-w-0 text-center" title={word.added_at}>{new Date(word.added_at).toLocaleDateString('vi-VN')}</div>
+                          <div className="p-3 flex-1 flex gap-2 justify-center">
+                            <button className="text-blue-500 hover:text-blue-600" onClick={() => setSelectedWord(word)}><FiEye /></button>
+                            <button onClick={() => handleDelete(word.id)} className="text-red-500 hover:text-red-600"><FiTrash2 /></button>
+                          </div>
                         </div>
-                      </div>
-                    );
-                  }}
-                </List>
+                      );
+                    }}
+                  </List>
+                  {/* Khi đang load thêm ở cuối danh sách */}
+                  {loading && words.length > 0 && (
+                    <div className="text-center py-2 text-gray-500">Đang tải...</div>
+                  )}
+                  {/* Nếu có phân trang, có thể thêm {!hasMore ...} */}
+                </>
               )}
             </div>
 
