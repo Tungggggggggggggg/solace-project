@@ -110,7 +110,7 @@ export function UserContextProvider({ children }: { children: ReactNode }) {
             return true;
         } catch (err) {
             console.error("Lỗi khi refreshAccessToken:", err);
-            await logout("Lỗi khi làm mới phiên. Vui lòng đăng nhập lại.");
+            await logout();
             return false;
         }
     };
@@ -271,7 +271,7 @@ export function UserContextProvider({ children }: { children: ReactNode }) {
         sessionStorage.setItem("accessToken", token);
     };
 
-    const logout = async (reason?: string) => {
+    const logout = async () => {
         try {
             await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/auth/logout`, {
                 method: "POST",
@@ -286,11 +286,7 @@ export function UserContextProvider({ children }: { children: ReactNode }) {
             sessionStorage.removeItem("accessToken");
             if (socket.connected) socket.disconnect();
 
-            // Chuyển hướng với lý do (nếu có)
-            const logoutReason = reason
-                ? `?reason=${encodeURIComponent(reason)}`
-                : "";
-            router.push(`/login${logoutReason}`);
+            router.push(`/`);
         }
     };
 

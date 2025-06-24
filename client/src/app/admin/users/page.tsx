@@ -142,7 +142,7 @@ export default function UserManagementPage(): ReactElement {
         limit: pageSize.toString(),
         search: searchText.trim() || '',
       });
-      const res = await fetch(`http://localhost:5000/api/users?${params.toString()}`);
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/users?${params.toString()}`);
       const data = await res.json();
       console.log('API data:', data);
       let filtered = data.users || [];
@@ -196,7 +196,7 @@ export default function UserManagementPage(): ReactElement {
 
   const toggleUserStatus = async (userId: string, currentStatus: boolean) => {
     try {
-      await fetch(`http://localhost:5000/api/users/${userId}/status`, {
+      await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/users/${userId}/status`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ is_active: !currentStatus }),
@@ -225,7 +225,7 @@ export default function UserManagementPage(): ReactElement {
     setUsers(prev => prev.map(u => u.id === userId ? { ...u, role: newRole } : u));
     try {
       // 2. Gửi request lên backend
-      const res = await fetch(`http://localhost:5000/api/users/${userId}/role`, {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/users/${userId}/role`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ role: newRole }),
@@ -508,7 +508,7 @@ export default function UserManagementPage(): ReactElement {
                           toast.error('Email không đúng định dạng!');
                           return;
                         }
-                        await fetch(`http://localhost:5000/api/users/${editingUser.id}`, {
+                        await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/users/${editingUser.id}`, {
                           method: 'PUT',
                           headers: { 'Content-Type': 'application/json' },
                           body: JSON.stringify({

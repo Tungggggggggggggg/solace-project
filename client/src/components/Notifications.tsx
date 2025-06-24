@@ -10,39 +10,7 @@ import { useRouter } from 'next/navigation';
 import PostDetailPopup from './PostDetailPopup';
 import { formatDate } from '../lib/dateUtils';
 import Toast from "./Toast";
-
-interface User {
-  id: string;
-  first_name: string;
-  last_name: string;
-  avatar_url: string;
-}
-
-interface PostDetail {
-  id: string;
-  name: string;
-  date: string;
-  content: string;
-  likes: number;
-  comments: number;
-  shares: number;
-  images?: string[];
-  avatar_url?: string;
-  shared_name?: string;
-  shared_avatar_url?: string;
-  shared_date?: string;
-  shared_post?: {
-    id: string;
-    name: string;
-    date: string;
-    content: string;
-    likes: number;
-    comments: number;
-    shares: number;
-    images?: string[];
-    avatar_url?: string;
-  };
-}
+import { PostType } from '@/types/Post';
 
 const NotificationsPage = () => {
   const { user, accessToken } = useUser();
@@ -56,7 +24,7 @@ const NotificationsPage = () => {
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const isFetchingRef = useRef(false);
   const router = useRouter();
-  const [openPost, setOpenPost] = useState<PostDetail | null>(null);
+  const [openPost, setOpenPost] = useState<PostType | null>(null);
   const [showPostModal, setShowPostModal] = useState(false);
   const [followedUserIds, setFollowedUserIds] = useState<string[]>([]);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
@@ -199,18 +167,23 @@ const NotificationsPage = () => {
       const data = await res.json();
       setOpenPost({
         id: data.id || data.post?.id || '',
-        name: `${data.first_name || data.post?.first_name || ''} ${data.last_name || data.post?.last_name || ''}`.trim(),
-        date: data.created_at || data.post?.created_at || '',
+        user_id: data.user_id || data.post?.user_id || '',
+        first_name: data.first_name || data.post?.first_name || '',
+        last_name: data.last_name || data.post?.last_name || '',
         content: data.content || data.post?.content || '',
-        likes: data.likes || data.post?.likes || 0,
-        comments: data.comments || data.post?.comments || 0,
+        created_at: data.created_at || data.post?.created_at || '',
+        type_post: data.type_post || data.post?.type_post || 'positive',
+        like_count: data.like_count || data.post?.like_count || 0,
+        comment_count: data.comment_count || data.post?.comment_count || 0,
         shares: data.shares || data.post?.shares || 0,
         images: data.images || data.post?.images || [],
         avatar_url: data.avatar_url || data.post?.avatar_url || '',
-        shared_name: data.shared_name || '',
-        shared_avatar_url: data.shared_avatar_url || '',
-        shared_date: data.shared_date || '',
-        shared_post: data.shared_post || undefined,
+        feeling: data.feeling || data.post?.feeling || null,
+        location: data.location || data.post?.location || null,
+        is_approved: data.is_approved || data.post?.is_approved || false,
+        is_liked: data.is_liked || data.post?.is_liked || false,
+        shared_post_id: data.shared_post_id || data.post?.shared_post_id,
+        shared_post: data.shared_post || data.post?.shared_post || null,
       });
       setShowPostModal(true);
     } catch (err) {

@@ -161,7 +161,7 @@ export default function PostManagementPage() {
       if (search.trim()) params.set('search', search);
       params.set('offset', reset ? '0' : offset.toString());
       params.set('limit', pageSize.toString());
-      const res = await fetch(`http://localhost:5000/api/admin/posts?${params.toString()}`);
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/admin/posts?${params.toString()}`);
       const result = await res.json();
       let sortedPosts = [...(result.items || [])];
       if (sortTime === 'newest') {
@@ -256,7 +256,7 @@ export default function PostManagementPage() {
   const handleApprove = async (id: string) => {
     const post = posts.find((p) => p.id === id);
     if (!post) return;
-    await fetch(`http://localhost:5000/api/admin/posts/${id}/approve`, { method: 'PUT' });
+    await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/admin/posts/${id}/approve`, { method: 'PUT' });
     toast.success(`Đã duyệt bài: "${post.content.slice(0, 50)}..."`);
     fetchPosts(true);
   };
@@ -265,7 +265,7 @@ export default function PostManagementPage() {
     setSelectedPost(null);
     setSharedPost(null);
     try {
-      const res = await fetch(`/api/admin/posts/${postId}`);
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/admin/posts/${postId}`);
       if (!res.ok) return;
       const data = await res.json();
       setSelectedPost(data.post);
@@ -284,7 +284,7 @@ export default function PostManagementPage() {
     if (deletePostId) {
       const post = posts.find((p) => p.id === deletePostId);
       if (!post) return;
-      await fetch(`http://localhost:5000/api/admin/posts/${deletePostId}`, { method: 'DELETE' });
+      await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/admin/posts/${deletePostId}`, { method: 'DELETE' });
       toast.success(`Đã xóa bài: "${post.content.slice(0, 50)}..."`);
       setDeletePostId(null);
       fetchPosts(true);

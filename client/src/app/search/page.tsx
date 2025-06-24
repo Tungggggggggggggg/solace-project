@@ -11,8 +11,9 @@ import gsap from "gsap";
 import SkeletonPost from '@/components/SkeletonPost';
 import { useUser } from '@/contexts/UserContext';
 import AuthModal from '@/components/AuthModal';
+import React, { Suspense } from "react";
 
-export default function SearchPage() {
+function SearchPageInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const query = searchParams.get("query") || "";
@@ -505,5 +506,13 @@ export default function SearchPage() {
         />
       )}
     </div>
+  );
+}
+
+export default function SearchPage() {
+  return (
+    <Suspense>
+      <SearchPageInner />
+    </Suspense>
   );
 }

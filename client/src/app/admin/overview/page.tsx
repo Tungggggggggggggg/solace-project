@@ -37,14 +37,14 @@ export default function AdminPage(): ReactElement {
   const COLORS = ['#6366F1', '#3B82F6', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6', '#EC4899', '#14B8A6', '#F97316', '#22C55E', '#0EA5E9', '#E11D48'];
 
   useEffect(() => {
-    fetch('http://localhost:5000/api/dashboard/summary')
+    fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/dashboard/summary`)
       .then(res => res.json())
       .then(data => setSummary(data))
       .catch(err => console.error('Lỗi khi lấy dữ liệu thống kê:', err));
   }, []);
 
   useEffect(() => {
-    fetch(`http://localhost:5000/api/dashboard/monthly-users?year=${selectedYear}`)
+    fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/dashboard/monthly-users?year=${selectedYear}`)
       .then((res) => res.json())
       .then((data) =>
         setMonthlyUsers(data.map((item: any) => ({ month: item.month, total: Number(item.total) })))
@@ -52,13 +52,13 @@ export default function AdminPage(): ReactElement {
   }, [selectedYear]);
 
   useEffect(() => {
-    fetch(`http://localhost:5000/api/dashboard/daily-visits?range=${visitRange}`)
+    fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/dashboard/daily-visits?range=${visitRange}`)
       .then(res => res.json())
       .then(data => setDailyVisits(data));
   }, [visitRange]);
 
   useEffect(() => {
-    fetch(`http://localhost:5000/api/dashboard/post-sentiment?range=${sentimentRange}`)
+    fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/dashboard/post-sentiment?range=${sentimentRange}`)
       .then(res => res.json())
       .then(data => setPostSentiment(data))
       .catch(err => console.error('Lỗi khi lấy biểu đồ cảm xúc:', err));
