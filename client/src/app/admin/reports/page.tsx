@@ -187,7 +187,14 @@ export default function ReportsPage(): ReactElement {
       } else {
         setReports(prev => {
           const all = [...prev, ...fetched];
-          const unique = Array.from(new Map(all.map(r => [r.report_id, r])).values());
+          const seen = new Set();
+          const unique = [];
+          for (const r of all) {
+            if (!seen.has(r.report_id)) {
+              unique.push(r);
+              seen.add(r.report_id);
+            }
+          }
           return unique;
         });
         setOffset(prev => prev + pageSize);
@@ -261,7 +268,7 @@ export default function ReportsPage(): ReactElement {
     const handleNewReport = (data: { report: Report }) => {
       setReports((prev) => {
         if (prev.some(r => r.report_id === data.report.report_id)) return prev;
-        return [data.report, ...prev];
+        return [data.report, ...prev.filter(r => r.report_id !== data.report.report_id)];
       });
     };
     const handleReportDeleted = (data: { reportId: string }) => {
@@ -666,7 +673,7 @@ export default function ReportsPage(): ReactElement {
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-2">
                               {imgs.map((img, idx) => (
                                 <Image
-                                  key={idx}
+                                  key={img + '-' + idx}
                                   src={img}
                                   alt={`Ảnh ${idx + 1}`}
                                   width={128}
@@ -712,7 +719,7 @@ export default function ReportsPage(): ReactElement {
                                 <div className="flex flex-wrap gap-2 mt-2">
                                   {imgs.map((img, idx) => (
                                     <Image
-                                      key={idx}
+                                      key={img + '-' + idx}
                                       src={img}
                                       alt={`Ảnh ${idx + 1}`}
                                       width={96}
