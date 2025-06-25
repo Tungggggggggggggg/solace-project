@@ -232,17 +232,20 @@ router.put("/:id", async (req, res) => {
 });
 
 // PUT /api/users/:id/role
-router.put('/:id/role', async (req, res) => {
+router.put("/:id/role", async (req, res) => {
     const { id } = req.params;
     const { role } = req.body;
-    if (!['admin', 'user'].includes(role)) {
-        return res.status(400).json({ error: 'Role không hợp lệ' });
+    if (!["admin", "user"].includes(role)) {
+        return res.status(400).json({ error: "Role không hợp lệ" });
     }
     try {
-        await pool.query('UPDATE users SET role = $1 WHERE id = $2', [role, id]);
+        await pool.query("UPDATE users SET role = $1 WHERE id = $2", [
+            role,
+            id,
+        ]);
         res.json({ success: true });
     } catch (error) {
-        console.error('Lỗi khi cập nhật role:', error);
+        console.error("Lỗi khi cập nhật role:", error);
         res.status(500).json({ error: error.message });
     }
 });
@@ -457,7 +460,7 @@ router.get("/:id", async (req, res) => {
     try {
         const result = await pool.query(
             `
-      SELECT u.id, u.first_name, u.last_name, u.email, u.avatar_url, ui.created_at
+      SELECT u.id, u.first_name, u.last_name, u.email, u.avatar_url, u.cover_url, u.bio, ui.created_at
       FROM users u
       JOIN user_info ui ON u.id = ui.id
       WHERE u.id = $1
