@@ -331,6 +331,10 @@ export default function PostManagementPage() {
     sortedPosts.sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
   }
 
+  useEffect(() => {
+    socket.emit('joinAdminRoom');
+  }, []);
+
   return (
     <AdminGuard>
       <AdminLayout onOpenAuth={() => {}}>

@@ -84,6 +84,10 @@ function init(server) {
       }
     });
 
+    socket.on('joinAdminRoom', () => {
+      socket.join('admin_room');
+    });
+
     socket.on('disconnect', async () => {
       if (userId) {
         socket.leave(`user:${userId}`);
