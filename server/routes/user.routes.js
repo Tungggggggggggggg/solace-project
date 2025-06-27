@@ -126,9 +126,9 @@ router.get("/search", isAuthenticated, async (req, res) => {
     }
 });
 
-// GET /api/users?status=Hoạt động&search=Nguyễn
+// GET /api/users?status=Hoạt động&search=Nguyễn&role=admin
 router.get("/", async (req, res) => {
-    const { status, search, offset = 0, limit = 10 } = req.query;
+    const { status, search, offset = 0, limit = 10, role } = req.query;
     const parsedOffset = Math.max(parseInt(offset, 10) || 0, 0);
     const parsedLimit = Math.min(Math.max(parseInt(limit, 10) || 10, 1), 100);
 
@@ -159,6 +159,11 @@ router.get("/", async (req, res) => {
             conditions.push(
                 `LOWER(u.first_name || ' ' || u.last_name) LIKE $${values.length}`
             );
+        }
+
+        if (role && ["admin", "user"].includes(role)) {
+            values.push(role);
+            conditions.push(`u.role = $${values.length}`);
         }
 
         if (conditions.length > 0) {
@@ -201,6 +206,17 @@ router.put("/:id/status", async (req, res) => {
             is_active,
             id,
         ]);
+        // Lấy lại user mới nhất
+        const userRes = await pool.query(
+            `SELECT u.id, u.first_name, u.last_name, u.email, u.role, u.avatar_url,
+                json_build_object('is_active', ui.is_active, 'created_at', ui.created_at) AS user_info,
+                (SELECT COUNT(*) FROM posts p WHERE p.user_id = u.id) AS posts_count
+            FROM users u
+            JOIN user_info ui ON u.id = ui.id
+            WHERE u.id = $1`, [id]
+        );
+        const updatedUser = userRes.rows[0];
+        req.app.get('io').emit('userUpdated', updatedUser);
         res.json({ success: true });
     } catch (error) {
         console.error("Lỗi khi cập nhật trạng thái:", error);
@@ -220,11 +236,17 @@ router.put("/:id", async (req, res) => {
             [first_name, last_name, email, avatar_url, cover_url, bio, id]
         );
         // Truy vấn lại user mới nhất
-        const updatedUser = await pool.query(
-            `SELECT id, first_name, last_name, email, avatar_url, cover_url, bio FROM users WHERE id = $1`,
-            [id]
+        const userRes = await pool.query(
+            `SELECT u.id, u.first_name, u.last_name, u.email, u.role, u.avatar_url,
+                json_build_object('is_active', ui.is_active, 'created_at', ui.created_at) AS user_info,
+                (SELECT COUNT(*) FROM posts p WHERE p.user_id = u.id) AS posts_count
+            FROM users u
+            JOIN user_info ui ON u.id = ui.id
+            WHERE u.id = $1`, [id]
         );
-        res.json({ success: true, user: updatedUser.rows[0] });
+        const updatedUser = userRes.rows[0];
+        req.app.get('io').emit('userUpdated', updatedUser);
+        res.json({ success: true, user: updatedUser });
     } catch (error) {
         console.error("Lỗi khi cập nhật thông tin người dùng:", error);
         res.status(500).json({ error: error.message });
@@ -243,7 +265,18 @@ router.put("/:id/role", async (req, res) => {
             role,
             id,
         ]);
-        res.json({ success: true });
+        // Lấy lại user mới nhất
+        const userRes = await pool.query(
+            `SELECT u.id, u.first_name, u.last_name, u.email, u.role, u.avatar_url,
+                json_build_object('is_active', ui.is_active, 'created_at', ui.created_at) AS user_info,
+                (SELECT COUNT(*) FROM posts p WHERE p.user_id = u.id) AS posts_count
+            FROM users u
+            JOIN user_info ui ON u.id = ui.id
+            WHERE u.id = $1`, [id]
+        );
+        const updatedUser = userRes.rows[0];
+        req.app.get('io').emit('userUpdated', updatedUser);
+        res.status(200).json({ success: true });
     } catch (error) {
         console.error("Lỗi khi cập nhật role:", error);
         res.status(500).json({ error: error.message });

@@ -145,13 +145,13 @@ export default function UserManagementPage(): ReactElement {
         limit: pageSize.toString(),
         search: searchText.trim() || '',
       });
+      if (roleFilter !== 'all') params.set('role', roleFilter);
       const res = await fetch(`http://localhost:5000/api/users?${params.toString()}`);
       const data = await res.json();
       console.log('API data:', data);
       let filtered = data.users || [];
       if (statusFilter === 'active') filtered = filtered.filter((u: User) => u.user_info?.is_active);
       else if (statusFilter === 'locked') filtered = filtered.filter((u: User) => !u.user_info?.is_active);
-      if (roleFilter !== 'all') filtered = filtered.filter((u: User) => u.role === roleFilter);
       if (reset) {
         setUsers(filtered);
         setOffset(pageSize);
@@ -206,27 +206,29 @@ export default function UserManagementPage(): ReactElement {
   const toggleUserStatus = async (userId: string, currentStatus: boolean) => {
     // Lưu lại trạng thái cũ để rollback nếu cần
     const oldUsers = [...users];
-    // 1. Cập nhật UI ngay lập tức
-    setUsers(prev => prev.map(u =>
-      u.id === userId
-        ? {
-            ...u,
-            user_info: u.user_info
-              ? { ...u.user_info, is_active: !currentStatus }
-              : { is_active: !currentStatus, created_at: '' },
-          }
-        : u
-    ));
+    const action = currentStatus ? 'khóa' : 'mở khóa';
     try {
+      // Gửi request lên backend trước
       await fetch(`http://localhost:5000/api/users/${userId}/status`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ is_active: !currentStatus }),
       });
-      toast.success(`Tài khoản đã được ${currentStatus ? 'khóa' : 'mở khóa'} thành công!`);
+      // Cập nhật UI sau khi thành công
+      setUsers(prev => prev.map(u =>
+        u.id === userId
+          ? {
+              ...u,
+              user_info: u.user_info
+                ? { ...u.user_info, is_active: !currentStatus }
+                : { is_active: !currentStatus, created_at: '' },
+            }
+          : u
+      ));
+      toast.success(`Tài khoản đã được ${action} thành công!`);
     } catch (err) {
-      // Rollback lại UI nếu lỗi
-      setUsers(oldUsers);
+      // Rollback lại UI nếu lỗi (không đổi UI ở optimistic nữa)
+      // setUsers(oldUsers); // Không cần vì chưa đổi UI
       console.error('Lỗi khi cập nhật trạng thái:', err);
       toast.error('Đã xảy ra lỗi khi cập nhật trạng thái tài khoản.');
     }
@@ -242,23 +244,16 @@ export default function UserManagementPage(): ReactElement {
   };
 
   const updateUserRole = async (userId: string, newRole: string) => {
-    // Lưu lại role cũ để rollback nếu cần
-    const oldRole = users.find(u => u.id === userId)?.role ?? newRole;
-    // 1. Cập nhật UI ngay lập tức
+    // 1. Cập nhật UI ngay lập tức (optimistic update)
     setUsers(prev => prev.map(u => u.id === userId ? { ...u, role: newRole } : u));
+    toast.success('Cập nhật phân quyền thành công!');
     try {
-      // 2. Gửi request lên backend
-      const res = await fetch(`http://localhost:5000/api/users/${userId}/role`, {
+      await fetch(`http://localhost:5000/api/users/${userId}/role`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ role: newRole }),
       });
-      if (!res.ok) throw new Error('Lỗi cập nhật backend');
-      toast.success('Cập nhật phân quyền thành công!');
     } catch (err) {
-      // 3. Nếu lỗi, rollback lại UI hoặc thông báo lỗi
-      setUsers(prev => prev.map(u => u.id === userId ? { ...u, role: oldRole } : u));
-      toast.error('Đã xảy ra lỗi khi cập nhật phân quyền.');
     }
   };
 
