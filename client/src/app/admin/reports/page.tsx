@@ -23,10 +23,6 @@ type Report = {
   status: string;
   reporter_id: string;
   reported_user_id: string;
-  reporter_first_name?: string;
-  reporter_last_name?: string;
-  reported_first_name?: string;
-  reported_last_name?: string;
 };
 
 type ReportedPost = {
@@ -199,10 +195,6 @@ export default function ReportsPage(): ReactElement {
       status: report.status === 'pending' ? 'Chưa xử lý' : (report.status === 'processed' ? 'Đã xử lý' : report.status || ''),
       reporter_id: String(report.reporter_id || ''),
       reported_user_id: String(report.reported_user_id || ''),
-      reporter_first_name: report.reporter_first_name,
-      reporter_last_name: report.reporter_last_name,
-      reported_first_name: report.reported_first_name,
-      reported_last_name: report.reported_last_name,
     };
   }
 
@@ -473,16 +465,8 @@ export default function ReportsPage(): ReactElement {
                       <div className="flex flex-col gap-2">
                         <p className="text-gray-600 text-sm"><span className="font-medium">Mã báo cáo:</span> <span className="text-gray-700">{truncateIfNeeded(report.report_id, windowWidth)}</span></p>
                         <p className="text-gray-600 text-sm"><span className="font-medium">Ngày báo cáo:</span> <span className="text-gray-700">{new Date(report.date_reported).toLocaleDateString('vi-VN')}</span></p>
-                        <p className="text-gray-600 text-sm"><span className="font-medium">Người báo cáo:</span> <span className="text-gray-700">{
-                          (report.reporter_first_name || report.reporter_last_name)
-                            ? truncateIfNeeded((report.reporter_first_name || '') + ' ' + (report.reporter_last_name || ''), windowWidth)
-                            : truncateIfNeeded(report.reporter_id || 'Không xác định', windowWidth)
-                        }</span></p>
-                        <p className="text-gray-600 text-sm"><span className="font-medium">Tài khoản bị báo cáo:</span> <span className="text-gray-700">{
-                          (report.reported_first_name || report.reported_last_name)
-                            ? truncateIfNeeded((report.reported_first_name || '') + ' ' + (report.reported_last_name || ''), windowWidth)
-                            : truncateIfNeeded(report.reported_user_id || 'Không xác định', windowWidth)
-                        }</span></p>
+                        <p className="text-gray-600 text-sm"><span className="font-medium">Người báo cáo:</span> <span className="text-gray-700">{truncateIfNeeded(report.reported_by, windowWidth)}</span></p>
+                        <p className="text-gray-600 text-sm"><span className="font-medium">Tài khoản bị báo cáo:</span> <span className="text-gray-700">{truncateIfNeeded(report.reported_account, windowWidth)}</span></p>
                         <p className="text-gray-600 text-sm"><span className="font-medium">Nội dung:</span> <span className="text-gray-700 whitespace-pre-line">{truncateIfNeeded(report.content, windowWidth)}</span></p>
                         <p className="text-gray-600 text-sm"><span className="font-medium">Trạng thái:</span> <span className={`px-2 py-1 rounded-full text-xs ${report.status === 'Đã xử lý' ? 'bg-blue-200' : 'bg-yellow-200'}`}>{truncateIfNeeded(report.status, windowWidth)}</span></p>
                         <div className="flex gap-2 mt-2">
@@ -552,13 +536,6 @@ export default function ReportsPage(): ReactElement {
                           >
                             <div className="p-3 flex-1 min-w-0 flex justify-center items-center text-center truncate" title={report.report_id}>{truncateIfNeeded(report.report_id, windowWidth)}</div>
                             <div className="p-3 flex-1 min-w-0 flex justify-center items-center text-center" title={report.date_reported}>{new Date(report.date_reported).toLocaleDateString('vi-VN')}</div>
-                            <div className="p-3 flex-1 min-w-0 flex justify-center items-center text-center truncate" title={report.reporter_first_name || report.reporter_last_name ? (report.reporter_first_name || '') + ' ' + (report.reporter_last_name || '') : report.reporter_id}>
-                              {
-                                (report.reporter_first_name || report.reporter_last_name)
-                                  ? truncateIfNeeded((report.reporter_first_name || '') + ' ' + (report.reporter_last_name || ''), windowWidth)
-                                  : truncateIfNeeded(report.reporter_id || 'Không xác định', windowWidth)
-                              }
-                            </div>
                             <div className="p-3 flex-1 min-w-0 flex justify-center items-center text-center truncate" title={report.reported_by}>{truncateIfNeeded(report.reported_by, windowWidth)}</div>
                             <div className="p-3 flex-1 min-w-0 flex justify-center items-center text-center truncate" title={report.reported_account}>{truncateIfNeeded(report.reported_account, windowWidth)}</div>
                             <div className="p-3 flex-1 min-w-0 flex justify-center items-center text-center truncate" title={report.content}>{truncateIfNeeded(report.content, windowWidth)}</div>
