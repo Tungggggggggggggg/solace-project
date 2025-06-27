@@ -365,6 +365,18 @@ export default function PostManagementPage() {
             </div>
             {/* Card view for mobile, giống report */}
             <div className="block sm:hidden" ref={mobileListRef} style={{ maxHeight: '70vh', overflowY: 'auto' }}>
+              {/* Filter nằm trong vùng cuộn, giống report */}
+              <div className="flex flex-col gap-2 mb-2">
+                <div>
+                  <CustomDropdown value={type} onChange={v => setType(v as any)} options={typeOptions} widthClass="w-full" />
+                </div>
+                <div>
+                  <CustomDropdown value={status} onChange={v => setStatus(v as any)} options={statusOptions} widthClass="w-full" />
+                </div>
+                <div>
+                  <CustomDropdown value={sortTime || ''} onChange={v => setSortTime(v as any)} options={timeOptions} placeholder="Thời gian" widthClass="w-full" />
+                </div>
+              </div>
               {loading && sortedPosts.length === 0 ? (
                 <div className="p-6 text-center text-gray-500 bg-white rounded-xl border">
                   <span className="inline-flex items-center justify-center">
