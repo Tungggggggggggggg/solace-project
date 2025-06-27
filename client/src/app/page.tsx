@@ -224,7 +224,7 @@ export default function Home() {
     };
 
     return (
-        <MainLayout>
+        <MainLayout theme={theme}>
             <div className={`min-h-screen w-full ${bgClass}`}>
 
                 <div className="pt-[3rem]">

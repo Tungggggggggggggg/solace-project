@@ -11,7 +11,7 @@ interface MainLayoutProps {
   theme?: 'inspiring' | 'reflective';
 }
 
-export default function MainLayout({ children, className = '', theme = 'inspiring' }: MainLayoutProps) {
+export default function MainLayout({ children, className = '', theme }: MainLayoutProps) {
   const { user } = useUser();
   const [showAuth, setShowAuth] = useState(false);
   const [authTab, setAuthTab] = useState<'login' | 'signup'>('login');
@@ -31,8 +31,10 @@ export default function MainLayout({ children, className = '', theme = 'inspirin
 
   return (
     <div className={`min-h-screen bg-gradient-to-br from-[#E1ECF7] to-[#AECBEB] ${className}`}>
-      {/* Header sticky luôn trên cùng */}
-      <Header onOpenAuth={handleOpenAuth} theme={theme} />
+      {/* Header với position fixed để luôn hiển thị trên cùng */}
+      <div style={{ position: 'fixed', top: 0, left: 0, width: '100%', zIndex: 50 }}>
+        <Header onOpenAuth={handleOpenAuth} theme={theme} />
+      </div>
 
       {/* Auth Modal */}
       {showAuth && !user && (
@@ -43,8 +45,10 @@ export default function MainLayout({ children, className = '', theme = 'inspirin
         />
       )}
 
-      {/* Main content không cần marginTop nữa */}
-      {children}
+      {/* Main content với margin-top để không bị Header che */}
+      <div style={{ marginTop: 80 }}>
+        {children}
+      </div>
     </div>
   );
 }
