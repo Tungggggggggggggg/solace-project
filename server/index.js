@@ -21,17 +21,21 @@ const adminNotificationRoutes = require("./routes/adminNotification");
 const searchHistoryRoutes = require("./routes/search_history");
 const notificationRoutes = require("./routes/notification.routes");
 const uploadRoutes = require("./routes/upload.routes");
+const chatBotRoutes = require("./routes/chatBotRoutes")
 const pool = require("./db");
 
 const app = express();
 dotenv.config();
 
 // CORS cấu hình rõ ràng
+const corsOrigins = (process.env.CORS_ORIGINS || '')
+    .split(',')
+    .map(s => s.trim())
+    .filter(Boolean);
+
 app.use(
     cors({
-        origin: process.env.CORS_ORIGINS
-            ? process.env.CORS_ORIGINS.split(",")
-            : ["http://localhost:3000", "http://127.0.0.1:3000"],
+        origin: corsOrigins,
         credentials: true,
     })
 );
@@ -79,6 +83,7 @@ app.use("/api/admin", adminNotificationRoutes);
 app.use("/api/search_history", searchHistoryRoutes);
 app.use("/api/notifications", notificationRoutes);
 app.use("/api/upload", uploadRoutes);
+app.use("/api/ai", chatBotRoutes);
 
 // Khởi tạo HTTP server
 const PORT = process.env.PORT || 5000;

@@ -4,6 +4,7 @@ import React, { useState, ReactNode } from 'react';
 import Header from './Header';
 import { useUser } from '@/contexts/UserContext';
 import AuthModal from './AuthModal';
+import ChatBot from './ChatBot';
 
 interface MainLayoutProps {
   children: ReactNode;
@@ -11,7 +12,7 @@ interface MainLayoutProps {
   theme?: 'inspiring' | 'reflective';
 }
 
-export default function MainLayout({ children, className = '', theme }: MainLayoutProps) {
+export default function MainLayout({ children, className = '', theme = 'inspiring' }: MainLayoutProps) {
   const { user } = useUser();
   const [showAuth, setShowAuth] = useState(false);
   const [authTab, setAuthTab] = useState<'login' | 'signup'>('login');
@@ -31,10 +32,8 @@ export default function MainLayout({ children, className = '', theme }: MainLayo
 
   return (
     <div className={`min-h-screen bg-gradient-to-br from-[#E1ECF7] to-[#AECBEB] ${className}`}>
-      {/* Header với position fixed để luôn hiển thị trên cùng */}
-      <div style={{ position: 'fixed', top: 0, left: 0, width: '100%', zIndex: 50 }}>
-        <Header onOpenAuth={handleOpenAuth} theme={theme} />
-      </div>
+      {/* Header sticky luôn trên cùng */}
+      <Header onOpenAuth={handleOpenAuth} theme={theme} />
 
       {/* Auth Modal */}
       {showAuth && !user && (
@@ -45,10 +44,10 @@ export default function MainLayout({ children, className = '', theme }: MainLayo
         />
       )}
 
-      {/* Main content với margin-top để không bị Header che */}
-      <div style={{ marginTop: 80 }}>
-        {children}
-      </div>
+      {/* Main content không cần marginTop nữa */}
+      {children}
+
+      {<ChatBot />}
     </div>
   );
 }

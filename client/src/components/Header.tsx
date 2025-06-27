@@ -47,7 +47,6 @@ const Header = memo<HeaderProps>(({
   const router = useRouter();
   const pathname = usePathname();
   const { user, loading, logout, accessToken, setCurrentConversationId } = useUser();
-  console.log("Header rendered with user:", user);
 
   // State declarations
   const [search, setSearch] = useState("");
