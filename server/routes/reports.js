@@ -133,6 +133,12 @@ router.post('/', async (req, res) => {
       reason
     );
 
+    // Emit socket cho admin
+    try {
+      const io = getIO();
+      io.to('admin_room').emit('newReport', { report });
+    } catch (e) { console.error('Socket emit newReport error:', e); }
+
     res.status(201).json({ success: true, report });
   } catch (err) {
     console.error('Report error:', err);

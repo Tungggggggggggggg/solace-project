@@ -454,7 +454,7 @@ const Post = (props: PostProps) => {
             onClick={() => onOpenDetail && onOpenDetail(post)}
         >
             {is_approved === false && (
-                <div className="absolute top-12 left-1/3 transform -translate-x-1/2 bg-yellow-300 text-yellow-800 px-4 py-1 rounded-full text-xs font-semibold animate-pulse shadow-md">
+                <div className="absolute top-8 left-1/2 transform -translate-x-1/2 bg-yellow-300 text-yellow-800 px-4 py-1 rounded-full text-xs font-semibold animate-pulse shadow-md">
                     Đang chờ duyệt
                 </div>
             )}

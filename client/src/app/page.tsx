@@ -155,7 +155,10 @@ export default function Home() {
         const handlePostApproved = (data: { post: PostType }) => {
             const typePost = activeTab === 0 ? "positive" : "negative";
             if (data.post.type_post === typePost) {
-                setPosts((prevPosts) => [data.post, ...prevPosts]);
+                setPosts((prevPosts) => [
+                    data.post,
+                    ...prevPosts.filter((p) => p.id !== data.post.id)
+                ]);
             }
         };
 
@@ -210,7 +213,7 @@ export default function Home() {
     };
 
     return (
-        <MainLayout theme={theme}>
+        <MainLayout>
             <div className={`min-h-screen w-full ${bgClass}`}>
 
                 <div className="pt-[3rem]">
@@ -277,7 +280,7 @@ export default function Home() {
                     <PostDetailPopup
                         post={openPost}
                         onClose={() => setOpenPost(null)}
-                        onCommentAdded={inc => handleCommentAdded(openPost.id, inc)}
+                        onCommentAdded={() => handleCommentAdded(openPost.id)}
                     />
                 )}
                 {showCreatePost && (
