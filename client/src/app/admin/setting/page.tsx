@@ -134,7 +134,7 @@ export default function SettingPage(): ReactElement {
       toast.success('Đã thêm từ cấm mới!');
       setNewWord('');
       setShowAddModal(false);
-      setWords((prev) => [{ id: result.id || Math.random().toString(), word: newWord.trim(), added_at: new Date().toISOString() }, ...prev]);
+      fetchWords(true);
     } else {
       toast.error('Có lỗi xảy ra, vui lòng thử lại.');
     }

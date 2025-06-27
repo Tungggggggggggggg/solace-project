@@ -204,6 +204,19 @@ export default function UserManagementPage(): ReactElement {
   };
 
   const toggleUserStatus = async (userId: string, currentStatus: boolean) => {
+    // Lưu lại trạng thái cũ để rollback nếu cần
+    const oldUsers = [...users];
+    // 1. Cập nhật UI ngay lập tức
+    setUsers(prev => prev.map(u =>
+      u.id === userId
+        ? {
+            ...u,
+            user_info: u.user_info
+              ? { ...u.user_info, is_active: !currentStatus }
+              : { is_active: !currentStatus, created_at: '' },
+          }
+        : u
+    ));
     try {
       await fetch(`http://localhost:5000/api/users/${userId}/status`, {
         method: 'PUT',
@@ -211,8 +224,9 @@ export default function UserManagementPage(): ReactElement {
         body: JSON.stringify({ is_active: !currentStatus }),
       });
       toast.success(`Tài khoản đã được ${currentStatus ? 'khóa' : 'mở khóa'} thành công!`);
-      fetchUsers();
     } catch (err) {
+      // Rollback lại UI nếu lỗi
+      setUsers(oldUsers);
       console.error('Lỗi khi cập nhật trạng thái:', err);
       toast.error('Đã xảy ra lỗi khi cập nhật trạng thái tài khoản.');
     }
@@ -339,7 +353,7 @@ export default function UserManagementPage(): ReactElement {
                             onClick={() => toggleUserStatus(user.id, user.user_info?.is_active ?? false)}
                             className="text-red-500 hover:text-red-600"
                           >
-                            {user.user_info?.is_active ? <FiLock size={18} /> : <FiUnlock size={18} />}
+                            {user.user_info?.is_active ? <FiUnlock size={18} /> : <FiLock size={18} />}
                           </button>
                         </div>
                       </div>
@@ -440,7 +454,7 @@ export default function UserManagementPage(): ReactElement {
                               onClick={() => toggleUserStatus(user.id, user.user_info?.is_active ?? false)}
                               className="text-red-500 hover:text-red-600"
                             >
-                              {user.user_info?.is_active ? <FiLock /> : <FiUnlock />}
+                              {user.user_info?.is_active ? <FiUnlock /> : <FiLock />}
                             </button>
                           </div>
                         </div>
@@ -518,18 +532,27 @@ export default function UserManagementPage(): ReactElement {
                           toast.error('Email không đúng định dạng!');
                           return;
                         }
-                        await fetch(`http://localhost:5000/api/users/${editingUser.id}`, {
-                          method: 'PUT',
-                          headers: { 'Content-Type': 'application/json' },
-                          body: JSON.stringify({
-                            first_name: editingUser.first_name,
-                            last_name: editingUser.last_name,
-                            email: editingUser.email,
-                          }),
-                        });
-                        toast.success('Đã lưu thông tin chỉnh sửa thành công!');
+                        // Lưu lại users cũ để rollback nếu cần
+                        const oldUsers = [...users];
+                        // Optimistic update
+                        setUsers(prev => prev.map(u => u.id === editingUser.id ? { ...u, first_name: editingUser.first_name, last_name: editingUser.last_name, email: editingUser.email } : u));
                         setEditingUser(null);
-                        fetchUsers();
+                        try {
+                          const res = await fetch(`http://localhost:5000/api/users/${editingUser.id}`, {
+                            method: 'PUT',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                              first_name: editingUser.first_name,
+                              last_name: editingUser.last_name,
+                              email: editingUser.email,
+                            }),
+                          });
+                          if (!res.ok) throw new Error('Lỗi cập nhật backend');
+                          toast.success('Đã lưu thông tin chỉnh sửa thành công!');
+                        } catch (err) {
+                          setUsers(oldUsers);
+                          toast.error('Đã xảy ra lỗi khi lưu thông tin người dùng.');
+                        }
                       }}
                     >
                       Lưu thay đổi
