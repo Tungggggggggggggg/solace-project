@@ -1,7 +1,7 @@
 "use client";
 
 // Import các component và hook cần thiết cho trang chủ
-import { useState, useEffect, useCallback, useContext, useMemo } from "react";
+import { useState, useEffect, useCallback, useContext, useMemo, useRef } from "react";
 import Tabs from "@/components/Tabs";
 import InputSection from "@/components/InputSection";
 import Post from "@/components/Post";
@@ -147,8 +147,19 @@ export default function Home() {
         }
     };
 
-    const handleOpenPostDetail = (postData: PostType) => {
-        setOpenPost(postData);
+    const handleOpenPostDetail = async (postData: PostType) => {
+        // Nếu là bài shared mà thiếu dữ liệu shared_post, thì fetch bài gốc
+        if (postData.shared_post_id && !postData.shared_post) {
+            try {
+                const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/posts/${postData.shared_post_id}`);
+                const sharedPost = await res.json();
+                setOpenPost({ ...postData, shared_post: sharedPost });
+            } catch {
+                setOpenPost(postData); // fallback nếu lỗi
+            }
+        } else {
+            setOpenPost(postData);
+        }
     };
 
     useEffect(() => {
@@ -177,26 +188,26 @@ export default function Home() {
         };
     }, [activeTab]);
 
-    const observer =
-        typeof window !== "undefined"
-            ? new IntersectionObserver(
-                  (entries) => {
-                      if (entries[0].isIntersecting && hasMore && !loading) {
-                          setPage((prev) => prev + 1);
-                      }
-                  },
-                  { threshold: 1.0 }
-              )
-            : null;
+    const observerRef = useRef<IntersectionObserver | null>(null);
 
     const loadMoreRef = useCallback(
         (node: HTMLDivElement) => {
-            if (observer) {
-                observer.disconnect();
-                if (node) observer.observe(node);
+            if (observerRef.current) {
+                observerRef.current.disconnect();
+            }
+            if (node) {
+                observerRef.current = new IntersectionObserver(
+                    (entries) => {
+                        if (entries[0].isIntersecting && hasMore && !loading) {
+                            setPage((prev) => prev + 1);
+                        }
+                    },
+                    { threshold: 1.0 }
+                );
+                observerRef.current.observe(node);
             }
         },
-        [observer]
+        [hasMore, loading]
     );
 
     const theme = activeTab === 1 ? "reflective" : "inspiring";
