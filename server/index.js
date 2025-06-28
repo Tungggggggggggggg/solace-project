@@ -27,12 +27,7 @@ const pool = require("./db");
 const app = express();
 dotenv.config();
 
-// CORS cấu hình rõ ràng
-const corsOrigins = (process.env.CORS_ORIGINS || '')
-    .split(',')
-    .map(s => s.trim())
-    .filter(Boolean);
-
+// CORS 
 app.use(
     cors({
         origin: process.env.CORS_ORIGINS
