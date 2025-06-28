@@ -4,6 +4,7 @@ const { pool, getClient } = require("../db");
 const { sanitizeInput } = require("../utils/security");
 const { isAuthenticated } = require("../middlewares/auth.middleware");
 const { createFollowNotification } = require("../utils/notification");
+const { getIO } = require("../socket");
 
 // GET /api/users/search
 router.get("/search", isAuthenticated, async (req, res) => {
@@ -216,7 +217,8 @@ router.put("/:id/status", async (req, res) => {
             WHERE u.id = $1`, [id]
         );
         const updatedUser = userRes.rows[0];
-        req.app.get('io').emit('userUpdated', updatedUser);
+        const io = getIO();
+        io.emit('userUpdated', updatedUser);
         res.json({ success: true });
     } catch (error) {
         console.error("Lỗi khi cập nhật trạng thái:", error);
@@ -245,7 +247,8 @@ router.put("/:id", async (req, res) => {
             WHERE u.id = $1`, [id]
         );
         const updatedUser = userRes.rows[0];
-        req.app.get('io').emit('userUpdated', updatedUser);
+        const io = getIO();
+        io.emit('userUpdated', updatedUser);
         res.json({ success: true, user: updatedUser });
     } catch (error) {
         console.error("Lỗi khi cập nhật thông tin người dùng:", error);
@@ -275,7 +278,8 @@ router.put("/:id/role", async (req, res) => {
             WHERE u.id = $1`, [id]
         );
         const updatedUser = userRes.rows[0];
-        req.app.get('io').emit('userUpdated', updatedUser);
+        const io = getIO();
+        io.emit('userUpdated', updatedUser);
         res.status(200).json({ success: true });
     } catch (error) {
         console.error("Lỗi khi cập nhật role:", error);
